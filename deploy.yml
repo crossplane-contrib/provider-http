@@ -1,0 +1,19 @@
+apiVersion: pkg.crossplane.io/v1
+kind: Provider
+metadata:
+  name: http-provider
+spec:
+  package: ghcr.io/arielsepton/provider-http:v1.0.0
+  controllerConfigRef:
+    name: debug-config  
+
+---
+
+apiVersion: pkg.crossplane.io/v1alpha1
+kind: ControllerConfig
+metadata:
+  name: debug-config
+spec:
+  args:
+    - --debug
+

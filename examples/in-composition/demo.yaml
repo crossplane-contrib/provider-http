@@ -1,0 +1,7 @@
+apiVersion: releases.example.io/v1alpha1
+kind: Demo
+metadata:
+  namespace: default
+  name: my-helm-and-http
+spec:
+  MyDemoVersion: "1.18"
