@@ -22,9 +22,19 @@ spec:
 ```
 
 ## Usage
+
 Currently, `provider-http` supports only one-time requests using the `DisposableRequest` Custom Resource Definition (CRD). This enables you to initiate a single-use HTTP interaction by creating a `DisposableRequest` resource.
 
-## Example
+## Developing locally
 
-Take a look at `examples/sample/desposiblerequest.yaml`
+Run controller against the cluster:
 
+```
+make run
+```
+
+Now you can create `DesposibleRequest` resources with provider reference, see [sample desposiblerequest.yaml](examples/sample/desposiblerequest.yaml).
+
+    ```
+    kubectl create -f examples/sample/desposiblerequest.yaml
+    ```
