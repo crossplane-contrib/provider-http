@@ -18,8 +18,12 @@ spec:
         forProvider:
           chart:
             name: wordpress
-            repository: https://turkenh.github.io/bitnami-charts
-            version: 9.5.1 
+            repository: https://charts.bitnami.com/bitnami
+            version: 15.2.5
+          namespace: wordpress
+        providerConfigRef:
+          name: helm-provider
+
     patches:
       - fromFieldPath: spec.Namespace
         toFieldPath: "spec.forProvider.namespace"
@@ -35,7 +39,7 @@ spec:
       spec:
           deletionPolicy: Orphan
           forProvider:
-            url: https://enwgarmh79yh.x.pipedream.net
+            url: https://enwgarmh79yh.x.pipedream.net/
             method: POST
             body: '{"key1": "value1"}'
             headers:

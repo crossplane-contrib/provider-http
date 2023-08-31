@@ -1,7 +1,7 @@
 apiVersion: http.crossplane.io/v1alpha1
 kind: DesposibleRequest
 metadata:
-  name: smee1
+  name: request
 spec:
   deletionPolicy: Orphan
   forProvider:

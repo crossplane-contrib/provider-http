@@ -25,6 +25,10 @@ GO111MODULE = on
 # ====================================================================================
 # Setup Kubernetes tools
 
+UP_VERSION ?= v0.17.0
+UP_CHANNEL ?= stable
+KIND_NODE_IMAGE_TAG ?= v1.24.0
+USE_HELM3 = true
 -include build/makelib/k8s_tools.mk
 
 # ====================================================================================
