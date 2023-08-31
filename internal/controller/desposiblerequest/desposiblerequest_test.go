@@ -65,10 +65,9 @@ var testTimeout = &v1.Duration{
 }
 
 const (
-	testURL     = "testchart"
-	testMethod  = "GET"
-	testBody    = "{\"key1\": \"value1\"}"
-	testRetries = 3
+	testURL    = "testchart"
+	testMethod = "GET"
+	testBody   = "{\"key1\": \"value1\"}"
 )
 
 type httpDesposibleRequestModifier func(request *v1alpha1.DesposibleRequest)
@@ -174,11 +173,14 @@ func Test_httpExternal_Create(t *testing.T) {
 		},
 	}
 	for name, tc := range cases {
+		tc := tc // Create local copies of loop variables
+
 		t.Run(name, func(t *testing.T) {
 			e := &external{
 				localKube: tc.args.localKube,
 				logger:    logging.NewNopLogger(),
-				http:      tc.args.http}
+				http:      tc.args.http,
+			}
 			_, gotErr := e.Create(context.Background(), tc.args.mg)
 			if diff := cmp.Diff(tc.want.err, gotErr, test.EquateErrors()); diff != "" {
 				t.Fatalf("e.Create(...): -want error, +got error: %s", diff)
@@ -244,6 +246,8 @@ func Test_httpExternal_Update(t *testing.T) {
 		},
 	}
 	for name, tc := range cases {
+		tc := tc // Create local copies of loop variables
+
 		t.Run(name, func(t *testing.T) {
 			e := &external{
 				localKube: tc.args.localKube,

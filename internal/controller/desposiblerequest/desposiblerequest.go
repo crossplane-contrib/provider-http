@@ -48,15 +48,12 @@ const (
 	errNewHttpClient                     = "cannot create new Http client"
 	errProviderNotRetrieved              = "provider could not be retrieved"
 	errFailedToSendHttpDesposibleRequest = "failed to send http request"
-	errGetCreds                          = "cannot get credentials"
 	errEmptyMethod                       = "no method is specified"
 	errEmptyURL                          = "no url is specified"
 	errFailedToSetStatusCode             = "failed to update status code"
 	errFailedToSetError                  = "failed to update request error"
 	errFailedToSetHeaders                = "failed to update headers"
 	errFailedToSetBody                   = "failed to update body"
-	errFailedToSetFailedCounter          = "failed to update failed counter"
-	errFailedToSetSynced                 = "failed to update synced state"
 )
 
 // Setup adds a controller that reconciles DesposibleRequest managed resources.

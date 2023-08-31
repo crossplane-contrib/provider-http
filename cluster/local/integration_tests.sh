@@ -32,11 +32,6 @@ echo_error(){
     exit 1
 }
 
-
-# The name of your provider. Many provider Makefiles override this value.
-PACKAGE_NAME="provider-http"
-
-
 # ------------------------------
 projectdir="$( cd "$( dirname "${BASH_SOURCE[0]}")"/../.. && pwd )"
 
@@ -46,16 +41,13 @@ eval $(make --no-print-directory -C ${projectdir} build.vars)
 # ------------------------------
 
 SAFEHOSTARCH="${SAFEHOSTARCH:-amd64}"
-BUILD_IMAGE="${BUILD_REGISTRY}/${PROJECT_NAME}-${SAFEHOSTARCH}"
-PACKAGE_IMAGE="crossplane.io/inttests/${PROJECT_NAME}:${VERSION}"
-CONTROLLER_IMAGE="${BUILD_REGISTRY}/${PROJECT_NAME}-controller-${SAFEHOSTARCH}"
+CONTROLLER_IMAGE="${BUILD_REGISTRY}/${PROJECT_NAME}-${SAFEHOSTARCH}"
 
 version_tag="$(cat ${projectdir}/_output/version)"
-# tag as latest version to load into kind cluster
-PACKAGE_CONTROLLER_IMAGE="${DOCKER_REGISTRY}/${PROJECT_NAME}-controller:${VERSION}"
 K8S_CLUSTER="${K8S_CLUSTER:-${BUILD_REGISTRY}-inttests}"
 
 CROSSPLANE_NAMESPACE="crossplane-system"
+PACKAGE_NAME="provider-helm"
 
 # cleanup on exit
 if [ "$skipcleanup" != true ]; then
@@ -73,8 +65,7 @@ echo_step "setting up local package cache"
 CACHE_PATH="${projectdir}/.work/inttest-package-cache"
 mkdir -p "${CACHE_PATH}"
 echo "created cache dir at ${CACHE_PATH}"
-docker tag "${BUILD_IMAGE}" "${PACKAGE_IMAGE}"
-"${UP}" xpkg xp-extract --from-daemon "${PACKAGE_IMAGE}" -o "${CACHE_PATH}/${PACKAGE_NAME}.gz" && chmod 644 "${CACHE_PATH}/${PACKAGE_NAME}.gz"
+"${UP}" alpha xpkg xp-extract --from-xpkg "${OUTPUT_DIR}"/xpkg/"${HOSTOS}"_"${SAFEHOSTARCH}"/"${PACKAGE_NAME}"-"${VERSION}".xpkg -o "${CACHE_PATH}/${PACKAGE_NAME}.gz" && chmod 644 "${CACHE_PATH}/${PACKAGE_NAME}.gz"
 
 # create kind cluster with extra mounts
 KIND_NODE_IMAGE="kindest/node:${KIND_NODE_IMAGE_TAG}"
@@ -92,8 +83,8 @@ EOF
 echo "${KIND_CONFIG}" | "${KIND}" create cluster --name="${K8S_CLUSTER}" --wait=5m --image="${KIND_NODE_IMAGE}" --config=-
 
 # tag controller image and load it into kind cluster
-docker tag "${CONTROLLER_IMAGE}" "${PACKAGE_CONTROLLER_IMAGE}"
-"${KIND}" load docker-image "${PACKAGE_CONTROLLER_IMAGE}" --name="${K8S_CLUSTER}"
+docker tag "${CONTROLLER_IMAGE}" "${PACKAGE_NAME}"
+"${KIND}" load docker-image "${PACKAGE_NAME}" --name="${K8S_CLUSTER}"
 
 echo_step "create crossplane-system namespace"
 "${KUBECTL}" create ns crossplane-system
@@ -138,13 +129,20 @@ echo "${PVC_YAML}" | "${KUBECTL}" create -f -
 
 # install crossplane from stable channel
 echo_step "installing crossplane from stable channel"
-"${HELM3}" repo add crossplane-stable https://charts.crossplane.io/stable/
+"${HELM3}" repo add --force-update crossplane-stable https://charts.crossplane.io/stable/
+"${HELM3}" repo update crossplane-stable
 chart_version="$("${HELM3}" search repo crossplane-stable/crossplane | awk 'FNR == 2 {print $2}')"
 echo_info "using crossplane version ${chart_version}"
 echo
 # we replace empty dir with our PVC so that the /cache dir in the kind node
 # container is exposed to the crossplane pod
-"${HELM3}" install crossplane --namespace crossplane-system crossplane-stable/crossplane --version ${chart_version} --wait --set packageCache.pvc=package-cache
+"${HELM3}" install crossplane --namespace crossplane-system crossplane-stable/crossplane --version ${chart_version} --set packageCache.pvc=package-cache
+
+echo_step "waiting for deployment crossplane rollout to finish"
+"${KUBECTL}" -n "${CROSSPLANE_NAMESPACE}" rollout status "deploy/crossplane" --timeout=2m
+
+echo_step "wait until the pods are up and running"
+"${KUBECTL}" -n "${CROSSPLANE_NAMESPACE}" wait --for=condition=Ready pods --all --timeout=1m
 
 # ----------- integration tests
 echo_step "--- INTEGRATION TESTS ---"
@@ -171,7 +169,29 @@ docker exec "${K8S_CLUSTER}-control-plane" ls -la /cache
 
 echo_step "waiting for provider to be installed"
 
-kubectl wait "provider.pkg.crossplane.io/${PACKAGE_NAME}" --for=condition=healthy --timeout=180s
+kubectl wait "provider.pkg.crossplane.io/${PACKAGE_NAME}" --for=condition=healthy --timeout=60s
+
+echo_step "setup provider"
+SA=$("${KUBECTL}" -n crossplane-system get sa -o name | grep provider-helm | sed -e 's|serviceaccount\/|crossplane-system:|g')
+"${KUBECTL}" create clusterrolebinding provider-helm-admin-binding --clusterrole cluster-admin --serviceaccount="${SA}"
+"${KUBECTL}" apply -f examples/provider-config/provider-config-incluster.yaml
+
+echo_step "install example chart"
+"${KUBECTL}" apply -f examples/sample/release.yaml
+"${KUBECTL}" wait --for=condition=Ready release --all --timeout=1m
+
+echo_step "waiting for wordpress pods to be ready"
+"${KUBECTL}" -n wordpress wait --for=condition=Ready pods --all --timeout=3m
+
+echo_sub_step "check namespace label"
+if $("${KUBECTL}" get namespaces --no-headers --selector="app.kubernetes.io/managed-by=provider-helm" | grep -iq 'No resources found'); then
+    echo "is not created"
+    exit -1
+else
+    echo_step_completed
+fi
+
+echo_sub_step "check release deployment"
 
 echo_step "uninstalling ${PROJECT_NAME}"
 
