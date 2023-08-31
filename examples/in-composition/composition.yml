@@ -23,7 +23,6 @@ spec:
           namespace: wordpress
         providerConfigRef:
           name: helm-provider
-
     patches:
       - fromFieldPath: spec.Namespace
         toFieldPath: "spec.forProvider.namespace"
