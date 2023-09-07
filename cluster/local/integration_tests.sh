@@ -47,7 +47,7 @@ version_tag="$(cat ${projectdir}/_output/version)"
 K8S_CLUSTER="${K8S_CLUSTER:-${BUILD_REGISTRY}-inttests}"
 
 CROSSPLANE_NAMESPACE="crossplane-system"
-PACKAGE_NAME="provider-helm"
+PACKAGE_NAME="provider-http"
 
 # cleanup on exit
 if [ "$skipcleanup" != true ]; then
@@ -87,7 +87,7 @@ docker tag "${CONTROLLER_IMAGE}" "${PACKAGE_NAME}"
 "${KIND}" load docker-image "${PACKAGE_NAME}" --name="${K8S_CLUSTER}"
 
 echo_step "create crossplane-system namespace"
-"${KUBECTL}" create ns crossplane-system
+"${KUBECTL}" create ns crossplane-system 
 
 echo_step "create persistent volume and claim for mounting package-cache"
 PV_YAML="$( cat <<EOF
@@ -107,7 +107,7 @@ spec:
     path: "/cache"
 EOF
 )"
-echo "${PV_YAML}" | "${KUBECTL}" create -f -
+echo "${PV_YAML}" | "${KUBECTL}" create -f - 
 
 PVC_YAML="$( cat <<EOF
 apiVersion: v1
@@ -125,18 +125,18 @@ spec:
       storage: 1Mi
 EOF
 )"
-echo "${PVC_YAML}" | "${KUBECTL}" create -f -
+echo "${PVC_YAML}" | "${KUBECTL}" create -f - 
 
 # install crossplane from stable channel
 echo_step "installing crossplane from stable channel"
-"${HELM3}" repo add --force-update crossplane-stable https://charts.crossplane.io/stable/
-"${HELM3}" repo update crossplane-stable
+"${HELM3}" repo add --force-update crossplane-stable https://charts.crossplane.io/stable/ 
+"${HELM3}" repo update crossplane-stable 
 chart_version="$("${HELM3}" search repo crossplane-stable/crossplane | awk 'FNR == 2 {print $2}')"
 echo_info "using crossplane version ${chart_version}"
 echo
 # we replace empty dir with our PVC so that the /cache dir in the kind node
 # container is exposed to the crossplane pod
-"${HELM3}" install crossplane --namespace crossplane-system crossplane-stable/crossplane --version ${chart_version} --set packageCache.pvc=package-cache
+"${HELM3}" install crossplane --namespace crossplane-system crossplane-stable/crossplane --version ${chart_version} --set packageCache.pvc=package-cache 
 
 echo_step "waiting for deployment crossplane rollout to finish"
 "${KUBECTL}" -n "${CROSSPLANE_NAMESPACE}" rollout status "deploy/crossplane" --timeout=2m
@@ -161,7 +161,7 @@ spec:
 EOF
 )"
 
-echo "${INSTALL_YAML}" | "${KUBECTL}" apply -f -
+echo "${INSTALL_YAML}" | "${KUBECTL}" apply -f - 
 
 # printing the cache dir contents can be useful for troubleshooting failures
 echo_step "check kind node cache dir contents"
@@ -169,39 +169,22 @@ docker exec "${K8S_CLUSTER}-control-plane" ls -la /cache
 
 echo_step "waiting for provider to be installed"
 
-kubectl wait "provider.pkg.crossplane.io/${PACKAGE_NAME}" --for=condition=healthy --timeout=60s
 
-echo_step "setup provider"
-SA=$("${KUBECTL}" -n crossplane-system get sa -o name | grep provider-helm | sed -e 's|serviceaccount\/|crossplane-system:|g')
-"${KUBECTL}" create clusterrolebinding provider-helm-admin-binding --clusterrole cluster-admin --serviceaccount="${SA}"
-"${KUBECTL}" apply -f examples/provider-config/provider-config-incluster.yaml
+"${KUBECTL}" get "provider.pkg.crossplane.io/${PACKAGE_NAME}" 
+"${KUBECTL}" describe provider.pkg.crossplane.io provider-http 
 
-echo_step "install example chart"
-"${KUBECTL}" apply -f examples/sample/release.yaml
-"${KUBECTL}" wait --for=condition=Ready release --all --timeout=1m
-
-echo_step "waiting for wordpress pods to be ready"
-"${KUBECTL}" -n wordpress wait --for=condition=Ready pods --all --timeout=3m
-
-echo_sub_step "check namespace label"
-if $("${KUBECTL}" get namespaces --no-headers --selector="app.kubernetes.io/managed-by=provider-helm" | grep -iq 'No resources found'); then
-    echo "is not created"
-    exit -1
-else
-    echo_step_completed
-fi
-
-echo_sub_step "check release deployment"
+"${KUBECTL}" describe providerrevisions 
+"${KUBECTL}" wait "provider.pkg.crossplane.io/${PACKAGE_NAME}" --for=condition=healthy --timeout=180s 
 
 echo_step "uninstalling ${PROJECT_NAME}"
 
-echo "${INSTALL_YAML}" | "${KUBECTL}" delete -f -
+echo "${INSTALL_YAML}" | "${KUBECTL}" delete -f - 
 
 # check pods deleted
 timeout=60
 current=0
 step=3
-while [[ $(kubectl get providerrevision.pkg.crossplane.io -o name | wc -l) != "0" ]]; do
+while [[ $("${KUBECTL}" get providerrevision.pkg.crossplane.io -o name  | wc -l) != "0" ]]; do
   echo "waiting for provider to be deleted for another $step seconds"
   current=$current+$step
   if ! [[ $timeout > $current ]]; then
