@@ -75,7 +75,7 @@ XPKGS = provider-http
 
 # NOTE(hasheddan): we force image building to happen prior to xpkg build so that
 # we ensure image is present in daemon.
-xpkg.build.provider-htto: do.build.images
+xpkg.build.provider-http: do.build.images
 
 # Generate a coverage report for cobertura applying exclusions on
 # - generated file
