@@ -9,3 +9,4 @@ cover.out
 .idea
 .DS_Store
 .devcontainer
+kubeconfig
