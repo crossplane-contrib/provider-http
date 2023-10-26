@@ -14,7 +14,6 @@ env:
   GOLANGCI_VERSION: 'v1.51.2'
   DOCKER_BUILDX_VERSION: 'v0.8.2'
 
-  CONTRIB_DOCKER_USR: ${{ secrets.CONTRIB_DOCKER_USR }}
   XPKG_ACCESS_ID: ${{ secrets.XPKG_ACCESS_ID }}
 
 jobs:
@@ -297,14 +296,7 @@ jobs:
         with:
           name: output
           path: _output/**
-      
-      - name: Login to Docker
-        uses: docker/login-action@v1
-        if: env.CONTRIB_DOCKER_USR != ''
-        with:
-          username: ${{ secrets.CONTRIB_DOCKER_USR }}
-          password: ${{ secrets.CONTRIB_DOCKER_PSW }}
-      
+
       - name: Login to Upbound
         uses: docker/login-action@v1
         if: env.XPKG_ACCESS_ID != ''
@@ -312,16 +304,9 @@ jobs:
           registry: xpkg.upbound.io
           username: ${{ secrets.XPKG_ACCESS_ID }}
           password: ${{ secrets.XPKG_TOKEN }}
-
-      - name: Publish Artifacts to S3 and Docker Hub
+      
+      - name: Publish Artifacts to Upbound
         run: make -j2 publish BRANCH_NAME=${GITHUB_REF##*/}
-        if: env.CONTRIB_DOCKER_USR != ''
+        if: env.XPKG_ACCESS_ID != ''
         env:
           GIT_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      
-      - name: Promote Artifacts in S3 and Docker Hub
-        if: github.ref == 'refs/heads/main' && env.CONTRIB_DOCKER_USR != ''
-        run: make -j2 promote
-        env:
-          BRANCH_NAME: main
-          CHANNEL: main
