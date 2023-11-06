@@ -27,6 +27,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/pkg/controller"
 	"github.com/crossplane/crossplane-runtime/pkg/event"
 	"github.com/crossplane/crossplane-runtime/pkg/ratelimiter"
@@ -52,6 +53,7 @@ const (
 	errEmptyMethod             = "no method is specified"
 	errEmptyURL                = "no url is specified"
 	errFailedToCheckIfUpToDate = "failed to check if request is up to date"
+	errFailedUpdateCR          = "failed updating CR"
 )
 
 // Setup adds a controller that reconciles Request managed resources.
@@ -150,9 +152,14 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.Wrap(err, errFailedToCheckIfUpToDate)
 	}
 
+	cr.Status.SetConditions(xpv1.Available())
+	if err := c.localKube.Status().Update(ctx, cr); err != nil {
+		return managed.ExternalObservation{}, errors.New(errFailedUpdateCR)
+	}
+
 	return managed.ExternalObservation{
 		ResourceExists:    true,
-		ResourceUpToDate:  !(shouldRetry(cr) && !retriesLimitReached(cr)),
+		ResourceUpToDate:  synced && !(shouldRetry(cr) && !retriesLimitReached(cr)),
 		ConnectionDetails: nil,
 	}, nil
 }
