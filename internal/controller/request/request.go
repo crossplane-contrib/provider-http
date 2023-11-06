@@ -14,10 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package desposiblerequest
+package request
 
 import (
 	"context"
+	"net/http"
 	"time"
 
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
@@ -26,14 +27,13 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/pkg/controller"
 	"github.com/crossplane/crossplane-runtime/pkg/event"
 	"github.com/crossplane/crossplane-runtime/pkg/ratelimiter"
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
 
-	"github.com/arielsepton/provider-http/apis/desposiblerequest/v1alpha1"
+	"github.com/arielsepton/provider-http/apis/request/v1alpha1"
 	apisv1alpha1 "github.com/arielsepton/provider-http/apis/v1alpha1"
 	httpClient "github.com/arielsepton/provider-http/internal/clients/http"
 	requestsUtils "github.com/arielsepton/provider-http/internal/utils/requests"
@@ -44,24 +44,22 @@ const (
 )
 
 const (
-	errNotDesposibleRequest              = "managed resource is not a DesposibleRequest custom resource"
-	errTrackPCUsage                      = "cannot track ProviderConfig usage"
-	errNewHttpClient                     = "cannot create new Http client"
-	errProviderNotRetrieved              = "provider could not be retrieved"
-	errFailedToSendHttpDesposibleRequest = "failed to send http request"
-	errEmptyMethod                       = "no method is specified"
-	errEmptyURL                          = "no url is specified"
-	errFailedToSetStatusCode             = "failed to update status code"
-	errFailedToSetError                  = "failed to update request error"
+	errNotRequest              = "managed resource is not a Request custom resource"
+	errTrackPCUsage            = "cannot track ProviderConfig usage"
+	errNewHttpClient           = "cannot create new Http client"
+	errProviderNotRetrieved    = "provider could not be retrieved"
+	errFailedToSendHttpRequest = "failed to send http request"
+	errEmptyMethod             = "no method is specified"
+	errEmptyURL                = "no url is specified"
 )
 
-// Setup adds a controller that reconciles DesposibleRequest managed resources.
+// Setup adds a controller that reconciles Request managed resources.
 func Setup(mgr ctrl.Manager, o controller.Options, timeout time.Duration) error {
-	name := managed.ControllerName(v1alpha1.DesposibleRequestGroupKind)
+	name := managed.ControllerName(v1alpha1.RequestGroupKind)
 	cps := []managed.ConnectionPublisher{managed.NewAPISecretPublisher(mgr.GetClient(), mgr.GetScheme())}
 
 	r := managed.NewReconciler(mgr,
-		resource.ManagedKind(v1alpha1.DesposibleRequestGroupVersionKind),
+		resource.ManagedKind(v1alpha1.RequestGroupVersionKind),
 		managed.WithExternalConnecter(&connector{
 			logger:          o.Logger,
 			kube:            mgr.GetClient(),
@@ -78,10 +76,12 @@ func Setup(mgr ctrl.Manager, o controller.Options, timeout time.Duration) error 
 		Named(name).
 		WithOptions(o.ForControllerRuntime()).
 		WithEventFilter(resource.DesiredStateChanged()).
-		For(&v1alpha1.DesposibleRequest{}).
+		For(&v1alpha1.Request{}).
 		Complete(ratelimiter.NewReconciler(name, r, o.GlobalRateLimiter))
 }
 
+// A connector is expected to produce an ExternalClient when its Connect method
+// is called.
 type connector struct {
 	logger          logging.Logger
 	kube            client.Client
@@ -89,13 +89,18 @@ type connector struct {
 	newHttpClientFn func(log logging.Logger, timeout time.Duration) (httpClient.Client, error)
 }
 
+// Connect typically produces an ExternalClient by:
+// 1. Tracking that the managed resource is using a ProviderConfig.
+// 2. Getting the managed resource's ProviderConfig.
+// 3. Getting the credentials specified by the ProviderConfig.
+// 4. Using the credentials to form a client.
 func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.ExternalClient, error) {
-	cr, ok := mg.(*v1alpha1.DesposibleRequest)
+	cr, ok := mg.(*v1alpha1.Request)
 	if !ok {
-		return nil, errors.New(errNotDesposibleRequest)
+		return nil, errors.New(errNotRequest)
 	}
 
-	l := c.logger.WithValues("despodibleRequest", cr.Name)
+	l := c.logger.WithValues("request", cr.Name)
 
 	if err := c.usage.Track(ctx, mg); err != nil {
 		return nil, errors.Wrap(err, errTrackPCUsage)
@@ -119,6 +124,8 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 	}, nil
 }
 
+// An ExternalClient observes, then either creates, updates, or deletes an
+// external resource to ensure it reflects the managed resource's desired state.
 type external struct {
 	localKube client.Client
 	logger    logging.Logger
@@ -126,21 +133,12 @@ type external struct {
 }
 
 func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
-	cr, ok := mg.(*v1alpha1.DesposibleRequest)
+	cr, ok := mg.(*v1alpha1.Request)
 	if !ok {
-		return managed.ExternalObservation{}, errors.New(errNotDesposibleRequest)
+		return managed.ExternalObservation{}, errors.New(errNotRequest)
 	}
 
-	if !cr.Status.Synced {
-		return managed.ExternalObservation{
-			ResourceExists: false,
-		}, nil
-	}
-
-	cr.Status.SetConditions(xpv1.Available())
-	if err := c.localKube.Status().Update(ctx, cr); err != nil {
-		return managed.ExternalObservation{}, errors.New("failed updating CR")
-	}
+	// TODO (REl): implement
 
 	return managed.ExternalObservation{
 		ResourceExists:    true,
@@ -149,7 +147,8 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	}, nil
 }
 
-func (c *external) deployAction(ctx context.Context, cr *v1alpha1.DesposibleRequest, method string, url string, body string, headers map[string][]string) error {
+// TODO (REl): duplicated code
+func (c *external) deployAction(ctx context.Context, cr *v1alpha1.Request, method string, url string, body string, headers map[string][]string) error {
 	res, err := c.http.SendRequest(ctx, method, url, body, headers)
 
 	if err != nil {
@@ -160,50 +159,70 @@ func (c *external) deployAction(ctx context.Context, cr *v1alpha1.DesposibleRequ
 }
 
 func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.ExternalCreation, error) {
-	cr, ok := mg.(*v1alpha1.DesposibleRequest)
+	// TODO (REl): implement generation of body and url
+
+	cr, ok := mg.(*v1alpha1.Request)
 	if !ok {
-		return managed.ExternalCreation{}, errors.New(errNotDesposibleRequest)
+		return managed.ExternalCreation{}, errors.New(errNotRequest)
 	}
 
-	if err := isDesposibleRequestValid(cr.Spec.ForProvider.Method, cr.Spec.ForProvider.URL); err != nil {
+	if err := isRequestValid(http.MethodPost, PostURL); err != nil {
 		return managed.ExternalCreation{}, err
 	}
 
-	return managed.ExternalCreation{}, errors.Wrap(c.deployAction(ctx, cr, cr.Spec.ForProvider.Method,
-		cr.Spec.ForProvider.URL, cr.Spec.ForProvider.Body, cr.Spec.ForProvider.Headers), errFailedToSendHttpDesposibleRequest)
+	return managed.ExternalCreation{}, errors.Wrap(c.deployAction(ctx, cr, http.MethodPost,
+		PostURL, PostBody, cr.Spec.ForProvider.Headers), errFailedToSendHttpRequest)
 }
 
 func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.ExternalUpdate, error) {
-	cr, ok := mg.(*v1alpha1.DesposibleRequest)
+	// TODO (REl): implement generation of body and url
+
+	cr, ok := mg.(*v1alpha1.Request)
 	if !ok {
-		return managed.ExternalUpdate{}, errors.New(errNotDesposibleRequest)
+		return managed.ExternalUpdate{}, errors.New(errNotRequest)
 	}
 
-	if err := isDesposibleRequestValid(cr.Spec.ForProvider.Method, cr.Spec.ForProvider.URL); err != nil {
+	if err := isRequestValid(http.MethodPut, PutURL); err != nil {
 		return managed.ExternalUpdate{}, err
 	}
 
-	return managed.ExternalUpdate{}, errors.Wrap(c.deployAction(ctx, cr, cr.Spec.ForProvider.Method,
-		cr.Spec.ForProvider.URL, cr.Spec.ForProvider.Body, cr.Spec.ForProvider.Headers), errFailedToSendHttpDesposibleRequest)
+	return managed.ExternalUpdate{}, errors.Wrap(c.deployAction(ctx, cr, http.MethodPut,
+		PutURL, PutBody, cr.Spec.ForProvider.Headers), errFailedToSendHttpRequest)
 }
 
-func (c *external) Delete(_ context.Context, _ resource.Managed) error {
-	return nil
+func (c *external) Delete(ctx context.Context, mg resource.Managed) error {
+	// TODO (REl): implement generation of body and url
+
+	cr, ok := mg.(*v1alpha1.Request)
+	if !ok {
+		return errors.New(errNotRequest)
+	}
+
+	if err := isRequestValid(http.MethodDelete, DeleteURL); err != nil {
+		return err
+	}
+
+	return errors.Wrap(c.deployAction(ctx, cr, http.MethodDelete,
+		DeleteURL, DeleteBody, cr.Spec.ForProvider.Headers), errFailedToSendHttpRequest)
 }
 
-func shouldRetry(cr *v1alpha1.DesposibleRequest) bool {
+// TODO (REl): duplicated code
+func shouldRetry(cr *v1alpha1.Request) bool {
 	return rollBackEnabled(cr) && cr.Status.Failed != 0
 }
 
-func rollBackEnabled(cr *v1alpha1.DesposibleRequest) bool {
+// TODO (REl): duplicated code
+func rollBackEnabled(cr *v1alpha1.Request) bool {
 	return cr.Spec.ForProvider.RollbackRetriesLimit != nil
 }
 
-func retriesLimitReached(cr *v1alpha1.DesposibleRequest) bool {
+// TODO (REl): duplicated code
+func retriesLimitReached(cr *v1alpha1.Request) bool {
 	return cr.Status.Failed >= *cr.Spec.ForProvider.RollbackRetriesLimit
 }
 
-func isDesposibleRequestValid(method string, url string) error {
+// TODO (REl): duplicated code
+func isRequestValid(method string, url string) error {
 	if method == "" {
 		return errors.New(errEmptyMethod)
 	}
@@ -215,24 +234,21 @@ func isDesposibleRequestValid(method string, url string) error {
 	return nil
 }
 
-func waitTimeout(cr *v1alpha1.DesposibleRequest) time.Duration {
+// TODO (REl): duplicated code
+func waitTimeout(cr *v1alpha1.Request) time.Duration {
 	if cr.Spec.ForProvider.WaitTimeout != nil {
 		return cr.Spec.ForProvider.WaitTimeout.Duration
 	}
 	return defaultWaitTimeout
 }
 
-func (c *external) handleDeployActionError(ctx context.Context, cr *v1alpha1.DesposibleRequest, err error) error {
+// TODO (REl): duplicated code
+func (c *external) handleDeployActionError(ctx context.Context, cr *v1alpha1.Request, err error) error {
 	cr.Status.Failed++
 
 	cr.Status.Error = err.Error()
 	if err := c.localKube.Status().Update(ctx, cr); err != nil {
-		return errors.Wrap(err, errFailedToSetError)
-	}
-
-	cr.Status.Synced = true
-	if err := c.localKube.Status().Update(ctx, cr); err != nil {
-		return errors.Wrap(err, errFailedToSetStatusCode)
+		return errors.Wrap(err, "failed to set error")
 	}
 
 	return err

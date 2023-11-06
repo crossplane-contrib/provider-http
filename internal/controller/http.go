@@ -24,6 +24,7 @@ import (
 
 	"github.com/arielsepton/provider-http/internal/controller/config"
 	desposiblerequest "github.com/arielsepton/provider-http/internal/controller/desposiblerequest"
+	request "github.com/arielsepton/provider-http/internal/controller/request"
 )
 
 // Setup creates all http controllers with the supplied logger and adds them to
@@ -32,6 +33,7 @@ func Setup(mgr ctrl.Manager, o controller.Options, timeout time.Duration) error 
 	for _, setup := range []func(ctrl.Manager, controller.Options, time.Duration) error{
 		config.Setup,
 		desposiblerequest.Setup,
+		request.Setup,
 	} {
 		if err := setup(mgr, o, timeout); err != nil {
 			return err
