@@ -6,12 +6,11 @@ import (
 
 	"github.com/arielsepton/provider-http/apis/request/v1alpha1"
 	"github.com/arielsepton/provider-http/internal/jq"
-	"github.com/crossplane/crossplane-runtime/pkg/logging"
 	"golang.org/x/exp/maps"
 )
 
 // This function receives a mapping and transforms it into a jq query format.
-func CreateJQQuery(mapping string, logger logging.Logger) (string, error) {
+func CreateJQQuery(mapping string) (string, error) {
 	if mapping == "" {
 		return "", nil
 	}
@@ -64,12 +63,12 @@ func StructToMap(obj interface{}) (newMap map[string]interface{}, err error) {
 	return
 }
 
-func applyGoJQ(jqQuery string, request *v1alpha1.Request, logger logging.Logger) (string, error) {
+func applyGoJQ(jqQuery string, request *v1alpha1.Request) (string, error) {
 	baseMap, _ := StructToMap(request.Spec.ForProvider)
 	statusMap, _ := StructToMap(request.Status)
 
 	maps.Copy(baseMap, statusMap)
-	convertJSONStringsToMaps(&baseMap, logger)
+	convertJSONStringsToMaps(&baseMap)
 
 	if result, _ := jq.ParseMapInterface(jqQuery, baseMap); result != nil {
 		transformedData, err := json.Marshal(result)
@@ -89,7 +88,7 @@ func applyGoJQ(jqQuery string, request *v1alpha1.Request, logger logging.Logger)
 }
 
 // Converts JSON strings within a map to maps for JSON data processing.
-func convertJSONStringsToMaps(merged *map[string]interface{}, logger logging.Logger) {
+func convertJSONStringsToMaps(merged *map[string]interface{}) {
 	for key, value := range *merged {
 
 		switch valueToHandle := value.(type) {
@@ -99,10 +98,10 @@ func convertJSONStringsToMaps(merged *map[string]interface{}, logger logging.Log
 				(*merged)[key] = mappedJSON
 			}
 		case map[string]interface{}:
-			convertJSONStringsToMaps(&valueToHandle, logger)
+			convertJSONStringsToMaps(&valueToHandle)
 		case []interface{}:
 			structToMap, _ := (StructToMap(valueToHandle))
-			convertJSONStringsToMaps(&structToMap, logger)
+			convertJSONStringsToMaps(&structToMap)
 		}
 	}
 }
