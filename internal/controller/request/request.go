@@ -51,6 +51,7 @@ const (
 	errFailedToSendHttpRequest = "failed to send http request"
 	errEmptyMethod             = "no method is specified"
 	errEmptyURL                = "no url is specified"
+	errFailedToCheckIfUpToDate = "failed to check if request is up to date"
 )
 
 // Setup adds a controller that reconciles Request managed resources.
@@ -138,8 +139,16 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.New(errNotRequest)
 	}
 
-	// TODO (REl): implement
-	s, err := c.isUpToDate(ctx, cr)
+	synced, err := c.isUpToDate(ctx, cr)
+	if err != nil && err.Error() == errObjectNotFound {
+		return managed.ExternalObservation{
+			ResourceExists: false,
+		}, nil
+	}
+
+	if err != nil {
+		return managed.ExternalObservation{}, errors.Wrap(err, errFailedToCheckIfUpToDate)
+	}
 
 	return managed.ExternalObservation{
 		ResourceExists:    true,
