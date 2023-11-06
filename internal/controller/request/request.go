@@ -139,6 +139,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	}
 
 	// TODO (REl): implement
+	s, err := c.isUpToDate(ctx, cr)
 
 	return managed.ExternalObservation{
 		ResourceExists:    true,
