@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/arielsepton/provider-http/apis/request/v1alpha1"
+	"github.com/arielsepton/provider-http/internal/controller/request/requestgen"
 	"github.com/pkg/errors"
 )
 
@@ -25,14 +26,20 @@ func (c *external) isUpToDate(ctx context.Context, cr *v1alpha1.Request) (bool, 
 		return false, errors.New(errNoGetMapping)
 	}
 
-	urlJQFilter := methodGetMapping.URL
-	GetURL, err := generateURL(urlJQFilter, cr)
+	// TODO (REL) : delete this:
+	// urlJQFilter := methodGetMapping.URL
+	// GetURL, err := requestgen.GenerateURL(urlJQFilter, cr)
+	// if err != nil {
+	// 	return false, err
+	// }
+
+	requestDetails, err := requestgen.GenerateValidRequestDetails(*methodGetMapping, cr)
 	if err != nil {
 		return false, err
 	}
 
 	// TODO (REL): handle headers from payload
-	res, err := c.http.SendRequest(ctx, http.MethodGet, GetURL, "", cr.Spec.ForProvider.Headers)
+	res, err := c.http.SendRequest(ctx, http.MethodGet, requestDetails.Url, requestDetails.Body, cr.Spec.ForProvider.Headers)
 	if err != nil {
 		return false, err
 	}
@@ -49,36 +56,13 @@ func (c *external) isUpToDate(ctx context.Context, cr *v1alpha1.Request) (bool, 
 	return strings.Contains(res.ResponseBody, desiredState) && isHTTPSuccess(res.StatusCode), nil
 }
 
-func generateURL(urlJQFilter string, cr *v1alpha1.Request) (string, error) {
-	// TODO (REl): implement
-	return "", nil
-}
-
-func generateBody(mappingBody string, cr *v1alpha1.Request) (string, error) {
-	if mappingBody == "" {
-		return "", nil
-	}
-
-	jqQuery, err := CreateJQQuery(mappingBody)
-	if err != nil {
-		return "", err
-	}
-
-	body, err := applyGoJQ(jqQuery, cr)
-	if err != nil {
-		return "", err
-	}
-
-	return body, nil
-}
-
 func desiredState(cr *v1alpha1.Request) (string, error) {
 	methodPutMapping, ok := getMappingByMethod(&cr.Spec.ForProvider, http.MethodPut)
 	if !ok {
 		return "", errors.New(errNoGetMapping)
 	}
 
-	return generateBody(methodPutMapping.Body, cr)
+	return requestgen.GenerateBody(methodPutMapping.Body, cr)
 }
 
 func isHTTPSuccess(statusCode int) bool {

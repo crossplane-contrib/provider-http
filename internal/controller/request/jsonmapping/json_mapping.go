@@ -1,4 +1,4 @@
-package request
+package jsonmapping
 
 import (
 	"encoding/json"
@@ -52,7 +52,7 @@ func jsonStringToMap(jsonStr string) (map[string]interface{}, error) {
 	return jsonData, nil
 }
 
-func StructToMap(obj interface{}) (newMap map[string]interface{}, err error) {
+func structToMap(obj interface{}) (newMap map[string]interface{}, err error) {
 	data, err := json.Marshal(obj) // Convert to a json string
 
 	if err != nil {
@@ -63,9 +63,9 @@ func StructToMap(obj interface{}) (newMap map[string]interface{}, err error) {
 	return
 }
 
-func applyGoJQ(jqQuery string, request *v1alpha1.Request) (string, error) {
-	baseMap, _ := StructToMap(request.Spec.ForProvider)
-	statusMap, _ := StructToMap(request.Status)
+func ApplyGoJQ(jqQuery string, request *v1alpha1.Request) (string, error) {
+	baseMap, _ := structToMap(request.Spec.ForProvider)
+	statusMap, _ := structToMap(request.Status)
 
 	maps.Copy(baseMap, statusMap)
 	convertJSONStringsToMaps(&baseMap)
@@ -100,7 +100,7 @@ func convertJSONStringsToMaps(merged *map[string]interface{}) {
 		case map[string]interface{}:
 			convertJSONStringsToMaps(&valueToHandle)
 		case []interface{}:
-			structToMap, _ := (StructToMap(valueToHandle))
+			structToMap, _ := (structToMap(valueToHandle))
 			convertJSONStringsToMaps(&structToMap)
 		}
 	}

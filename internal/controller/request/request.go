@@ -37,6 +37,7 @@ import (
 	"github.com/arielsepton/provider-http/apis/request/v1alpha1"
 	apisv1alpha1 "github.com/arielsepton/provider-http/apis/v1alpha1"
 	httpClient "github.com/arielsepton/provider-http/internal/clients/http"
+	"github.com/arielsepton/provider-http/internal/controller/request/requestgen"
 	httpRequestsUtils "github.com/arielsepton/provider-http/internal/utils/http_request_utils"
 )
 
@@ -52,6 +53,9 @@ const (
 	errFailedToSendHttpRequest = "failed to send http request"
 	errFailedToCheckIfUpToDate = "failed to check if request is up to date"
 	errFailedUpdateCR          = "failed updating CR"
+	errPostMappingNotFound     = "POST mapping doesn't exist"
+	errPutMappingNotFound      = "PUT mapping doesn't exist"
+	errDeleteMappingNotFound   = "DELETE mapping doesn't exist"
 )
 
 // Setup adds a controller that reconciles Request managed resources.
@@ -192,12 +196,18 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalCreation{}, errors.New(errNotRequest)
 	}
 
-	if err := httpRequestsUtils.IsRequestValid(http.MethodPost, PostURL); err != nil {
+	postMapping, ok := getMappingByMethod(&cr.Spec.ForProvider, http.MethodPut)
+	if !ok {
+		return managed.ExternalCreation{}, errors.New(errPostMappingNotFound)
+	}
+
+	requestDetails, err := requestgen.GenerateValidRequestDetails(*postMapping, cr)
+	if err != nil {
 		return managed.ExternalCreation{}, err
 	}
 
 	return managed.ExternalCreation{}, errors.Wrap(c.deployAction(ctx, cr, http.MethodPost,
-		PostURL, PostBody, cr.Spec.ForProvider.Headers), errFailedToSendHttpRequest)
+		requestDetails.Url, requestDetails.Body, cr.Spec.ForProvider.Headers), errFailedToSendHttpRequest)
 }
 
 func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.ExternalUpdate, error) {
