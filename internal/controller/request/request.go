@@ -113,7 +113,7 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 		return nil, errors.Wrap(err, errProviderNotRetrieved)
 	}
 
-	h, err := c.newHttpClientFn(l, waitTimeout(cr))
+	h, err := c.newHttpClientFn(l, httpRequestsUtils.WaitTimeout(cr.Spec.ForProvider.WaitTimeout))
 	if err != nil {
 		return nil, errors.Wrap(err, errNewHttpClient)
 	}
@@ -157,7 +157,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 
 	return managed.ExternalObservation{
 		ResourceExists:    true,
-		ResourceUpToDate:  synced && !(shouldRetry(cr) && !retriesLimitReached(cr)),
+		ResourceUpToDate:  synced && !(httpRequestsUtils.ShouldRetry(cr.Spec.ForProvider.RollbackRetriesLimit, cr.Status.Failed) && !httpRequestsUtils.RetriesLimitReached(cr.Status.Failed, cr.Spec.ForProvider.RollbackRetriesLimit)),
 		ConnectionDetails: nil,
 	}, nil
 }
@@ -230,27 +230,4 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) error {
 
 	return errors.Wrap(c.deployAction(ctx, cr, http.MethodDelete,
 		DeleteURL, DeleteBody, cr.Spec.ForProvider.Headers), errFailedToSendHttpRequest)
-}
-
-// TODO (REl): duplicated code
-func shouldRetry(cr *v1alpha1.Request) bool {
-	return rollBackEnabled(cr) && cr.Status.Failed != 0
-}
-
-// TODO (REl): duplicated code
-func rollBackEnabled(cr *v1alpha1.Request) bool {
-	return cr.Spec.ForProvider.RollbackRetriesLimit != nil
-}
-
-// TODO (REl): duplicated code
-func retriesLimitReached(cr *v1alpha1.Request) bool {
-	return cr.Status.Failed >= *cr.Spec.ForProvider.RollbackRetriesLimit
-}
-
-// TODO (REl): duplicated code
-func waitTimeout(cr *v1alpha1.Request) time.Duration {
-	if cr.Spec.ForProvider.WaitTimeout != nil {
-		return cr.Spec.ForProvider.WaitTimeout.Duration
-	}
-	return defaultWaitTimeout
 }

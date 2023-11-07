@@ -40,10 +40,6 @@ import (
 )
 
 const (
-	defaultWaitTimeout = 5 * time.Minute
-)
-
-const (
 	errNotDesposibleRequest              = "managed resource is not a DesposibleRequest custom resource"
 	errTrackPCUsage                      = "cannot track ProviderConfig usage"
 	errNewHttpClient                     = "cannot create new Http client"
@@ -105,7 +101,7 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 		return nil, errors.Wrap(err, errProviderNotRetrieved)
 	}
 
-	h, err := c.newHttpClientFn(l, waitTimeout(cr))
+	h, err := c.newHttpClientFn(l, httpRequestsUtils.WaitTimeout(cr.Spec.ForProvider.WaitTimeout))
 	if err != nil {
 		return nil, errors.Wrap(err, errNewHttpClient)
 	}
@@ -142,7 +138,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 
 	return managed.ExternalObservation{
 		ResourceExists:    true,
-		ResourceUpToDate:  !(shouldRetry(cr) && !retriesLimitReached(cr)),
+		ResourceUpToDate:  !(httpRequestsUtils.ShouldRetry(cr.Spec.ForProvider.RollbackRetriesLimit, cr.Status.Failed) && !httpRequestsUtils.RetriesLimitReached(cr.Status.Failed, cr.Spec.ForProvider.RollbackRetriesLimit)),
 		ConnectionDetails: nil,
 	}, nil
 }
@@ -201,23 +197,4 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 
 func (c *external) Delete(_ context.Context, _ resource.Managed) error {
 	return nil
-}
-
-func shouldRetry(cr *v1alpha1.DesposibleRequest) bool {
-	return rollBackEnabled(cr) && cr.Status.Failed != 0
-}
-
-func rollBackEnabled(cr *v1alpha1.DesposibleRequest) bool {
-	return cr.Spec.ForProvider.RollbackRetriesLimit != nil
-}
-
-func retriesLimitReached(cr *v1alpha1.DesposibleRequest) bool {
-	return cr.Status.Failed >= *cr.Spec.ForProvider.RollbackRetriesLimit
-}
-
-func waitTimeout(cr *v1alpha1.DesposibleRequest) time.Duration {
-	if cr.Spec.ForProvider.WaitTimeout != nil {
-		return cr.Spec.ForProvider.WaitTimeout.Duration
-	}
-	return defaultWaitTimeout
 }
