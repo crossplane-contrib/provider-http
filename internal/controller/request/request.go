@@ -189,8 +189,6 @@ func (c *external) deployAction(ctx context.Context, cr *v1alpha1.Request, metho
 }
 
 func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.ExternalCreation, error) {
-	// TODO (REl): implement generation of body and url
-
 	cr, ok := mg.(*v1alpha1.Request)
 	if !ok {
 		return managed.ExternalCreation{}, errors.New(errNotRequest)
