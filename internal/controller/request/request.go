@@ -37,7 +37,7 @@ import (
 	"github.com/arielsepton/provider-http/apis/request/v1alpha1"
 	apisv1alpha1 "github.com/arielsepton/provider-http/apis/v1alpha1"
 	httpClient "github.com/arielsepton/provider-http/internal/clients/http"
-	requestsUtils "github.com/arielsepton/provider-http/internal/utils/requests"
+	httpRequestsUtils "github.com/arielsepton/provider-http/internal/utils/http_request_utils"
 )
 
 const (
@@ -50,8 +50,6 @@ const (
 	errNewHttpClient           = "cannot create new Http client"
 	errProviderNotRetrieved    = "provider could not be retrieved"
 	errFailedToSendHttpRequest = "failed to send http request"
-	errEmptyMethod             = "no method is specified"
-	errEmptyURL                = "no url is specified"
 	errFailedToCheckIfUpToDate = "failed to check if request is up to date"
 	errFailedUpdateCR          = "failed updating CR"
 )
@@ -167,7 +165,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 func (c *external) deployAction(ctx context.Context, cr *v1alpha1.Request, method string, url string, body string, headers map[string][]string) error {
 	res, err := c.http.SendRequest(ctx, method, url, body, headers)
 
-	resource := &requestsUtils.RequestResource{
+	resource := &httpRequestsUtils.RequestResource{
 		Resource:       cr,
 		RequestContext: ctx,
 		HttpResponse:   res,
@@ -176,14 +174,14 @@ func (c *external) deployAction(ctx context.Context, cr *v1alpha1.Request, metho
 
 	if err != nil {
 		setErr := resource.SetError(err)
-		return requestsUtils.SetRequestResourceStatus(*resource, setErr)
+		return httpRequestsUtils.SetRequestResourceStatus(*resource, setErr)
 	}
 
 	setStatusCode := resource.SetStatusCode()
 	setHeaders := resource.SetHeaders()
 	setBody := resource.SetBody()
 
-	return requestsUtils.SetRequestResourceStatus(*resource, setStatusCode, setHeaders, setBody)
+	return httpRequestsUtils.SetRequestResourceStatus(*resource, setStatusCode, setHeaders, setBody)
 }
 
 func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.ExternalCreation, error) {
@@ -194,7 +192,7 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalCreation{}, errors.New(errNotRequest)
 	}
 
-	if err := isRequestValid(http.MethodPost, PostURL); err != nil {
+	if err := httpRequestsUtils.IsRequestValid(http.MethodPost, PostURL); err != nil {
 		return managed.ExternalCreation{}, err
 	}
 
@@ -210,7 +208,7 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalUpdate{}, errors.New(errNotRequest)
 	}
 
-	if err := isRequestValid(http.MethodPut, PutURL); err != nil {
+	if err := httpRequestsUtils.IsRequestValid(http.MethodPut, PutURL); err != nil {
 		return managed.ExternalUpdate{}, err
 	}
 
@@ -226,7 +224,7 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) error {
 		return errors.New(errNotRequest)
 	}
 
-	if err := isRequestValid(http.MethodDelete, DeleteURL); err != nil {
+	if err := httpRequestsUtils.IsRequestValid(http.MethodDelete, DeleteURL); err != nil {
 		return err
 	}
 
@@ -247,19 +245,6 @@ func rollBackEnabled(cr *v1alpha1.Request) bool {
 // TODO (REl): duplicated code
 func retriesLimitReached(cr *v1alpha1.Request) bool {
 	return cr.Status.Failed >= *cr.Spec.ForProvider.RollbackRetriesLimit
-}
-
-// TODO (REl): duplicated code
-func isRequestValid(method string, url string) error {
-	if method == "" {
-		return errors.New(errEmptyMethod)
-	}
-
-	if url == "" {
-		return errors.New(errEmptyURL)
-	}
-
-	return nil
 }
 
 // TODO (REl): duplicated code
