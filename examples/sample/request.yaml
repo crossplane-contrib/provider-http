@@ -19,20 +19,22 @@ spec:
         }'
     mappings:
       - method: "POST"
-        body: '{
-          "todo_name": ".payload.body.name", 
-          "reminder": ".payload.body.reminder", 
-          "responsible": ".payload.body.responsible"
-          }'
+        body: |
+          {
+            "todo_name": ".payload.body.name", 
+            "reminder": ".payload.body.reminder", 
+            "responsible": ".payload.body.responsible"
+          }
         url: .payload.baseUrl
       - method: "GET"
         url: (.payload.baseUrl + "/" + (.response.body.id|tostring)) 
       - method: "PUT"
-        body: '{
-          "todo_name": ".payload.body.name", 
-          "reminder": ".payload.body.reminder", 
-          "responsible": ".payload.body.responsible"
-          }'
+        body: |
+          {
+            "todo_name": ".payload.body.name", 
+            "reminder": ".payload.body.reminder", 
+            "responsible": ".payload.body.responsible"
+          }
         url: (.payload.baseUrl + "/" + (.response.body.id|tostring)) 
       - method: "DELETE"
         url: (.payload.baseUrl + "/" + (.response.body.id|tostring)) 

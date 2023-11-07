@@ -172,7 +172,18 @@ func (c *external) deployAction(ctx context.Context, cr *v1alpha1.Request, metho
 		return c.handleDeployActionError(ctx, cr, err)
 	}
 
-	return requestsUtils.SetDesposibleRequestStatus(ctx, cr, res, c.localKube)
+	resource := &requestsUtils.RequestResource{
+		Resource:       cr,
+		RequestContext: ctx,
+		HttpResponse:   res,
+		LocalClient:    c.localKube,
+	}
+
+	setStatusCode := resource.SetStatusCode()
+	setHeaders := resource.SetHeaders()
+	setBody := resource.SetBody()
+
+	return requestsUtils.SetRequestResourceStatus(*resource, setStatusCode, setHeaders, setBody)
 }
 
 func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.ExternalCreation, error) {
