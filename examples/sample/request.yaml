@@ -12,11 +12,12 @@ spec:
         - application/xml
     payload:
       baseUrl: "https://mytryings.free.beeceptor.com"
-      body: '{
+      body: |
+        {
         "name": "Do Laundry", 
         "reminder": "Every 1 hour", 
         "responsible": "Dan"
-        }'
+        }
     mappings:
       - method: "POST"
         body: |

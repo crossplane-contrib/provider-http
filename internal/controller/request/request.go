@@ -164,19 +164,19 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	}, nil
 }
 
-// TODO (REl): duplicated code
 func (c *external) deployAction(ctx context.Context, cr *v1alpha1.Request, method string, url string, body string, headers map[string][]string) error {
 	res, err := c.http.SendRequest(ctx, method, url, body, headers)
-
-	if err != nil {
-		return c.handleDeployActionError(ctx, cr, err)
-	}
 
 	resource := &requestsUtils.RequestResource{
 		Resource:       cr,
 		RequestContext: ctx,
 		HttpResponse:   res,
 		LocalClient:    c.localKube,
+	}
+
+	if err != nil {
+		setErr := resource.SetError(err)
+		return requestsUtils.SetRequestResourceStatus(*resource, setErr)
 	}
 
 	setStatusCode := resource.SetStatusCode()
@@ -268,16 +268,4 @@ func waitTimeout(cr *v1alpha1.Request) time.Duration {
 		return cr.Spec.ForProvider.WaitTimeout.Duration
 	}
 	return defaultWaitTimeout
-}
-
-// TODO (REl): duplicated code
-func (c *external) handleDeployActionError(ctx context.Context, cr *v1alpha1.Request, err error) error {
-	cr.Status.Failed++
-
-	cr.Status.Error = err.Error()
-	if err := c.localKube.Status().Update(ctx, cr); err != nil {
-		return errors.Wrap(err, "failed to set error")
-	}
-
-	return err
 }

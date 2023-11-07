@@ -17,8 +17,7 @@ const (
 type SetRequestStatusFunc func() error
 
 type RequestResource struct {
-	Resource client.Object
-
+	Resource       client.Object
 	RequestContext context.Context
 	HttpResponse   httpClient.HttpResponse
 	LocalClient    client.Client
@@ -70,6 +69,17 @@ func (rr *RequestResource) SetSynced() SetRequestStatusFunc {
 	}
 }
 
+func (rr *RequestResource) SetError(err error) SetRequestStatusFunc {
+	return func() error {
+		if resourceSetErr, ok := rr.Resource.(ErrorSetter); ok {
+			resourceSetErr.SetError(err)
+			return rr.LocalClient.Status().Update(rr.RequestContext, rr.Resource)
+
+		}
+		return nil
+	}
+}
+
 type ResponseSetter interface {
 	SetStatusCode(statusCode int)
 	SetHeaders(headers map[string][]string)
@@ -78,6 +88,10 @@ type ResponseSetter interface {
 
 type SyncedSetter interface {
 	SetSynced(synced bool)
+}
+
+type ErrorSetter interface {
+	SetError(err error)
 }
 
 func SetRequestResourceStatus(rr RequestResource, statusFuncs ...SetRequestStatusFunc) error {
