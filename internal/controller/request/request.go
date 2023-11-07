@@ -42,10 +42,6 @@ import (
 )
 
 const (
-	defaultWaitTimeout = 5 * time.Minute
-)
-
-const (
 	errNotRequest              = "managed resource is not a Request custom resource"
 	errTrackPCUsage            = "cannot track ProviderConfig usage"
 	errNewHttpClient           = "cannot create new Http client"
