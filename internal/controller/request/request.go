@@ -194,7 +194,7 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalCreation{}, errors.New(errNotRequest)
 	}
 
-	postMapping, ok := getMappingByMethod(&cr.Spec.ForProvider, http.MethodPut)
+	postMapping, ok := getMappingByMethod(&cr.Spec.ForProvider, http.MethodPost)
 	if !ok {
 		return managed.ExternalCreation{}, errors.New(errPostMappingNotFound)
 	}
@@ -209,33 +209,41 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 }
 
 func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.ExternalUpdate, error) {
-	// TODO (REl): implement generation of body and url
-
 	cr, ok := mg.(*v1alpha1.Request)
 	if !ok {
 		return managed.ExternalUpdate{}, errors.New(errNotRequest)
 	}
 
-	if err := httpRequestsUtils.IsRequestValid(http.MethodPut, PutURL); err != nil {
+	putMapping, ok := getMappingByMethod(&cr.Spec.ForProvider, http.MethodPut)
+	if !ok {
+		return managed.ExternalUpdate{}, errors.New(errPutMappingNotFound)
+	}
+
+	requestDetails, err := requestgen.GenerateValidRequestDetails(*putMapping, cr)
+	if err != nil {
 		return managed.ExternalUpdate{}, err
 	}
 
 	return managed.ExternalUpdate{}, errors.Wrap(c.deployAction(ctx, cr, http.MethodPut,
-		PutURL, PutBody, cr.Spec.ForProvider.Headers), errFailedToSendHttpRequest)
+		requestDetails.Url, requestDetails.Body, cr.Spec.ForProvider.Headers), errFailedToSendHttpRequest)
 }
 
 func (c *external) Delete(ctx context.Context, mg resource.Managed) error {
-	// TODO (REl): implement generation of body and url
-
 	cr, ok := mg.(*v1alpha1.Request)
 	if !ok {
 		return errors.New(errNotRequest)
 	}
 
-	if err := httpRequestsUtils.IsRequestValid(http.MethodDelete, DeleteURL); err != nil {
+	deleteMapping, ok := getMappingByMethod(&cr.Spec.ForProvider, http.MethodDelete)
+	if !ok {
+		return errors.New(errDeleteMappingNotFound)
+	}
+
+	requestDetails, err := requestgen.GenerateValidRequestDetails(*deleteMapping, cr)
+	if err != nil {
 		return err
 	}
 
 	return errors.Wrap(c.deployAction(ctx, cr, http.MethodDelete,
-		DeleteURL, DeleteBody, cr.Spec.ForProvider.Headers), errFailedToSendHttpRequest)
+		requestDetails.Url, requestDetails.Body, cr.Spec.ForProvider.Headers), errFailedToSendHttpRequest)
 }
