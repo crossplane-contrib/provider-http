@@ -1,5 +1,3 @@
-# TODO: add headers for payload
-
 apiVersion: http.crossplane.io/v1alpha1
 kind: Request
 metadata:
@@ -14,17 +12,18 @@ spec:
       baseUrl: "https://mytryings.free.beeceptor.com"
       body: |
         {
-        "name": "Do Laundry", 
-        "reminder": "Every 1 hour", 
-        "responsible": "Dan"
+          "name": "Do Laundry", 
+          "reminder": "Every 1 hour", 
+          "responsible": "Dan"
         }
     mappings:
       - method: "POST"
         body: |
           {
-            "todo_name": ".payload.body.name", 
-            "reminder": ".payload.body.reminder", 
-            "responsible": ".payload.body.responsible"
+            todo_name: .payload.body.name, 
+            reminder: .payload.body.reminder, 
+            responsible: .payload.body.responsible,
+            managed_by: "crossplane!"
           }
         url: .payload.baseUrl
       - method: "GET"
@@ -32,9 +31,9 @@ spec:
       - method: "PUT"
         body: |
           {
-            "todo_name": ".payload.body.name", 
-            "reminder": ".payload.body.reminder", 
-            "responsible": ".payload.body.responsible"
+            todo_name: .payload.body.name, 
+            reminder: .payload.body.reminder, 
+            responsible: .payload.body.responsible
           }
         url: (.payload.baseUrl + "/" + (.response.body.id|tostring)) 
       - method: "DELETE"
