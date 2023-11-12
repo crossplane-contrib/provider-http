@@ -11,7 +11,7 @@ func Contains(container, containee map[string]interface{}) bool {
 	return true
 }
 
-func IsJSONString(jsonStr string) bool {
+func isJSONString(jsonStr string) bool {
 	jsonStringBytes := []byte(jsonStr)
 	return json.Valid(jsonStringBytes)
 }
@@ -25,6 +25,25 @@ func JsonStringToMap(jsonStr string) (map[string]interface{}, error) {
 	}
 
 	return jsonData, nil
+}
+
+// Converts JSON strings within a map to maps for JSON data processing.
+func ConvertJSONStringsToMaps(merged *map[string]interface{}) {
+	for key, value := range *merged {
+
+		switch valueToHandle := value.(type) {
+		case string:
+			if isJSONString(valueToHandle) {
+				mappedJSON, _ := JsonStringToMap(valueToHandle)
+				(*merged)[key] = mappedJSON
+			}
+		case map[string]interface{}:
+			ConvertJSONStringsToMaps(&valueToHandle)
+		case []interface{}:
+			structToMap, _ := (StructToMap(valueToHandle))
+			ConvertJSONStringsToMaps(&structToMap)
+		}
+	}
 }
 
 func StructToMap(obj interface{}) (newMap map[string]interface{}, err error) {
