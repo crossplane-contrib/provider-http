@@ -10,5 +10,5 @@ func getMappingByMethod(requestParams *v1alpha1.RequestParameters, method string
 			return &mapping, true
 		}
 	}
-	return nil, false // Method not found, TODO (REL): implement this case
+	return nil, false
 }
