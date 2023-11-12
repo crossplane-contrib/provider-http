@@ -3,10 +3,11 @@ package request
 import (
 	"context"
 	"net/http"
-	"strings"
 
 	"github.com/arielsepton/provider-http/apis/request/v1alpha1"
 	"github.com/arielsepton/provider-http/internal/controller/request/requestgen"
+	"github.com/arielsepton/provider-http/internal/json"
+	"github.com/crossplane/crossplane-runtime/pkg/logging"
 	"github.com/pkg/errors"
 )
 
@@ -26,20 +27,12 @@ func (c *external) isUpToDate(ctx context.Context, cr *v1alpha1.Request) (bool, 
 		return false, errors.New(errNoGetMapping)
 	}
 
-	// TODO (REL) : delete this:
-	// urlJQFilter := methodGetMapping.URL
-	// GetURL, err := requestgen.GenerateURL(urlJQFilter, cr)
-	// if err != nil {
-	// 	return false, err
-	// }
-
-	requestDetails, err := requestgen.GenerateValidRequestDetails(*methodGetMapping, cr)
+	requestDetails, err := requestgen.GenerateValidRequestDetails(*methodGetMapping, cr, c.logger)
 	if err != nil {
 		return false, err
 	}
 
-	// TODO (REL): handle headers from payload
-	res, err := c.http.SendRequest(ctx, http.MethodGet, requestDetails.Url, requestDetails.Body, cr.Spec.ForProvider.Headers)
+	res, err := c.http.SendRequest(ctx, http.MethodGet, requestDetails.Url, requestDetails.Body, requestDetails.Headers)
 	if err != nil {
 		return false, err
 	}
@@ -48,21 +41,25 @@ func (c *external) isUpToDate(ctx context.Context, cr *v1alpha1.Request) (bool, 
 		return false, errors.New(errObjectNotFound)
 	}
 
-	desiredState, err := desiredState(cr)
+	desiredState, err := desiredState(cr, c.logger)
+
 	if err != nil {
 		return false, err
 	}
 
-	return strings.Contains(res.ResponseBody, desiredState) && isHTTPSuccess(res.StatusCode), nil
+	// TODO (REL): check what happens if one of them is not a json.
+	responseBodyMap, _ := json.JsonStringToMap(res.ResponseBody)
+	desiredStateMap, _ := json.JsonStringToMap(desiredState)
+	return json.Contains(responseBodyMap, desiredStateMap) && isHTTPSuccess(res.StatusCode), nil
 }
 
-func desiredState(cr *v1alpha1.Request) (string, error) {
+func desiredState(cr *v1alpha1.Request, logger logging.Logger) (string, error) {
 	methodPutMapping, ok := getMappingByMethod(&cr.Spec.ForProvider, http.MethodPut)
 	if !ok {
 		return "", errors.New(errNoGetMapping)
 	}
-
-	return requestgen.GenerateBody(methodPutMapping.Body, cr)
+	requestDetails, err := requestgen.GenerateValidRequestDetails(*methodPutMapping, cr, logger)
+	return requestDetails.Body, err
 }
 
 func isHTTPSuccess(statusCode int) bool {
