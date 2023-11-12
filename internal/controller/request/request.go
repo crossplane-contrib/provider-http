@@ -49,9 +49,9 @@ const (
 	errFailedToSendHttpRequest = "failed to send http request"
 	errFailedToCheckIfUpToDate = "failed to check if request is up to date"
 	errFailedUpdateCR          = "failed updating CR"
-	errPostMappingNotFound     = "POST mapping doesn't exist"
-	errPutMappingNotFound      = "PUT mapping doesn't exist"
-	errDeleteMappingNotFound   = "DELETE mapping doesn't exist"
+	errPostMappingNotFound     = "POST mapping doesn't exist in request"
+	errPutMappingNotFound      = "PUT mapping doesn't exist in request"
+	errDeleteMappingNotFound   = "DELETE mapping doesn't exist in request"
 )
 
 // Setup adds a controller that reconciles Request managed resources.
@@ -185,6 +185,7 @@ func (c *external) deployAction(ctx context.Context, cr *v1alpha1.Request, metho
 }
 
 func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.ExternalCreation, error) {
+	c.logger.Debug("post is here")
 	cr, ok := mg.(*v1alpha1.Request)
 	if !ok {
 		return managed.ExternalCreation{}, errors.New(errNotRequest)
@@ -195,16 +196,17 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalCreation{}, errors.New(errPostMappingNotFound)
 	}
 
-	requestDetails, err := requestgen.GenerateValidRequestDetails(*postMapping, cr)
+	requestDetails, err := requestgen.GenerateValidRequestDetails(*postMapping, cr, c.logger)
 	if err != nil {
 		return managed.ExternalCreation{}, err
 	}
 
 	return managed.ExternalCreation{}, errors.Wrap(c.deployAction(ctx, cr, http.MethodPost,
-		requestDetails.Url, requestDetails.Body, cr.Spec.ForProvider.Headers), errFailedToSendHttpRequest)
+		requestDetails.Url, requestDetails.Body, requestDetails.Headers), errFailedToSendHttpRequest)
 }
 
 func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.ExternalUpdate, error) {
+	c.logger.Debug("put is here")
 	cr, ok := mg.(*v1alpha1.Request)
 	if !ok {
 		return managed.ExternalUpdate{}, errors.New(errNotRequest)
@@ -215,16 +217,17 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalUpdate{}, errors.New(errPutMappingNotFound)
 	}
 
-	requestDetails, err := requestgen.GenerateValidRequestDetails(*putMapping, cr)
+	requestDetails, err := requestgen.GenerateValidRequestDetails(*putMapping, cr, c.logger)
 	if err != nil {
 		return managed.ExternalUpdate{}, err
 	}
 
 	return managed.ExternalUpdate{}, errors.Wrap(c.deployAction(ctx, cr, http.MethodPut,
-		requestDetails.Url, requestDetails.Body, cr.Spec.ForProvider.Headers), errFailedToSendHttpRequest)
+		requestDetails.Url, requestDetails.Body, requestDetails.Headers), errFailedToSendHttpRequest)
 }
 
 func (c *external) Delete(ctx context.Context, mg resource.Managed) error {
+	c.logger.Debug("delete is here")
 	cr, ok := mg.(*v1alpha1.Request)
 	if !ok {
 		return errors.New(errNotRequest)
@@ -235,11 +238,11 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) error {
 		return errors.New(errDeleteMappingNotFound)
 	}
 
-	requestDetails, err := requestgen.GenerateValidRequestDetails(*deleteMapping, cr)
+	requestDetails, err := requestgen.GenerateValidRequestDetails(*deleteMapping, cr, c.logger)
 	if err != nil {
 		return err
 	}
 
 	return errors.Wrap(c.deployAction(ctx, cr, http.MethodDelete,
-		requestDetails.Url, requestDetails.Body, cr.Spec.ForProvider.Headers), errFailedToSendHttpRequest)
+		requestDetails.Url, requestDetails.Body, requestDetails.Headers), errFailedToSendHttpRequest)
 }
