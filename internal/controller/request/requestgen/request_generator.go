@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/arielsepton/provider-http/apis/request/v1alpha1"
-	"github.com/arielsepton/provider-http/internal/controller/request/requestmapping"
+	"github.com/arielsepton/provider-http/internal/controller/request/requestprocessing"
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
 )
 
@@ -21,7 +21,7 @@ type RequestDetails struct {
 }
 
 func generateURL(urlJQFilter string, cr *v1alpha1.Request, logger logging.Logger) (string, error) {
-	getURL, err := requestmapping.ApplyJQOnStr(urlJQFilter, cr, logger)
+	getURL, err := requestprocessing.ApplyJQOnStr(urlJQFilter, cr, logger)
 	if err != nil {
 		return "", err
 	}
@@ -30,8 +30,8 @@ func generateURL(urlJQFilter string, cr *v1alpha1.Request, logger logging.Logger
 }
 
 func generateBody(mappingBody string, cr *v1alpha1.Request, logger logging.Logger) (string, error) {
-	jqQuery := requestmapping.ConvertStringToJQQuery(mappingBody)
-	body, err := requestmapping.ApplyJQOnStr(jqQuery, cr, logger)
+	jqQuery := requestprocessing.ConvertStringToJQQuery(mappingBody)
+	body, err := requestprocessing.ApplyJQOnStr(jqQuery, cr, logger)
 	if err != nil {
 		return "", err
 	}
@@ -40,7 +40,7 @@ func generateBody(mappingBody string, cr *v1alpha1.Request, logger logging.Logge
 }
 
 func generateHeaders(headers map[string][]string, cr *v1alpha1.Request, logger logging.Logger) (map[string][]string, error) {
-	generatedHeaders, err := requestmapping.ApplyJQOnMap(headers, cr, logger)
+	generatedHeaders, err := requestprocessing.ApplyJQOnMap(headers, cr, logger)
 	if err != nil {
 		return nil, err
 	}
