@@ -37,6 +37,7 @@ type RequestParameters struct {
 }
 
 type Mapping struct {
+	// +kubebuilder:validation:Enum=POST,GET,PUT
 	Method  string              `json:"method"`
 	Body    string              `json:"body,omitempty"`
 	URL     string              `json:"url"`
@@ -47,15 +48,6 @@ type Payload struct {
 	BaseUrl string `json:"baseUrl"`
 	Body    string `json:"body"`
 }
-
-type MappingType string
-
-// TODO (REL): maybe remove this and set permanant variables at yaml level (GetMethod.. etc)
-const (
-	MappingTypePOST MappingType = "POST"
-	MappingTypeGET  MappingType = "GET"
-	MappingTypePUT  MappingType = "PUT"
-)
 
 // RequestObservation are the observable fields of a Request.
 type RequestObservation struct {
