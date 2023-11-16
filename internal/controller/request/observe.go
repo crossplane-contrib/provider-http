@@ -16,12 +16,12 @@ import (
 const (
 	errObjectNotFound = "object wasn't created"
 	errNoGetMapping   = "forProvider doesn't contain GET mapping"
-	errStatusCode     = "received status code "
 )
 
 // isUpToDate checks whether desired spec up to date with the observed state for a given request
 func (c *external) isUpToDate(ctx context.Context, cr *v1alpha1.Request) (bool, error) {
-	if cr.Status.Response.Body == "" {
+	if cr.Status.Response.Body == "" ||
+		(cr.Status.Response.Method == http.MethodPost && utils.IsHTTPError(cr.Status.Response.StatusCode)) {
 		return false, errors.New(errObjectNotFound)
 	}
 
@@ -45,7 +45,8 @@ func (c *external) isUpToDate(ctx context.Context, cr *v1alpha1.Request) (bool, 
 	}
 
 	if utils.IsHTTPError(res.StatusCode) {
-		return false, errors.New(fmt.Sprint(errStatusCode, res.StatusCode, " indicates an error. aborting"))
+		c.setRequestStatus(ctx, cr, res, err)
+		return false, errors.New(fmt.Sprint(utils.ErrStatusCode, res.StatusCode))
 	}
 
 	desiredState, err := desiredState(cr, c.logger)

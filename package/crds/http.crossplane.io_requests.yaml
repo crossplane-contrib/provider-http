@@ -358,6 +358,8 @@ spec:
                         type: string
                       type: array
                     type: object
+                  method:
+                    type: string
                   statusCode:
                     type: integer
                 type: object

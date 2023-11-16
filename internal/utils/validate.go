@@ -7,6 +7,7 @@ import (
 const (
 	errEmptyMethod = "no method is specified"
 	errEmptyURL    = "no url is specified"
+	ErrStatusCode  = "HTTP request failed with status code: "
 )
 
 func IsRequestValid(method string, url string) error {

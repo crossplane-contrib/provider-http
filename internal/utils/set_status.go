@@ -59,6 +59,18 @@ func (rr *RequestResource) SetBody() SetRequestStatusFunc {
 	}
 }
 
+func (rr *RequestResource) SetMethod() SetRequestStatusFunc {
+	return func() error {
+		if resp, ok := rr.Resource.(ResponseSetter); ok {
+			if rr.HttpResponse.Method != "" {
+				resp.SetMethod(rr.HttpResponse.Method)
+				return rr.LocalClient.Status().Update(rr.RequestContext, rr.Resource)
+			}
+		}
+		return nil
+	}
+}
+
 func (rr *RequestResource) SetSynced() SetRequestStatusFunc {
 	return func() error {
 		if synced, ok := rr.Resource.(SyncedSetter); ok {
@@ -84,6 +96,7 @@ type ResponseSetter interface {
 	SetStatusCode(statusCode int)
 	SetHeaders(headers map[string][]string)
 	SetBody(body string)
+	SetMethod(method string)
 }
 
 type SyncedSetter interface {

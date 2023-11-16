@@ -60,6 +60,7 @@ type Response struct {
 	StatusCode int                 `json:"statusCode,omitempty"`
 	Body       string              `json:"body,omitempty"`
 	Headers    map[string][]string `json:"headers,omitempty"`
+	Method     string              `json:"method,omitempty"`
 }
 
 // A RequestStatus represents the observed state of a Request.

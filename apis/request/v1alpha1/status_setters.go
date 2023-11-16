@@ -12,6 +12,10 @@ func (d *Request) SetBody(body string) {
 	d.Status.Response.Body = body
 }
 
+func (d *Request) SetMethod(method string) {
+	d.Status.Response.Method = method
+}
+
 func (d *Request) SetError(err error) {
 	// TODO (REL): make sure it gets incremented
 	d.Status.Failed++

@@ -18,6 +18,7 @@ package request
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -165,23 +166,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 func (c *external) deployAction(ctx context.Context, cr *v1alpha1.Request, method string, url string, body string, headers map[string][]string) error {
 	res, err := c.http.SendRequest(ctx, method, url, body, headers)
 
-	resource := &utils.RequestResource{
-		Resource:       cr,
-		RequestContext: ctx,
-		HttpResponse:   res,
-		LocalClient:    c.localKube,
-	}
-
-	if err != nil {
-		setErr := resource.SetError(err)
-		return utils.SetRequestResourceStatus(*resource, setErr)
-	}
-
-	setStatusCode := resource.SetStatusCode()
-	setHeaders := resource.SetHeaders()
-	setBody := resource.SetBody()
-
-	return utils.SetRequestResourceStatus(*resource, setStatusCode, setHeaders, setBody)
+	return c.setRequestStatus(ctx, cr, res, err)
 }
 
 func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.ExternalCreation, error) {
@@ -245,4 +230,31 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) error {
 
 	return errors.Wrap(c.deployAction(ctx, cr, http.MethodDelete,
 		requestDetails.Url, requestDetails.Body, requestDetails.Headers), errFailedToSendHttpRequest)
+}
+
+func (c *external) setRequestStatus(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse, err error) error {
+	resource := &utils.RequestResource{
+		Resource:       cr,
+		RequestContext: ctx,
+		HttpResponse:   res,
+		LocalClient:    c.localKube,
+	}
+
+	setStatusCode := resource.SetStatusCode()
+	setHeaders := resource.SetHeaders()
+	setBody := resource.SetBody()
+	setMethod := resource.SetMethod()
+
+	if err != nil {
+		setErr := resource.SetError(err)
+		utils.SetRequestResourceStatus(*resource, setErr)
+		return err
+	}
+
+	if res.StatusCode != 0 && utils.IsHTTPError(res.StatusCode) {
+		utils.SetRequestResourceStatus(*resource, setStatusCode, setHeaders, setBody, setMethod)
+		return errors.New(fmt.Sprint(utils.ErrStatusCode, res.StatusCode))
+	}
+
+	return utils.SetRequestResourceStatus(*resource, setStatusCode, setHeaders, setBody)
 }
