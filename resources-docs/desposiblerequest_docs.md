@@ -48,9 +48,7 @@ Example `DesposibleRequest` status:
     body: >-
       {
         "id":"65565b69681e0b47dcea4464",
-        "todo_name":"Do Laundry",
-        "reminder":"Every 1 hour",
-        "responsible":"Dan"
+        "key":"value"
       }
     headers:
       Content-Length:
