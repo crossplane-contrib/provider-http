@@ -18,6 +18,7 @@ package desposiblerequest
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
@@ -155,7 +156,8 @@ func (c *external) deployAction(ctx context.Context, cr *v1alpha1.DesposibleRequ
 
 	if err != nil {
 		setErr := resource.SetError(err)
-		return utils.SetRequestResourceStatus(*resource, setErr)
+		utils.SetRequestResourceStatus(*resource, setErr)
+		return err
 	}
 
 	setStatusCode := resource.SetStatusCode()
@@ -163,8 +165,12 @@ func (c *external) deployAction(ctx context.Context, cr *v1alpha1.DesposibleRequ
 	setBody := resource.SetBody()
 	setSynced := resource.SetSynced()
 
+	if res.StatusCode != 0 && utils.IsHTTPError(res.StatusCode) {
+		utils.SetRequestResourceStatus(*resource, setStatusCode, setHeaders, setBody)
+		return errors.New(fmt.Sprint(utils.ErrStatusCode, res.StatusCode))
+	}
+
 	return utils.SetRequestResourceStatus(*resource, setStatusCode, setHeaders, setBody, setSynced)
-	// return requestsUtils.SetDesposibleRequestStatus(ctx, cr, res, c.localKube)
 }
 
 func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.ExternalCreation, error) {
