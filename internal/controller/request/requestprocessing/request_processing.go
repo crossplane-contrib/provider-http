@@ -2,7 +2,6 @@ package requestprocessing
 
 import (
 	"encoding/json"
-	"fmt"
 	"strings"
 
 	"github.com/arielsepton/provider-http/apis/request/v1alpha1"
@@ -16,7 +15,8 @@ func ConvertStringToJQQuery(input string) string {
 	return strings.Join(strings.Fields(input), " ")
 }
 
-// This function receives a jq query format and Request and returns the jq result.
+// ApplyJQOnStr applies a jq query to a Request, returning the result as a string.
+// The function handles complex results by converting them to JSON format.
 func ApplyJQOnStr(jqQuery string, request *v1alpha1.Request, logger logging.Logger) (string, error) {
 	baseMap := generateJQObject(request)
 
@@ -36,31 +36,15 @@ func ApplyJQOnStr(jqQuery string, request *v1alpha1.Request, logger logging.Logg
 	return stringResult, nil
 }
 
-// This function receives a jq query format and Requet and returns the jq result.
-func ApplyJQOnMap(keyToJQQueries map[string][]string, request *v1alpha1.Request, logger logging.Logger) (map[string][]string, error) {
-	mapInterface := make(map[string][]string, len(keyToJQQueries))
-
-	for key, jqQueries := range keyToJQQueries {
-		results := make([]string, len(jqQueries))
-
-		for i, jqQuery := range jqQueries {
-			queryRes, err := ApplyJQOnStr(jqQuery, request, logger)
-
-			if err != nil {
-				logger.Debug(fmt.Sprint(err))
-
-				return nil, err
-			}
-
-			results[i] = queryRes
-		}
-
-		mapInterface[key] = results
-	}
-
-	return mapInterface, nil
+// ApplyJQOnMapStrings applies the provided JQ queries to a map of strings, using the given Request.
+// It generates a base JQ object from the provided Request and then parses the queries to produce the resulting map.
+func ApplyJQOnMapStrings(keyToJQQueries map[string][]string, request *v1alpha1.Request, logger logging.Logger) (map[string][]string, error) {
+	baseMap := generateJQObject(request)
+	return jq.ParseMapStrings(keyToJQQueries, baseMap, logger)
 }
 
+// generateJQObject creates a JSON-compatible map from the specified Request's ForProvider and Status fields.
+// It merges the two maps, converts JSON strings to nested maps, and returns the resulting map.
 func generateJQObject(request *v1alpha1.Request) map[string]interface{} {
 	baseMap, _ := json_util.StructToMap(request.Spec.ForProvider)
 	statusMap, _ := json_util.StructToMap(request.Status)

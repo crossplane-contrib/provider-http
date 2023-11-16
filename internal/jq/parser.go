@@ -11,6 +11,7 @@ import (
 
 const (
 	errStringParseFailed = "failed to parse string:"
+	errResultParseFailed = "failed to parse result on jq query: "
 	errMapParseFailed    = "failed to parse map:"
 	errQueryFailed       = "query should return at least one value"
 	errInvalidQuery      = "failed to parse given mapping -"
@@ -74,36 +75,31 @@ func ParseMapInterface(jqQuery string, obj interface{}, logger logging.Logger) (
 }
 
 func ParseMapStrings(keyToJQQueries map[string][]string, obj interface{}, logger logging.Logger) (map[string][]string, error) {
-	mapInterface := make(map[string][]string, len(keyToJQQueries))
+	result := make(map[string][]string, len(keyToJQQueries))
 
 	for key, jqQueries := range keyToJQQueries {
-
 		results := make([]string, len(jqQueries))
+
 		for i, jqQuery := range jqQueries {
-			logger.Debug("jq query in headers")
-			logger.Debug(jqQuery)
-			queryRes, err := ParseString(jqQuery, obj, logger)
+			queryRes, err := runJQQuery(jqQuery, obj, logger)
 			if err != nil {
-				return nil, err
+				// Log the error and use the original query as a fallback
+				logger.Debug("Error parsing query: ", jqQuery, " using the original value instead.")
+				results[i] = jqQuery
+				continue
 			}
 
-			results[i] = queryRes
+			str, ok := queryRes.(string)
+			if !ok {
+				// Raise an error if the result is not a string
+				return nil, errors.New(fmt.Sprint(errResultParseFailed, jqQuery))
+			}
+
+			results[i] = str
 		}
 
-		mapInterface[key] = results
+		result[key] = results
 	}
 
-	return mapInterface, nil
-}
-
-// This function is for debugging purposes, remove when not neccassary
-func ParseInterface(jqQuery string, obj interface{}, logger logging.Logger) {
-	queryRes, err := runJQQuery(jqQuery, obj, logger)
-	if err != nil {
-		logger.Debug(fmt.Sprint("error ", err))
-
-	}
-
-	logger.Debug(fmt.Sprintf("Type of queryRes: %T", queryRes))
-	logger.Debug(fmt.Sprintf("Value of queryRes: %v", queryRes))
+	return result, nil
 }
