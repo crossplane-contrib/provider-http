@@ -1,4 +1,4 @@
-package httprequest
+package utils
 
 import (
 	"time"
