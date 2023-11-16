@@ -36,7 +36,7 @@ import (
 	"github.com/arielsepton/provider-http/apis/desposiblerequest/v1alpha1"
 	apisv1alpha1 "github.com/arielsepton/provider-http/apis/v1alpha1"
 	httpClient "github.com/arielsepton/provider-http/internal/clients/http"
-	httpRequestsUtils "github.com/arielsepton/provider-http/internal/utils/http_request_utils"
+	"github.com/arielsepton/provider-http/internal/utils"
 )
 
 const (
@@ -101,7 +101,7 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 		return nil, errors.Wrap(err, errProviderNotRetrieved)
 	}
 
-	h, err := c.newHttpClientFn(l, httpRequestsUtils.WaitTimeout(cr.Spec.ForProvider.WaitTimeout))
+	h, err := c.newHttpClientFn(l, utils.WaitTimeout(cr.Spec.ForProvider.WaitTimeout))
 	if err != nil {
 		return nil, errors.Wrap(err, errNewHttpClient)
 	}
@@ -138,7 +138,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 
 	return managed.ExternalObservation{
 		ResourceExists:    true,
-		ResourceUpToDate:  !(httpRequestsUtils.ShouldRetry(cr.Spec.ForProvider.RollbackRetriesLimit, cr.Status.Failed) && !httpRequestsUtils.RetriesLimitReached(cr.Status.Failed, cr.Spec.ForProvider.RollbackRetriesLimit)),
+		ResourceUpToDate:  !(utils.ShouldRetry(cr.Spec.ForProvider.RollbackRetriesLimit, cr.Status.Failed) && !utils.RetriesLimitReached(cr.Status.Failed, cr.Spec.ForProvider.RollbackRetriesLimit)),
 		ConnectionDetails: nil,
 	}, nil
 }
@@ -146,7 +146,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 func (c *external) deployAction(ctx context.Context, cr *v1alpha1.DesposibleRequest, method string, url string, body string, headers map[string][]string) error {
 	res, err := c.http.SendRequest(ctx, method, url, body, headers)
 
-	resource := &httpRequestsUtils.RequestResource{
+	resource := &utils.RequestResource{
 		Resource:       cr,
 		RequestContext: ctx,
 		HttpResponse:   res,
@@ -155,7 +155,7 @@ func (c *external) deployAction(ctx context.Context, cr *v1alpha1.DesposibleRequ
 
 	if err != nil {
 		setErr := resource.SetError(err)
-		return httpRequestsUtils.SetRequestResourceStatus(*resource, setErr)
+		return utils.SetRequestResourceStatus(*resource, setErr)
 	}
 
 	setStatusCode := resource.SetStatusCode()
@@ -163,7 +163,7 @@ func (c *external) deployAction(ctx context.Context, cr *v1alpha1.DesposibleRequ
 	setBody := resource.SetBody()
 	setSynced := resource.SetSynced()
 
-	return httpRequestsUtils.SetRequestResourceStatus(*resource, setStatusCode, setHeaders, setBody, setSynced)
+	return utils.SetRequestResourceStatus(*resource, setStatusCode, setHeaders, setBody, setSynced)
 	// return requestsUtils.SetDesposibleRequestStatus(ctx, cr, res, c.localKube)
 }
 
@@ -173,7 +173,7 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalCreation{}, errors.New(errNotDesposibleRequest)
 	}
 
-	if err := httpRequestsUtils.IsRequestValid(cr.Spec.ForProvider.Method, cr.Spec.ForProvider.URL); err != nil {
+	if err := utils.IsRequestValid(cr.Spec.ForProvider.Method, cr.Spec.ForProvider.URL); err != nil {
 		return managed.ExternalCreation{}, err
 	}
 
@@ -187,7 +187,7 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalUpdate{}, errors.New(errNotDesposibleRequest)
 	}
 
-	if err := httpRequestsUtils.IsRequestValid(cr.Spec.ForProvider.Method, cr.Spec.ForProvider.URL); err != nil {
+	if err := utils.IsRequestValid(cr.Spec.ForProvider.Method, cr.Spec.ForProvider.URL); err != nil {
 		return managed.ExternalUpdate{}, err
 	}
 
