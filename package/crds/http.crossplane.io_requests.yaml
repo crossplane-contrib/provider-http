@@ -309,12 +309,6 @@ spec:
           status:
             description: A RequestStatus represents the observed state of a Request.
             properties:
-              atProvider:
-                description: RequestObservation are the observable fields of a Request.
-                properties:
-                  observableField:
-                    type: string
-                type: object
               conditions:
                 description: Conditions of the resource.
                 items:

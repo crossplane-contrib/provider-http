@@ -285,13 +285,6 @@ spec:
             description: A DesposibleRequestStatus represents the observed state of
               a DesposibleRequest.
             properties:
-              atProvider:
-                description: DesposibleRequestObservation are the observable fields
-                  of a DesposibleRequest.
-                properties:
-                  observableField:
-                    type: string
-                type: object
               conditions:
                 description: Conditions of the resource.
                 items:
@@ -331,8 +324,6 @@ spec:
                 format: int32
                 type: integer
               response:
-                description: DesposibleRequestObservation are the observable fields
-                  of a DesposibleRequest.
                 properties:
                   body:
                     type: string
