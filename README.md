@@ -1,40 +1,76 @@
 # provider-http
 
-`provider-http` is a Crossplane Provider that enables sending one-time HTTP requests as disposable resources.
+`provider-http` is a Crossplane Provider designed to facilitate sending HTTP requests as resources.
+
 
 ## Installation
 
-If you would like to install `provider-http` without modifications, you can use the Crossplane CLI in a Kubernetes cluster where Crossplane is installed:
+To install `provider-http`, you have two options:
 
-```console
-kubectl crossplane install provider crossplanecontrib/provider-http:master
-```
+1. Using the Crossplane CLI in a Kubernetes cluster where Crossplane is installed:
 
-You can also manually install `provider-http` by creating a Provider directly:
+    ```console
+    kubectl crossplane install provider crossplanecontrib/provider-http:master
+    ```
 
-```yaml
-apiVersion: pkg.crossplane.io/v1
-kind: Provider
-metadata:
-  name: provider-http
-spec:
-  package: "crossplanecontrib/provider-http:master"
-```
+2. Manually creating a Provider by applying the following YAML:
+
+    ```yaml
+    apiVersion: pkg.crossplane.io/v1
+    kind: Provider
+    metadata:
+      name: provider-http
+    spec:
+      package: "crossplanecontrib/provider-http:master"
+    ```
+
+
+## Supported Resources
+
+`provider-http` supports the following resources:
+
+- **DisposableRequest:** Initiates a one-time HTTP request. See [DisposableRequest CRD documentation](resources-docs/desposiblerequest_docs.md).
+- **Request:** Manages a resource through HTTP requests. See [Request CRD documentation](resources-docs/request_docs.md).
 
 ## Usage
 
-Currently, `provider-http` supports only one-time requests using the `DisposableRequest` Custom Resource Definition (CRD). This enables you to initiate a single-use HTTP interaction by creating a `DisposableRequest` resource.
+### DisposableRequest
 
-## Developing locally
+Create a `DisposableRequest` resource to initiate a single-use HTTP interaction:
+
+```yaml
+apiVersion: http.crossplane.io/v1alpha1
+kind: DisposableRequest
+metadata:
+  name: example-disposable-request
+spec:
+  # Add your DisposableRequest specification here
+```
+For more detailed examples and configuration options, refer to the [examples directory](examples/sample/).
+
+
+### Request
+
+Manage a resource through HTTP requests with a `Request` resource:
+
+```yaml
+apiVersion: http.crossplane.io/v1alpha1
+kind: Request
+metadata:
+  name: example-request
+spec:
+  # Add your Request specification here
+```
+For more detailed examples and configuration options, refer to the [examples directory](examples/sample/).
+
+
+### Developing locally
 
 Run controller against the cluster:
-
 ```
 make run
 ```
 
-Now you can create `DesposibleRequest` resources with provider reference, see [sample desposiblerequest.yaml](examples/sample/desposiblerequest.yaml).
 
-    ```
-    kubectl create -f examples/sample/desposiblerequest.yaml
-    ```
+### Troubleshooting
+If you encounter any issues during installation or usage, refer to the [troubleshooting guide](https://docs.crossplane.io/knowledge-base/guides/troubleshoot/) for common problems and solutions.
