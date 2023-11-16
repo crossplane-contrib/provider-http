@@ -8,8 +8,7 @@ The `DisposableRequest` resource is designed for initiating one-time HTTP reques
 ### Specification
 
 Here is an example `DisposableRequest` resource definition:
-
-    ```yaml
+```yaml
     apiVersion: http.crossplane.io/v1alpha1
     kind: DisposableRequest
     metadata:
@@ -25,7 +24,7 @@ Here is an example `DisposableRequest` resource definition:
             - application/json
           Authorization:
             - Bearer myToken
-    ```
+```
 
 -  deletionPolicy: specifies what will happen to the underlying external when this managed resource is   deleted. in this case it should be set to "Orphan" the external resource.
 -  url: The URL endpoint for the HTTP request.
