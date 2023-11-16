@@ -5,19 +5,15 @@ metadata:
 spec:
   deletionPolicy: Orphan
   forProvider:
-    url: https://enwgarmh79yh.x.pipedream.net/
+    url: https://api.example.com/health
     method: POST
-    body: '{"key": "value"}'
+    body: |
+      {
+        "check_type": "simple",
+        "additional_info": "optional"
+      }
     headers:
-      Content-Type:
-        - application/json
-        - application/xml
-      Authorization:
-        - Bearer myToken
-      Custom-Header:
-        - Value1
-        - Value2
-        - Value3
+      User-Agent: "Crossplane Health Checker"
   providerConfigRef:
-    name: http-provider
+    name: http-conf
 # TODO: check if it's possible to modify the deletionPolicy to be orphan by default.

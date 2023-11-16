@@ -7,8 +7,6 @@ spec:
     headers:
       Content-Type:
         - application/json
-        - application/xml
-        - .response.body.id
     payload:
       baseUrl: "http://host.docker.internal:5000/todo"
       body: |
@@ -26,6 +24,9 @@ spec:
             responsible: .payload.body.responsible,
           }
         url: .payload.baseUrl
+        headers:
+          Authorization:
+            - token
       - method: "GET"
         url: (.payload.baseUrl + "/" + (.response.body.id|tostring)) 
       - method: "PUT"
