@@ -49,11 +49,6 @@ type Payload struct {
 	Body    string `json:"body"`
 }
 
-// RequestObservation are the observable fields of a Request.
-type RequestObservation struct {
-	ObservableField string `json:"observableField,omitempty"`
-}
-
 // A RequestSpec defines the desired state of a Request.
 type RequestSpec struct {
 	xpv1.ResourceSpec `json:",inline"`
@@ -70,10 +65,9 @@ type Response struct {
 // A RequestStatus represents the observed state of a Request.
 type RequestStatus struct {
 	xpv1.ResourceStatus `json:",inline"`
-	AtProvider          RequestObservation `json:"atProvider,omitempty"`
-	Response            Response           `json:"response,omitempty"`
-	Failed              int32              `json:"failed,omitempty"`
-	Error               string             `json:"error,omitempty"`
+	Response            Response `json:"response,omitempty"`
+	Failed              int32    `json:"failed,omitempty"`
+	Error               string   `json:"error,omitempty"`
 }
 
 // +kubebuilder:object:root=true

@@ -37,11 +37,6 @@ type DesposibleRequestParameters struct {
 	RollbackRetriesLimit *int32 `json:"rollbackLimit,omitempty"`
 }
 
-// DesposibleRequestObservation are the observable fields of a DesposibleRequest.
-type DesposibleRequestObservation struct {
-	ObservableField string `json:"observableField,omitempty"`
-}
-
 // A DesposibleRequestSpec defines the desired state of a DesposibleRequest.
 type DesposibleRequestSpec struct {
 	xpv1.ResourceSpec `json:",inline"`
@@ -50,7 +45,6 @@ type DesposibleRequestSpec struct {
 	ForProvider DesposibleRequestParameters `json:"forProvider"`
 }
 
-// DesposibleRequestObservation are the observable fields of a DesposibleRequest.
 type Response struct {
 	StatusCode int                 `json:"statusCode,omitempty"`
 	Body       string              `json:"body,omitempty"`
@@ -60,11 +54,10 @@ type Response struct {
 // A DesposibleRequestStatus represents the observed state of a DesposibleRequest.
 type DesposibleRequestStatus struct {
 	xpv1.ResourceStatus `json:",inline"`
-	AtProvider          DesposibleRequestObservation `json:"atProvider,omitempty"`
-	Response            Response                     `json:"response,omitempty"`
-	Failed              int32                        `json:"failed,omitempty"`
-	Error               string                       `json:"error,omitempty"`
-	Synced              bool                         `json:"synced,omitempty"`
+	Response            Response `json:"response,omitempty"`
+	Failed              int32    `json:"failed,omitempty"`
+	Error               string   `json:"error,omitempty"`
+	Synced              bool     `json:"synced,omitempty"`
 }
 
 // +kubebuilder:object:root=true
