@@ -40,7 +40,7 @@ func generateBody(mappingBody string, cr *v1alpha1.Request, logger logging.Logge
 }
 
 func generateHeaders(headers map[string][]string, cr *v1alpha1.Request, logger logging.Logger) (map[string][]string, error) {
-	generatedHeaders, err := requestprocessing.ApplyJQOnMap(headers, cr, logger)
+	generatedHeaders, err := requestprocessing.ApplyJQOnMapStrings(headers, cr, logger)
 	if err != nil {
 		return nil, err
 	}

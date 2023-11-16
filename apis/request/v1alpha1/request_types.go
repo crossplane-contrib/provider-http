@@ -37,7 +37,7 @@ type RequestParameters struct {
 }
 
 type Mapping struct {
-	// +kubebuilder:validation:Enum=POST,GET,PUT
+	// +kubebuilder:validation:Enum=POST;GET;PUT;DELETE
 	Method  string              `json:"method"`
 	Body    string              `json:"body,omitempty"`
 	URL     string              `json:"url"`

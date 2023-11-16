@@ -8,8 +8,9 @@ spec:
       Content-Type:
         - application/json
         - application/xml
+        - .response.body.id
     payload:
-      baseUrl: "https://mytryings.free.beeceptor.com"
+      baseUrl: "http://host.docker.internal:5000/todo"
       body: |
         {
           "name": "Do Laundry", 
@@ -23,7 +24,6 @@ spec:
             todo_name: .payload.body.name, 
             reminder: .payload.body.reminder, 
             responsible: .payload.body.responsible,
-            managed_by: "crossplane!"
           }
         url: .payload.baseUrl
       - method: "GET"

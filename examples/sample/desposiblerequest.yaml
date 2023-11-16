@@ -1,13 +1,13 @@
 apiVersion: http.crossplane.io/v1alpha1
 kind: DesposibleRequest
 metadata:
-  name: request
+  name: health-check
 spec:
   deletionPolicy: Orphan
   forProvider:
     url: https://enwgarmh79yh.x.pipedream.net/
     method: POST
-    body: '{"key1": "value2"}'
+    body: '{"key": "value"}'
     headers:
       Content-Type:
         - application/json
