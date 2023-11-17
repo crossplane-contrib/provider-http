@@ -1,0 +1,23 @@
+apiVersion: http.crossplane.io/v1alpha1
+kind: DesposibleRequest
+metadata:
+  name: request
+spec:
+  deletionPolicy: Orphan
+  forProvider:
+    url: https://enwgarmh79yh.x.pipedream.net/
+    method: POST
+    body: '{"key1": "value2"}'
+    headers:
+      Content-Type:
+        - application/json
+        - application/xml
+      Authorization:
+        - Bearer myToken
+      Custom-Header:
+        - Value1
+        - Value2
+        - Value3
+  providerConfigRef:
+    name: http-provider
+# TODO: check if it's possible to modify the deletionPolicy to be orphan by default.

@@ -1,0 +1,30 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: cluster-role-job
+rules:
+  - apiGroups: ["apiextensions.crossplane.io", "releases.example.io", "http.crossplane.io"]
+    resources:
+      - demos
+      - compositeresourcedefinitions
+      - compositions
+      - requests
+    verbs:
+      - create    
+      - get
+      - delete
+      - patch
+      - list
+---    
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: role-binding-job
+subjects:
+- kind: ServiceAccount
+  name: default
+  namespace: default
+roleRef:
+  kind: ClusterRole
+  name: cluster-role-job
+  apiGroup: rbac.authorization.k8s.io
