@@ -83,8 +83,7 @@ func ParseMapStrings(keyToJQQueries map[string][]string, obj interface{}, logger
 		for i, jqQuery := range jqQueries {
 			queryRes, err := runJQQuery(jqQuery, obj, logger)
 			if err != nil {
-				// Log the error and use the original query as a fallback
-				logger.Debug("Error parsing query: ", jqQuery, " using the original value instead.")
+				// Use the original query as a fallback
 				results[i] = jqQuery
 				continue
 			}
