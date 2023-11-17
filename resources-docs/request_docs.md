@@ -45,7 +45,7 @@ Here is an example `Request` resource definition:
   ```
 
 - headers: Default HTTP request headers.
-- payload: Customizable values for HTTP requests, with jq query support [jq Documentation](https://lzone.de/cheat-sheet/jq).
+- payload: Customizable values for HTTP requests, with jq query support [jq Documentation](https://jqlang.github.io/jq/manual/#object-identifier-index).
 - mappings: List of mappings, each specifying the HTTP method, URL, and optional request body.
 
 
