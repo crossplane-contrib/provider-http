@@ -1,0 +1,59 @@
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: example
+  labels: 
+    crossplane.io/xrd: xdemos.releases.example.io
+spec:
+  writeConnectionSecretsToNamespace: crossplane-system
+  compositeTypeRef:
+    apiVersion: releases.example.io/v1alpha1
+    kind: XDemo
+  resources:
+  - name: demo
+    base:
+      apiVersion: helm.crossplane.io/v1beta1
+      kind: Release
+      spec:
+        forProvider:
+          chart:
+            name: wordpress
+            repository: https://charts.bitnami.com/bitnami
+            version: 15.2.5
+          namespace: wordpress
+        providerConfigRef:
+          name: helm-provider
+    patches:
+      - fromFieldPath: spec.Namespace
+        toFieldPath: "spec.forProvider.namespace"
+      - type: ToCompositeFieldPath
+        fromFieldPath: status.atProvider.state
+        toFieldPath: status.helm.state
+        policy:
+          fromFieldPath: Optional
+  - name: httprequestincompo
+    base:
+      apiVersion: http.crossplane.io/v1alpha1
+      kind: DesposibleRequest 
+      spec:
+          deletionPolicy: Orphan
+          forProvider:
+            url: https://enwgarmh79yh.x.pipedream.net/
+            method: POST
+            body: '{"key1": "value1"}'
+            headers:
+              Authorization:
+                - Just a Token
+              Custom-Header:
+                - Nice Header
+                - Value2
+                - Value3
+          providerConfigRef:
+            name: http-conf
+          rollbackLimit: 2
+    patches:
+    # This ensures the request won't happen unless the helm chart is deployed.
+      - fromFieldPath: status.helm.state 
+        toFieldPath: spec.forProvider.state 
+        policy:
+          fromFieldPath: Required
