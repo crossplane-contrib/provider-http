@@ -67,8 +67,14 @@ type Response struct {
 type RequestStatus struct {
 	xpv1.ResourceStatus `json:",inline"`
 	Response            Response `json:"response,omitempty"`
+	Cache               Cache    `json:"cache,omitempty"`
 	Failed              int32    `json:"failed,omitempty"`
 	Error               string   `json:"error,omitempty"`
+}
+
+type Cache struct {
+	LastUpdated string   `json:"lastUpdated,omitempty"`
+	Response    Response `json:"response,omitempty"`
 }
 
 // +kubebuilder:object:root=true

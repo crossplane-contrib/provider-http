@@ -21,10 +21,10 @@ type client struct {
 }
 
 type HttpResponse struct {
-	ResponseBody string
-	Headers      map[string][]string
-	StatusCode   int
-	Method       string
+	Body       string
+	Headers    map[string][]string
+	StatusCode int
+	Method     string
 }
 
 func (hc *client) SendRequest(ctx context.Context, method string, url string, body string, headers map[string][]string) (resp HttpResponse, err error) {
@@ -56,10 +56,10 @@ func (hc *client) SendRequest(ctx context.Context, method string, url string, bo
 	}
 
 	beautifiedResponse := HttpResponse{
-		ResponseBody: string(responsebody),
-		Headers:      response.Header,
-		StatusCode:   response.StatusCode,
-		Method:       response.Request.Method,
+		Body:       string(responsebody),
+		Headers:    response.Header,
+		StatusCode: response.StatusCode,
+		Method:     response.Request.Method,
 	}
 
 	err = response.Body.Close()

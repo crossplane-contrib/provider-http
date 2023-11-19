@@ -50,8 +50,8 @@ func (rr *RequestResource) SetHeaders() SetRequestStatusFunc {
 func (rr *RequestResource) SetBody() SetRequestStatusFunc {
 	return func() error {
 		if resp, ok := rr.Resource.(ResponseSetter); ok {
-			if rr.HttpResponse.ResponseBody != "" {
-				resp.SetBody(rr.HttpResponse.ResponseBody)
+			if rr.HttpResponse.Body != "" {
+				resp.SetBody(rr.HttpResponse.Body)
 				return rr.LocalClient.Status().Update(rr.RequestContext, rr.Resource)
 			}
 		}
@@ -81,6 +81,16 @@ func (rr *RequestResource) SetSynced() SetRequestStatusFunc {
 	}
 }
 
+func (rr *RequestResource) SetCache() SetRequestStatusFunc {
+	return func() error {
+		if cached, ok := rr.Resource.(CacheSetter); ok {
+			cached.SetCache(rr.HttpResponse.StatusCode, rr.HttpResponse.Headers, rr.HttpResponse.Body, rr.HttpResponse.Method)
+			return rr.LocalClient.Status().Update(rr.RequestContext, rr.Resource)
+		}
+		return nil
+	}
+}
+
 func (rr *RequestResource) SetError(err error) SetRequestStatusFunc {
 	return func() error {
 		if resourceSetErr, ok := rr.Resource.(ErrorSetter); ok {
@@ -97,6 +107,10 @@ type ResponseSetter interface {
 	SetHeaders(headers map[string][]string)
 	SetBody(body string)
 	SetMethod(method string)
+}
+
+type CacheSetter interface {
+	SetCache(statusCode int, headers map[string][]string, body string, method string)
 }
 
 type SyncedSetter interface {
