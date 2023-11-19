@@ -6,7 +6,7 @@ import (
 )
 
 // Convert HttpResponse to Response
-func HttpResponseToResponse(httpResponse httpClient.HttpResponse) v1alpha1.Response {
+func HttpResponseToV1alpha1Response(httpResponse httpClient.HttpResponse) v1alpha1.Response {
 	return v1alpha1.Response{
 		StatusCode: httpResponse.StatusCode,
 		Body:       httpResponse.Body,
