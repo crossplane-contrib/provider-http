@@ -39,6 +39,7 @@ import (
 	apisv1alpha1 "github.com/arielsepton/provider-http/apis/v1alpha1"
 	httpClient "github.com/arielsepton/provider-http/internal/clients/http"
 	"github.com/arielsepton/provider-http/internal/controller/request/requestgen"
+	"github.com/arielsepton/provider-http/internal/controller/request/responseconverter"
 	"github.com/arielsepton/provider-http/internal/utils"
 )
 
@@ -53,6 +54,7 @@ const (
 	errPostMappingNotFound     = "POST mapping doesn't exist in request"
 	errPutMappingNotFound      = "PUT mapping doesn't exist in request"
 	errDeleteMappingNotFound   = "DELETE mapping doesn't exist in request"
+	errMappingNotFound         = " mapping doesn't exist in request"
 )
 
 // Setup adds a controller that reconciles Request managed resources.
@@ -163,10 +165,19 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	}, nil
 }
 
-func (c *external) deployAction(ctx context.Context, cr *v1alpha1.Request, method string, url string, body string, headers map[string][]string) error {
-	res, err := c.http.SendRequest(ctx, method, url, body, headers)
+func (c *external) deployAction(ctx context.Context, cr *v1alpha1.Request, method string) error {
+	mapping, ok := getMappingByMethod(&cr.Spec.ForProvider, method)
+	if !ok {
+		return errors.New(fmt.Sprint(method, errMappingNotFound))
+	}
 
-	return c.setRequestStatus(ctx, cr, res, err)
+	requestDetails, err := generateValidRequestDetails(cr, mapping, c.logger)
+	if err != nil {
+		return err
+	}
+
+	res, err := c.http.SendRequest(ctx, mapping.Method, requestDetails.Url, requestDetails.Body, requestDetails.Headers)
+	return c.setRequestStatus(ctx, cr, res, mapping, err)
 }
 
 func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.ExternalCreation, error) {
@@ -176,18 +187,7 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalCreation{}, errors.New(errNotRequest)
 	}
 
-	postMapping, ok := getMappingByMethod(&cr.Spec.ForProvider, http.MethodPost)
-	if !ok {
-		return managed.ExternalCreation{}, errors.New(errPostMappingNotFound)
-	}
-
-	requestDetails, err := requestgen.GenerateValidRequestDetails(*postMapping, cr, c.logger)
-	if err != nil {
-		return managed.ExternalCreation{}, err
-	}
-
-	return managed.ExternalCreation{}, errors.Wrap(c.deployAction(ctx, cr, http.MethodPost,
-		requestDetails.Url, requestDetails.Body, requestDetails.Headers), errFailedToSendHttpRequest)
+	return managed.ExternalCreation{}, errors.Wrap(c.deployAction(ctx, cr, http.MethodPost), errFailedToSendHttpRequest)
 }
 
 func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.ExternalUpdate, error) {
@@ -197,18 +197,7 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalUpdate{}, errors.New(errNotRequest)
 	}
 
-	putMapping, ok := getMappingByMethod(&cr.Spec.ForProvider, http.MethodPut)
-	if !ok {
-		return managed.ExternalUpdate{}, errors.New(errPutMappingNotFound)
-	}
-
-	requestDetails, err := requestgen.GenerateValidRequestDetails(*putMapping, cr, c.logger)
-	if err != nil {
-		return managed.ExternalUpdate{}, err
-	}
-
-	return managed.ExternalUpdate{}, errors.Wrap(c.deployAction(ctx, cr, http.MethodPut,
-		requestDetails.Url, requestDetails.Body, requestDetails.Headers), errFailedToSendHttpRequest)
+	return managed.ExternalUpdate{}, errors.Wrap(c.deployAction(ctx, cr, http.MethodPut), errFailedToSendHttpRequest)
 }
 
 func (c *external) Delete(ctx context.Context, mg resource.Managed) error {
@@ -218,21 +207,10 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) error {
 		return errors.New(errNotRequest)
 	}
 
-	deleteMapping, ok := getMappingByMethod(&cr.Spec.ForProvider, http.MethodDelete)
-	if !ok {
-		return errors.New(errDeleteMappingNotFound)
-	}
-
-	requestDetails, err := requestgen.GenerateValidRequestDetails(*deleteMapping, cr, c.logger)
-	if err != nil {
-		return err
-	}
-
-	return errors.Wrap(c.deployAction(ctx, cr, http.MethodDelete,
-		requestDetails.Url, requestDetails.Body, requestDetails.Headers), errFailedToSendHttpRequest)
+	return errors.Wrap(c.deployAction(ctx, cr, http.MethodDelete), errFailedToSendHttpRequest)
 }
 
-func (c *external) setRequestStatus(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse, err error) error {
+func (c *external) setRequestStatus(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse, mapping *v1alpha1.Mapping, err error) error {
 	resource := &utils.RequestResource{
 		Resource:       cr,
 		RequestContext: ctx,
@@ -240,21 +218,45 @@ func (c *external) setRequestStatus(ctx context.Context, cr *v1alpha1.Request, r
 		LocalClient:    c.localKube,
 	}
 
-	setStatusCode := resource.SetStatusCode()
-	setHeaders := resource.SetHeaders()
-	setBody := resource.SetBody()
-	setMethod := resource.SetMethod()
+	setStatusCode, setHeaders, setBody, setMethod := resource.SetStatusCode(), resource.SetHeaders(), resource.SetBody(), resource.SetMethod()
 
 	if err != nil {
-		setErr := resource.SetError(err)
-		utils.SetRequestResourceStatus(*resource, setErr)
+		utils.SetRequestResourceStatus(*resource, resource.SetError(err))
 		return err
 	}
 
-	if res.StatusCode != 0 && utils.IsHTTPError(res.StatusCode) {
+	if utils.IsHTTPError(res.StatusCode) {
 		utils.SetRequestResourceStatus(*resource, setStatusCode, setHeaders, setBody, setMethod)
 		return errors.New(fmt.Sprint(utils.ErrStatusCode, res.StatusCode))
 	}
 
-	return utils.SetRequestResourceStatus(*resource, setStatusCode, setHeaders, setBody)
+	if utils.IsHTTPSuccess(res.StatusCode) && shouldSetCache(mapping, res, cr.Spec.ForProvider, c.logger) {
+		return utils.SetRequestResourceStatus(*resource, setStatusCode, setHeaders, setBody, setMethod, resource.SetCache())
+	}
+
+	return utils.SetRequestResourceStatus(*resource, setStatusCode, setHeaders, setBody, setMethod)
+}
+
+func shouldSetCache(mapping *v1alpha1.Mapping, res httpClient.HttpResponse, forProvider v1alpha1.RequestParameters, logger logging.Logger) bool {
+	response := responseconverter.HttpResponseToResponse(res)
+	requestDetails, _, ok := requestgen.GenerateRequestDetails(*mapping, forProvider, response, logger)
+	if !ok {
+		return false
+	}
+
+	return requestgen.IsRequestValid(requestDetails)
+}
+
+func generateValidRequestDetails(cr *v1alpha1.Request, mapping *v1alpha1.Mapping, logger logging.Logger) (requestgen.RequestDetails, error) {
+	requestDetails, _, ok := requestgen.GenerateRequestDetails(*mapping, cr.Spec.ForProvider, cr.Status.Response, logger)
+	if requestgen.IsRequestValid(requestDetails) && ok {
+		return requestDetails, nil
+	}
+
+	requestDetails, err, _ := requestgen.GenerateRequestDetails(*mapping, cr.Spec.ForProvider, cr.Status.Cache.Response, logger)
+	if err != nil {
+		return requestgen.RequestDetails{}, err
+	}
+
+	return requestDetails, nil
 }
