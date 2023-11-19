@@ -309,6 +309,28 @@ spec:
           status:
             description: A RequestStatus represents the observed state of a Request.
             properties:
+              cache:
+                properties:
+                  lastUpdated:
+                    type: string
+                  response:
+                    description: RequestObservation are the observable fields of a
+                      Request.
+                    properties:
+                      body:
+                        type: string
+                      headers:
+                        additionalProperties:
+                          items:
+                            type: string
+                          type: array
+                        type: object
+                      method:
+                        type: string
+                      statusCode:
+                        type: integer
+                    type: object
+                type: object
               conditions:
                 description: Conditions of the resource.
                 items:
