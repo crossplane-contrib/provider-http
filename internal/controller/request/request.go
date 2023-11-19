@@ -210,6 +210,10 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) error {
 	return errors.Wrap(c.deployAction(ctx, cr, http.MethodDelete), errFailedToSendHttpRequest)
 }
 
+// setRequestStatus updates the current Request's status to reflect the details of the last HTTP request that occurred.
+// It takes the context, the Request resource, the HTTP response, the mapping configuration, and any error that occurred
+// during the HTTP request. The function sets the status fields such as StatusCode, Headers, Body, Method, and Cache,
+// based on the outcome of the HTTP request and the presence of an error.
 func (c *external) setRequestStatus(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse, mapping *v1alpha1.Mapping, err error) error {
 	resource := &utils.RequestResource{
 		Resource:       cr,
@@ -237,8 +241,11 @@ func (c *external) setRequestStatus(ctx context.Context, cr *v1alpha1.Request, r
 	return utils.SetRequestResourceStatus(*resource, setStatusCode, setHeaders, setBody, setMethod)
 }
 
+// shouldSetCache determines whether the cache should be updated based on the provided mapping, HTTP response,
+// and RequestParameters. It generates request details according to the given mapping and response. If the request
+// details are not valid, it means that instead of using the response, the cache should be used.
 func shouldSetCache(mapping *v1alpha1.Mapping, res httpClient.HttpResponse, forProvider v1alpha1.RequestParameters, logger logging.Logger) bool {
-	response := responseconverter.HttpResponseToResponse(res)
+	response := responseconverter.HttpResponseToV1alpha1Response(res)
 	requestDetails, _, ok := requestgen.GenerateRequestDetails(*mapping, forProvider, response, logger)
 	if !ok {
 		return false
@@ -247,6 +254,11 @@ func shouldSetCache(mapping *v1alpha1.Mapping, res httpClient.HttpResponse, forP
 	return requestgen.IsRequestValid(requestDetails)
 }
 
+// generateValidRequestDetails generates valid request details based on the given Request resource and Mapping configuration.
+// It first attempts to generate request details using the HTTP response stored in the Request's status. If the generated
+// details are valid, the function returns them. If not, it falls back to using the cached response in the Request's status
+// and attempts to generate request details again. The function returns the generated request details or an error if the
+// generation process fails.
 func generateValidRequestDetails(cr *v1alpha1.Request, mapping *v1alpha1.Mapping, logger logging.Logger) (requestgen.RequestDetails, error) {
 	requestDetails, _, ok := requestgen.GenerateRequestDetails(*mapping, cr.Spec.ForProvider, cr.Status.Response, logger)
 	if requestgen.IsRequestValid(requestDetails) && ok {
