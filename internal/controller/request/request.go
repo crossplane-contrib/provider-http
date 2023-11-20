@@ -177,11 +177,10 @@ func (c *external) deployAction(ctx context.Context, cr *v1alpha1.Request, metho
 	}
 
 	res, err := c.http.SendRequest(ctx, mapping.Method, requestDetails.Url, requestDetails.Body, requestDetails.Headers)
-	return c.setRequestStatus(ctx, cr, res, mapping, err)
+	return c.setRequestStatus(ctx, cr, res, err)
 }
 
 func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.ExternalCreation, error) {
-	c.logger.Debug("post is here")
 	cr, ok := mg.(*v1alpha1.Request)
 	if !ok {
 		return managed.ExternalCreation{}, errors.New(errNotRequest)
@@ -191,7 +190,6 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 }
 
 func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.ExternalUpdate, error) {
-	c.logger.Debug("put is here")
 	cr, ok := mg.(*v1alpha1.Request)
 	if !ok {
 		return managed.ExternalUpdate{}, errors.New(errNotRequest)
@@ -201,7 +199,6 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 }
 
 func (c *external) Delete(ctx context.Context, mg resource.Managed) error {
-	c.logger.Debug("delete is here")
 	cr, ok := mg.(*v1alpha1.Request)
 	if !ok {
 		return errors.New(errNotRequest)
@@ -214,7 +211,7 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) error {
 // It takes the context, the Request resource, the HTTP response, the mapping configuration, and any error that occurred
 // during the HTTP request. The function sets the status fields such as StatusCode, Headers, Body, Method, and Cache,
 // based on the outcome of the HTTP request and the presence of an error.
-func (c *external) setRequestStatus(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse, mapping *v1alpha1.Mapping, err error) error {
+func (c *external) setRequestStatus(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse, err error) error {
 	resource := &utils.RequestResource{
 		Resource:       cr,
 		RequestContext: ctx,
@@ -234,7 +231,7 @@ func (c *external) setRequestStatus(ctx context.Context, cr *v1alpha1.Request, r
 		return errors.New(fmt.Sprint(utils.ErrStatusCode, res.StatusCode))
 	}
 
-	if utils.IsHTTPSuccess(res.StatusCode) && shouldSetCache(mapping, res, cr.Spec.ForProvider, c.logger) {
+	if utils.IsHTTPSuccess(res.StatusCode) && shouldSetCache(cr.Spec.ForProvider.Mappings, res, cr.Spec.ForProvider, c.logger) {
 		return utils.SetRequestResourceStatus(*resource, setStatusCode, setHeaders, setBody, setMethod, resource.SetCache())
 	}
 
@@ -244,14 +241,16 @@ func (c *external) setRequestStatus(ctx context.Context, cr *v1alpha1.Request, r
 // shouldSetCache determines whether the cache should be updated based on the provided mapping, HTTP response,
 // and RequestParameters. It generates request details according to the given mapping and response. If the request
 // details are not valid, it means that instead of using the response, the cache should be used.
-func shouldSetCache(mapping *v1alpha1.Mapping, res httpClient.HttpResponse, forProvider v1alpha1.RequestParameters, logger logging.Logger) bool {
-	response := responseconverter.HttpResponseToV1alpha1Response(res)
-	requestDetails, _, ok := requestgen.GenerateRequestDetails(*mapping, forProvider, response, logger)
-	if !ok {
-		return false
+func shouldSetCache(mappings []v1alpha1.Mapping, res httpClient.HttpResponse, forProvider v1alpha1.RequestParameters, logger logging.Logger) bool {
+	for _, mapping := range mappings {
+		response := responseconverter.HttpResponseToV1alpha1Response(res)
+		requestDetails, _, ok := requestgen.GenerateRequestDetails(mapping, forProvider, response, logger)
+		if !(requestgen.IsRequestValid(requestDetails) && ok) {
+			return false
+		}
 	}
 
-	return requestgen.IsRequestValid(requestDetails)
+	return true
 }
 
 // generateValidRequestDetails generates valid request details based on the given Request resource and Mapping configuration.
