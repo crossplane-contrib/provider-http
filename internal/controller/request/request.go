@@ -18,8 +18,8 @@ package request
 
 import (
 	"context"
-	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
@@ -54,7 +54,7 @@ const (
 	errPostMappingNotFound     = "POST mapping doesn't exist in request"
 	errPutMappingNotFound      = "PUT mapping doesn't exist in request"
 	errDeleteMappingNotFound   = "DELETE mapping doesn't exist in request"
-	errMappingNotFound         = " mapping doesn't exist in request"
+	errMappingNotFound         = "%s mapping doesn't exist in request"
 )
 
 // Setup adds a controller that reconciles Request managed resources.
@@ -168,7 +168,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 func (c *external) deployAction(ctx context.Context, cr *v1alpha1.Request, method string) error {
 	mapping, ok := getMappingByMethod(&cr.Spec.ForProvider, method)
 	if !ok {
-		return errors.New(fmt.Sprint(method, errMappingNotFound))
+		return errors.Errorf(errMappingNotFound, method)
 	}
 
 	requestDetails, err := generateValidRequestDetails(cr, mapping, c.logger)
@@ -228,7 +228,7 @@ func (c *external) setRequestStatus(ctx context.Context, cr *v1alpha1.Request, r
 
 	if utils.IsHTTPError(res.StatusCode) {
 		utils.SetRequestResourceStatus(*resource, setStatusCode, setHeaders, setBody, setMethod)
-		return errors.New(fmt.Sprint(utils.ErrStatusCode, res.StatusCode))
+		return errors.Errorf(utils.ErrStatusCode, strconv.Itoa(res.StatusCode))
 	}
 
 	if utils.IsHTTPSuccess(res.StatusCode) && shouldSetCache(cr.Spec.ForProvider.Mappings, res, cr.Spec.ForProvider, c.logger) {

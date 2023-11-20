@@ -18,7 +18,7 @@ package desposiblerequest
 
 import (
 	"context"
-	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
@@ -48,6 +48,7 @@ const (
 	errFailedToSendHttpDesposibleRequest = "failed to send http request"
 	errFailedToSetStatusCode             = "failed to update status code"
 	errFailedToSetError                  = "failed to update request error"
+	errFailedToUpdate                    = "failed updating CR"
 )
 
 // Setup adds a controller that reconciles DesposibleRequest managed resources.
@@ -134,7 +135,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 
 	cr.Status.SetConditions(xpv1.Available())
 	if err := c.localKube.Status().Update(ctx, cr); err != nil {
-		return managed.ExternalObservation{}, errors.New("failed updating CR")
+		return managed.ExternalObservation{}, errors.New(errFailedToUpdate)
 	}
 
 	return managed.ExternalObservation{
@@ -167,7 +168,7 @@ func (c *external) deployAction(ctx context.Context, cr *v1alpha1.DesposibleRequ
 
 	if res.StatusCode != 0 && utils.IsHTTPError(res.StatusCode) {
 		utils.SetRequestResourceStatus(*resource, setStatusCode, setHeaders, setBody)
-		return errors.New(fmt.Sprint(utils.ErrStatusCode, res.StatusCode))
+		return errors.Errorf(utils.ErrStatusCode, strconv.Itoa(res.StatusCode))
 	}
 
 	return utils.SetRequestResourceStatus(*resource, setStatusCode, setHeaders, setBody, setSynced)

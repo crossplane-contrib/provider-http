@@ -1,20 +1,21 @@
 package jq
 
 import (
-	"errors"
 	"fmt"
 	"sync"
+
+	"github.com/pkg/errors"
 
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
 	"github.com/itchyny/gojq"
 )
 
 const (
-	errStringParseFailed = "failed to parse string:"
-	errResultParseFailed = "failed to parse result on jq query: "
-	errMapParseFailed    = "failed to parse map:"
-	errQueryFailed       = "query should return at least one value"
-	errInvalidQuery      = "failed to parse given mapping -"
+	errStringParseFailed = "failed to parse string: %s"
+	errResultParseFailed = "failed to parse result on jq query: %s"
+	errMapParseFailed    = "failed to parse map: %s"
+	errQueryFailed       = "query should return at least one value, failed on: %s"
+	errInvalidQuery      = "failed to parse given mapping - %s jq error: %s"
 )
 
 var mutex = &sync.Mutex{}
@@ -30,12 +31,12 @@ func runJQQuery(jqQuery string, obj interface{}, logger logging.Logger) (interfa
 	mutex.Unlock()
 
 	if !ok {
-		return nil, errors.New(fmt.Sprint(errQueryFailed, queryRes))
+		return nil, errors.Errorf(errQueryFailed, fmt.Sprint(queryRes))
 	}
 
 	err, ok = queryRes.(error)
 	if ok {
-		return nil, errors.New(fmt.Sprint(errInvalidQuery, " ", jqQuery, " jq error: ", err.Error()))
+		return nil, errors.Errorf(errInvalidQuery, jqQuery, err.Error())
 	}
 
 	return queryRes, nil
@@ -49,7 +50,7 @@ func ParseString(jqQuery string, obj interface{}, logger logging.Logger) (string
 
 	str, ok := queryRes.(string)
 	if !ok {
-		return "", errors.New(fmt.Sprint(errStringParseFailed, queryRes))
+		return "", errors.Errorf(errStringParseFailed, fmt.Sprint(queryRes))
 	}
 
 	return str, nil
@@ -71,7 +72,7 @@ func ParseMapInterface(jqQuery string, obj interface{}, logger logging.Logger) (
 		return mapInterface, nil
 	}
 
-	return nil, errors.New(fmt.Sprint(errMapParseFailed, queryRes))
+	return nil, errors.Errorf(errMapParseFailed, fmt.Sprint(queryRes))
 }
 
 func ParseMapStrings(keyToJQQueries map[string][]string, obj interface{}, logger logging.Logger) (map[string][]string, error) {
@@ -91,7 +92,7 @@ func ParseMapStrings(keyToJQQueries map[string][]string, obj interface{}, logger
 			str, ok := queryRes.(string)
 			if !ok {
 				// Raise an error if the result is not a string
-				return nil, errors.New(fmt.Sprint(errResultParseFailed, jqQuery))
+				return nil, errors.Errorf(errResultParseFailed, fmt.Sprint(queryRes))
 			}
 
 			results[i] = str

@@ -2,7 +2,6 @@ package request
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"strings"
 
@@ -14,11 +13,10 @@ import (
 )
 
 const (
-	errObjectNotFound         = "object wasn't created"
-	errNoGetMapping           = "forProvider doesn't contain GET mapping"
-	errNoPutMapping           = "forProvider doesn't contain PUT mapping"
-	errBodyNotValidJSON       = "response body is not a valid JSON string "
-	errPutMappingNotValidJSON = "PUT mapping is not a valid JSON string"
+	errObjectNotFound = "object wasn't created"
+	errNoGetMapping   = "forProvider doesn't contain GET mapping"
+	errNoPutMapping   = "forProvider doesn't contain PUT mapping"
+	errNotValidJSON   = "%s is not a valid JSON string: %s"
 )
 
 // isUpToDate checks whether desired spec up to date with the observed state for a given request
@@ -64,11 +62,11 @@ func (c *external) isUpToDate(ctx context.Context, cr *v1alpha1.Request) (bool, 
 	}
 
 	if !json.IsJSONString(res.Body) && json.IsJSONString(desiredState) {
-		return false, errors.New(fmt.Sprint(errBodyNotValidJSON, res.Body))
+		return false, errors.Errorf(errNotValidJSON, "response body", res.Body)
 	}
 
 	if json.IsJSONString(res.Body) && !json.IsJSONString(desiredState) {
-		return false, errors.New(errPutMappingNotValidJSON)
+		return false, errors.Errorf(errNotValidJSON, "PUT mapping result", desiredState)
 	}
 
 	return strings.Contains(res.Body, desiredState) && utils.IsHTTPSuccess(res.StatusCode), nil
