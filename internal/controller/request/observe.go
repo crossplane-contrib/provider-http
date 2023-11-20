@@ -2,7 +2,9 @@ package request
 
 import (
 	"context"
+	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/arielsepton/provider-http/apis/request/v1alpha1"
 	"github.com/arielsepton/provider-http/internal/json"
@@ -12,9 +14,11 @@ import (
 )
 
 const (
-	errObjectNotFound = "object wasn't created"
-	errNoGetMapping   = "forProvider doesn't contain GET mapping"
-	errNoPutMapping   = "forProvider doesn't contain PUT mapping"
+	errObjectNotFound         = "object wasn't created"
+	errNoGetMapping           = "forProvider doesn't contain GET mapping"
+	errNoPutMapping           = "forProvider doesn't contain PUT mapping"
+	errBodyNotValidJSON       = "response body is not a valid JSON string "
+	errPutMappingNotValidJSON = "PUT mapping is not a valid JSON string"
 )
 
 // isUpToDate checks whether desired spec up to date with the observed state for a given request
@@ -48,16 +52,26 @@ func (c *external) isUpToDate(ctx context.Context, cr *v1alpha1.Request) (bool, 
 		return false, err
 	}
 
-	// TODO (REL): check what happens if one of them is not a json.
-	responseBodyMap, _ := json.JsonStringToMap(res.Body)
-	desiredStateMap, _ := json.JsonStringToMap(desiredState)
-
-	err = c.setRequestStatus(ctx, cr, res, methodGetMapping, err)
+	err = c.setRequestStatus(ctx, cr, res, err)
 	if err != nil {
 		return false, err
 	}
 
-	return json.Contains(responseBodyMap, desiredStateMap) && utils.IsHTTPSuccess(res.StatusCode), nil
+	if json.IsJSONString(res.Body) && json.IsJSONString(desiredState) {
+		responseBodyMap := json.JsonStringToMap(res.Body)
+		desiredStateMap := json.JsonStringToMap(desiredState)
+		return json.Contains(responseBodyMap, desiredStateMap) && utils.IsHTTPSuccess(res.StatusCode), nil
+	}
+
+	if !json.IsJSONString(res.Body) && json.IsJSONString(desiredState) {
+		return false, errors.New(fmt.Sprint(errBodyNotValidJSON, res.Body))
+	}
+
+	if json.IsJSONString(res.Body) && !json.IsJSONString(desiredState) {
+		return false, errors.New(errPutMappingNotValidJSON)
+	}
+
+	return strings.Contains(res.Body, desiredState) && utils.IsHTTPSuccess(res.StatusCode), nil
 }
 
 func (c *external) desiredState(cr *v1alpha1.Request, logger logging.Logger) (string, error) {
