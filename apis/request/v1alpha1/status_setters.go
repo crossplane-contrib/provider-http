@@ -28,7 +28,12 @@ func (d *Request) SetCache(statusCode int, headers map[string][]string, body str
 }
 
 func (d *Request) SetError(err error) {
-	// TODO (REL): make sure it gets incremented
 	d.Status.Failed++
-	d.Status.Error = err.Error()
+	if err != nil {
+		d.Status.Error = err.Error()
+	}
+}
+
+func (d *Request) ResetFailures() {
+	d.Status.Failed = 0
 }

@@ -6,6 +6,8 @@ import (
 	"strings"
 
 	"github.com/arielsepton/provider-http/apis/request/v1alpha1"
+	httpClient "github.com/arielsepton/provider-http/internal/clients/http"
+	"github.com/arielsepton/provider-http/internal/controller/request/requestgen"
 	"github.com/arielsepton/provider-http/internal/json"
 	"github.com/arielsepton/provider-http/internal/utils"
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
@@ -14,71 +16,90 @@ import (
 
 const (
 	errObjectNotFound = "object wasn't created"
-	errNoGetMapping   = "forProvider doesn't contain GET mapping"
-	errNoPutMapping   = "forProvider doesn't contain PUT mapping"
 	errNotValidJSON   = "%s is not a valid JSON string: %s"
 )
 
+type ObserveRequestDetails struct {
+	Response      httpClient.HttpResponse
+	ResponseError error
+	Synced        bool
+}
+
+// NewObserveRequestDetails is a constructor function that initializes
+// an instance of ObserveRequestDetails with default values.
+func NewObserve(res httpClient.HttpResponse, resErr error, synced bool) ObserveRequestDetails {
+	return ObserveRequestDetails{
+		Synced:        synced,
+		Response:      res,
+		ResponseError: resErr,
+	}
+}
+
+// NewObserveRequestDetails is a constructor function that initializes
+// an instance of ObserveRequestDetails with default values.
+func FailedObserve() ObserveRequestDetails {
+	return ObserveRequestDetails{
+		Synced: false,
+	}
+}
+
 // isUpToDate checks whether desired spec up to date with the observed state for a given request
-func (c *external) isUpToDate(ctx context.Context, cr *v1alpha1.Request) (bool, error) {
+func (c *external) isUpToDate(ctx context.Context, cr *v1alpha1.Request) (ObserveRequestDetails, error) {
 	if cr.Status.Response.Body == "" ||
 		(cr.Status.Response.Method == http.MethodPost && utils.IsHTTPError(cr.Status.Response.StatusCode)) {
-		return false, errors.New(errObjectNotFound)
+		return FailedObserve(), errors.New(errObjectNotFound)
 	}
 
-	methodGetMapping, ok := getMappingByMethod(&cr.Spec.ForProvider, http.MethodGet)
-	if !ok {
-		return false, errors.New(errNoGetMapping)
-	}
-
-	requestDetails, err := generateValidRequestDetails(cr, methodGetMapping, c.logger)
-	if err != nil {
-		return false, err
-	}
-
-	res, err := c.http.SendRequest(ctx, http.MethodGet, requestDetails.Url, requestDetails.Body, requestDetails.Headers)
-	if err != nil {
-		return false, err
-	}
+	res, err := c.sendObserveRequest(ctx, cr)
+	observeRequestDetails := NewObserve(res, err, false)
 
 	if res.StatusCode == http.StatusNotFound {
-		return false, errors.New(errObjectNotFound)
+		return FailedObserve(), errors.New(errObjectNotFound)
 	}
 
 	desiredState, err := c.desiredState(cr, c.logger)
 	if err != nil {
-		return false, err
-	}
-
-	err = c.setRequestStatus(ctx, cr, res, err)
-	if err != nil {
-		return false, err
+		return FailedObserve(), err
 	}
 
 	if json.IsJSONString(res.Body) && json.IsJSONString(desiredState) {
 		responseBodyMap := json.JsonStringToMap(res.Body)
 		desiredStateMap := json.JsonStringToMap(desiredState)
-		return json.Contains(responseBodyMap, desiredStateMap) && utils.IsHTTPSuccess(res.StatusCode), nil
+		observeRequestDetails.Synced = json.Contains(responseBodyMap, desiredStateMap) && utils.IsHTTPSuccess(res.StatusCode)
+		return observeRequestDetails, nil
 	}
 
 	if !json.IsJSONString(res.Body) && json.IsJSONString(desiredState) {
-		return false, errors.Errorf(errNotValidJSON, "response body", res.Body)
+		return FailedObserve(), errors.Errorf(errNotValidJSON, "response body", res.Body)
 	}
 
 	if json.IsJSONString(res.Body) && !json.IsJSONString(desiredState) {
-		return false, errors.Errorf(errNotValidJSON, "PUT mapping result", desiredState)
+		return FailedObserve(), errors.Errorf(errNotValidJSON, "PUT mapping result", desiredState)
 	}
 
-	return strings.Contains(res.Body, desiredState) && utils.IsHTTPSuccess(res.StatusCode), nil
+	observeRequestDetails.Synced = strings.Contains(res.Body, desiredState) && utils.IsHTTPSuccess(res.StatusCode)
+	return observeRequestDetails, nil
 }
 
 func (c *external) desiredState(cr *v1alpha1.Request, logger logging.Logger) (string, error) {
-	methodPutMapping, ok := getMappingByMethod(&cr.Spec.ForProvider, http.MethodPut)
-	if !ok {
-		// TODO (REL): maybe here use POST if PUT is not present.
-		return "", errors.New(errNoPutMapping)
+	requestDetails, err := c.requestDetails(cr, http.MethodPut)
+	return requestDetails.Body, err
+}
+
+func (c *external) sendObserveRequest(ctx context.Context, cr *v1alpha1.Request) (httpClient.HttpResponse, error) {
+	requestDetails, err := c.requestDetails(cr, http.MethodGet)
+	if err != nil {
+		return httpClient.HttpResponse{}, err
 	}
 
-	requestDetails, err := generateValidRequestDetails(cr, methodPutMapping, c.logger)
-	return requestDetails.Body, err
+	return c.http.SendRequest(ctx, http.MethodGet, requestDetails.Url, requestDetails.Body, requestDetails.Headers)
+}
+
+func (c *external) requestDetails(cr *v1alpha1.Request, method string) (requestgen.RequestDetails, error) {
+	mapping, ok := getMappingByMethod(&cr.Spec.ForProvider, method)
+	if !ok {
+		return requestgen.RequestDetails{}, errors.Errorf(errMappingNotFound, method)
+	}
+
+	return generateValidRequestDetails(cr, mapping, c.logger)
 }

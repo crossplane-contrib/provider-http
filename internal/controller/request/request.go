@@ -19,7 +19,6 @@ package request
 import (
 	"context"
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
@@ -39,7 +38,7 @@ import (
 	apisv1alpha1 "github.com/arielsepton/provider-http/apis/v1alpha1"
 	httpClient "github.com/arielsepton/provider-http/internal/clients/http"
 	"github.com/arielsepton/provider-http/internal/controller/request/requestgen"
-	"github.com/arielsepton/provider-http/internal/controller/request/responseconverter"
+	"github.com/arielsepton/provider-http/internal/controller/request/statushandler"
 	"github.com/arielsepton/provider-http/internal/utils"
 )
 
@@ -48,12 +47,9 @@ const (
 	errTrackPCUsage            = "cannot track ProviderConfig usage"
 	errNewHttpClient           = "cannot create new Http client"
 	errProviderNotRetrieved    = "provider could not be retrieved"
-	errFailedToSendHttpRequest = "failed to send http request"
+	errFailedToSendHttpRequest = "something went wrong"
 	errFailedToCheckIfUpToDate = "failed to check if request is up to date"
 	errFailedUpdateCR          = "failed updating CR"
-	errPostMappingNotFound     = "POST mapping doesn't exist in request"
-	errPutMappingNotFound      = "PUT mapping doesn't exist in request"
-	errDeleteMappingNotFound   = "DELETE mapping doesn't exist in request"
 	errMappingNotFound         = "%s mapping doesn't exist in request"
 )
 
@@ -142,7 +138,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.New(errNotRequest)
 	}
 
-	synced, err := c.isUpToDate(ctx, cr)
+	observeRequestDetails, err := c.isUpToDate(ctx, cr)
 	if err != nil && err.Error() == errObjectNotFound {
 		return managed.ExternalObservation{
 			ResourceExists: false,
@@ -153,11 +149,23 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.Wrap(err, errFailedToCheckIfUpToDate)
 	}
 
+	statusHandler := statushandler.NewStatusHandler(ctx, cr, observeRequestDetails.Response, c.localKube, c.logger)
+	synced := observeRequestDetails.Synced
+	if synced {
+		statusHandler.ResetFailures()
+	}
+
+	err = statusHandler.SetRequestStatus(cr.Spec.ForProvider.Mappings, cr.Spec.ForProvider, observeRequestDetails.ResponseError)
+	if err != nil {
+		return managed.ExternalObservation{}, err
+	}
+
 	cr.Status.SetConditions(xpv1.Available())
 	if err := c.localKube.Status().Update(ctx, cr); err != nil {
 		return managed.ExternalObservation{}, errors.New(errFailedUpdateCR)
 	}
 
+	// TODO (REL): for testing purposes, remove synced and see if retries work
 	return managed.ExternalObservation{
 		ResourceExists:    true,
 		ResourceUpToDate:  synced && !(utils.ShouldRetry(cr.Spec.ForProvider.RollbackRetriesLimit, cr.Status.Failed) && !utils.RetriesLimitReached(cr.Status.Failed, cr.Spec.ForProvider.RollbackRetriesLimit)),
@@ -177,7 +185,10 @@ func (c *external) deployAction(ctx context.Context, cr *v1alpha1.Request, metho
 	}
 
 	res, err := c.http.SendRequest(ctx, mapping.Method, requestDetails.Url, requestDetails.Body, requestDetails.Headers)
-	return c.setRequestStatus(ctx, cr, res, err)
+	statusHandler := statushandler.NewStatusHandler(ctx, cr, res, c.localKube, c.logger)
+
+	// TODO (REL): perhaps err should be in inititate.
+	return statusHandler.SetRequestStatus(cr.Spec.ForProvider.Mappings, cr.Spec.ForProvider, err)
 }
 
 func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.ExternalCreation, error) {
@@ -205,52 +216,6 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) error {
 	}
 
 	return errors.Wrap(c.deployAction(ctx, cr, http.MethodDelete), errFailedToSendHttpRequest)
-}
-
-// setRequestStatus updates the current Request's status to reflect the details of the last HTTP request that occurred.
-// It takes the context, the Request resource, the HTTP response, the mapping configuration, and any error that occurred
-// during the HTTP request. The function sets the status fields such as StatusCode, Headers, Body, Method, and Cache,
-// based on the outcome of the HTTP request and the presence of an error.
-func (c *external) setRequestStatus(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse, err error) error {
-	resource := &utils.RequestResource{
-		Resource:       cr,
-		RequestContext: ctx,
-		HttpResponse:   res,
-		LocalClient:    c.localKube,
-	}
-
-	setStatusCode, setHeaders, setBody, setMethod := resource.SetStatusCode(), resource.SetHeaders(), resource.SetBody(), resource.SetMethod()
-
-	if err != nil {
-		utils.SetRequestResourceStatus(*resource, resource.SetError(err))
-		return err
-	}
-
-	if utils.IsHTTPError(res.StatusCode) {
-		utils.SetRequestResourceStatus(*resource, setStatusCode, setHeaders, setBody, setMethod)
-		return errors.Errorf(utils.ErrStatusCode, strconv.Itoa(res.StatusCode))
-	}
-
-	if utils.IsHTTPSuccess(res.StatusCode) && shouldSetCache(cr.Spec.ForProvider.Mappings, res, cr.Spec.ForProvider, c.logger) {
-		return utils.SetRequestResourceStatus(*resource, setStatusCode, setHeaders, setBody, setMethod, resource.SetCache())
-	}
-
-	return utils.SetRequestResourceStatus(*resource, setStatusCode, setHeaders, setBody, setMethod)
-}
-
-// shouldSetCache determines whether the cache should be updated based on the provided mapping, HTTP response,
-// and RequestParameters. It generates request details according to the given mapping and response. If the request
-// details are not valid, it means that instead of using the response, the cache should be used.
-func shouldSetCache(mappings []v1alpha1.Mapping, res httpClient.HttpResponse, forProvider v1alpha1.RequestParameters, logger logging.Logger) bool {
-	for _, mapping := range mappings {
-		response := responseconverter.HttpResponseToV1alpha1Response(res)
-		requestDetails, _, ok := requestgen.GenerateRequestDetails(mapping, forProvider, response, logger)
-		if !(requestgen.IsRequestValid(requestDetails) && ok) {
-			return false
-		}
-	}
-
-	return true
 }
 
 // generateValidRequestDetails generates valid request details based on the given Request resource and Mapping configuration.

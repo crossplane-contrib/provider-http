@@ -102,6 +102,16 @@ func (rr *RequestResource) SetError(err error) SetRequestStatusFunc {
 	}
 }
 
+func (rr *RequestResource) ResetFailures() SetRequestStatusFunc {
+	return func() error {
+		if resetter, ok := rr.Resource.(ResetFailures); ok {
+			resetter.ResetFailures()
+			return rr.LocalClient.Status().Update(rr.RequestContext, rr.Resource)
+		}
+		return nil
+	}
+}
+
 type ResponseSetter interface {
 	SetStatusCode(statusCode int)
 	SetHeaders(headers map[string][]string)
@@ -119,6 +129,10 @@ type SyncedSetter interface {
 
 type ErrorSetter interface {
 	SetError(err error)
+}
+
+type ResetFailures interface {
+	ResetFailures()
 }
 
 func SetRequestResourceStatus(rr RequestResource, statusFuncs ...SetRequestStatusFunc) error {
