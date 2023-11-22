@@ -166,9 +166,9 @@ func (c *external) deployAction(ctx context.Context, cr *v1alpha1.DesposibleRequ
 	setBody := resource.SetBody()
 	setSynced := resource.SetSynced()
 
-	if res.StatusCode != 0 && utils.IsHTTPError(res.StatusCode) {
-		utils.SetRequestResourceStatus(*resource, setStatusCode, setHeaders, setBody)
-		return errors.Errorf(utils.ErrStatusCode, strconv.Itoa(res.StatusCode))
+	if utils.IsHTTPError(res.StatusCode) {
+		utils.SetRequestResourceStatus(*resource, setStatusCode, setHeaders, setBody, resource.SetError(nil))
+		return errors.Errorf(utils.ErrStatusCode, resource.HttpResponse.Method, strconv.Itoa(res.StatusCode))
 	}
 
 	return utils.SetRequestResourceStatus(*resource, setStatusCode, setHeaders, setBody, setSynced)
