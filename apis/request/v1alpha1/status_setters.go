@@ -36,4 +36,5 @@ func (d *Request) SetError(err error) {
 
 func (d *Request) ResetFailures() {
 	d.Status.Failed = 0
+	d.Status.Error = ""
 }
