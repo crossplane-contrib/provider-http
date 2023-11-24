@@ -149,13 +149,21 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.Wrap(err, errFailedToCheckIfUpToDate)
 	}
 
-	statusHandler := statushandler.NewStatusHandler(ctx, cr, observeRequestDetails.Response, c.localKube, c.logger)
+	statusHandler := statushandler.NewStatusHandler(
+		ctx,
+		cr,
+		c.localKube,
+		observeRequestDetails.Response,
+		observeRequestDetails.ResponseError,
+		c.logger,
+	)
+
 	synced := observeRequestDetails.Synced
 	if synced {
 		statusHandler.ResetFailures()
 	}
 
-	err = statusHandler.SetRequestStatus(cr.Spec.ForProvider.Mappings, cr.Spec.ForProvider, observeRequestDetails.ResponseError)
+	err = statusHandler.SetRequestStatus(cr.Spec.ForProvider.Mappings, cr.Spec.ForProvider)
 	if err != nil {
 		return managed.ExternalObservation{}, err
 	}
@@ -185,10 +193,16 @@ func (c *external) deployAction(ctx context.Context, cr *v1alpha1.Request, metho
 	}
 
 	res, err := c.http.SendRequest(ctx, mapping.Method, requestDetails.Url, requestDetails.Body, requestDetails.Headers)
-	statusHandler := statushandler.NewStatusHandler(ctx, cr, res, c.localKube, c.logger)
+	statusHandler := statushandler.NewStatusHandler(
+		ctx,
+		cr,
+		c.localKube,
+		res,
+		err,
+		c.logger,
+	)
 
-	// TODO (REL): perhaps err should be in inititate.
-	return statusHandler.SetRequestStatus(cr.Spec.ForProvider.Mappings, cr.Spec.ForProvider, err)
+	return statusHandler.SetRequestStatus(cr.Spec.ForProvider.Mappings, cr.Spec.ForProvider)
 }
 
 func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.ExternalCreation, error) {

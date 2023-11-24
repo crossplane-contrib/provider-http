@@ -17,7 +17,7 @@ import (
 
 // RequestStatusHandler is the interface to interact with status setting for v1alpha1.Request
 type RequestStatusHandler interface {
-	SetRequestStatus(mappings []v1alpha1.Mapping, forProvider v1alpha1.RequestParameters, err error) error
+	SetRequestStatus(mappings []v1alpha1.Mapping, forProvider v1alpha1.RequestParameters) error
 	ResetFailures()
 }
 
@@ -26,6 +26,7 @@ type RequestStatusHandler interface {
 type requestStatusHandler struct {
 	logger       logging.Logger
 	resource     *utils.RequestResource
+	httpError    error
 	basicSetters *[]utils.SetRequestStatusFunc
 }
 
@@ -33,9 +34,9 @@ type requestStatusHandler struct {
 // It takes the context, the Request resource, the HTTP response, the mapping configuration, and any error that occurred
 // during the HTTP request. The function sets the status fields such as StatusCode, Headers, Body, Method, and Cache,
 // based on the outcome of the HTTP request and the presence of an error.
-func (r *requestStatusHandler) SetRequestStatus(mappings []v1alpha1.Mapping, forProvider v1alpha1.RequestParameters, err error) error {
-	if err != nil {
-		return r.setErrorAndReturn(r.resource, err)
+func (r *requestStatusHandler) SetRequestStatus(mappings []v1alpha1.Mapping, forProvider v1alpha1.RequestParameters) error {
+	if r.httpError != nil {
+		return r.setErrorAndReturn(r.resource, r.httpError)
 	}
 
 	if utils.IsHTTPError(r.resource.HttpResponse.StatusCode) {
@@ -91,7 +92,7 @@ func (r *requestStatusHandler) ResetFailures() {
 }
 
 // NewClient returns a new Request statusHandler
-func NewStatusHandler(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse, client client.Client, logger logging.Logger) RequestStatusHandler {
+func NewStatusHandler(ctx context.Context, cr *v1alpha1.Request, client client.Client, res httpClient.HttpResponse, err error, logger logging.Logger) RequestStatusHandler {
 	requestStatusHandler := &requestStatusHandler{
 		logger: logger,
 		resource: &utils.RequestResource{
