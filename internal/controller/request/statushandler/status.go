@@ -22,7 +22,7 @@ type RequestStatusHandler interface {
 }
 
 // requestStatusHandler sets the request status.
-// it checks wether to set cache, and failures count for retries.
+// it checks wether to set cache, and failures count.
 type requestStatusHandler struct {
 	logger       logging.Logger
 	resource     *utils.RequestResource
