@@ -31,9 +31,7 @@ type RequestParameters struct {
 	Payload  Payload             `json:"payload"`
 	Headers  map[string][]string `json:"headers,omitempty"`
 
-	// RollbackRetriesLimit is max number of attempts to retry HTTP request by sending again the request.
-	RollbackRetriesLimit *int32           `json:"rollbackLimit,omitempty"`
-	WaitTimeout          *metav1.Duration `json:"waitTimeout,omitempty"`
+	WaitTimeout *metav1.Duration `json:"waitTimeout,omitempty"`
 }
 
 type Mapping struct {

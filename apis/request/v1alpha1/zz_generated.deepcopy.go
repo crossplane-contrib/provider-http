@@ -172,11 +172,6 @@ func (in *RequestParameters) DeepCopyInto(out *RequestParameters) {
 			(*out)[key] = outVal
 		}
 	}
-	if in.RollbackRetriesLimit != nil {
-		in, out := &in.RollbackRetriesLimit, &out.RollbackRetriesLimit
-		*out = new(int32)
-		**out = **in
-	}
 	if in.WaitTimeout != nil {
 		in, out := &in.WaitTimeout, &out.WaitTimeout
 		*out = new(v1.Duration)

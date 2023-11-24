@@ -109,11 +109,6 @@ spec:
                     - baseUrl
                     - body
                     type: object
-                  rollbackLimit:
-                    description: RollbackRetriesLimit is max number of attempts to
-                      retry HTTP request by sending again the request.
-                    format: int32
-                    type: integer
                   waitTimeout:
                     type: string
                 required:

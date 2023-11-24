@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The Crossplane Authors.
+Copyright 2024 The Crossplane Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -173,10 +173,9 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.New(errFailedUpdateCR)
 	}
 
-	// TODO (REL): for testing purposes, remove synced and see if retries work
 	return managed.ExternalObservation{
 		ResourceExists:    true,
-		ResourceUpToDate:  synced && !(utils.ShouldRetry(cr.Spec.ForProvider.RollbackRetriesLimit, cr.Status.Failed) && !utils.RetriesLimitReached(cr.Status.Failed, cr.Spec.ForProvider.RollbackRetriesLimit)),
+		ResourceUpToDate:  synced,
 		ConnectionDetails: nil,
 	}, nil
 }
