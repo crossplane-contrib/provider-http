@@ -61,10 +61,11 @@ func Setup(mgr ctrl.Manager, o controller.Options, timeout time.Duration) error 
 	r := managed.NewReconciler(mgr,
 		resource.ManagedKind(v1alpha1.RequestGroupVersionKind),
 		managed.WithExternalConnecter(&connector{
-			logger:          o.Logger,
-			kube:            mgr.GetClient(),
-			usage:           resource.NewProviderConfigUsageTracker(mgr.GetClient(), &apisv1alpha1.ProviderConfigUsage{}),
-			newHttpClientFn: httpClient.NewClient,
+			logger:              o.Logger,
+			kube:                mgr.GetClient(),
+			usage:               resource.NewProviderConfigUsageTracker(mgr.GetClient(), &apisv1alpha1.ProviderConfigUsage{}),
+			newHttpClientFn:     httpClient.NewClient,
+			newStatusHandler1Fn: statushandler.NewStatusHandler,
 		}),
 		managed.WithLogger(o.Logger.WithValues("controller", name)),
 		managed.WithPollInterval(o.PollInterval),
@@ -83,10 +84,11 @@ func Setup(mgr ctrl.Manager, o controller.Options, timeout time.Duration) error 
 // A connector is expected to produce an ExternalClient when its Connect method
 // is called.
 type connector struct {
-	logger          logging.Logger
-	kube            client.Client
-	usage           resource.Tracker
-	newHttpClientFn func(log logging.Logger, timeout time.Duration) (httpClient.Client, error)
+	logger              logging.Logger
+	kube                client.Client
+	usage               resource.Tracker
+	newHttpClientFn     func(log logging.Logger, timeout time.Duration) (httpClient.Client, error)
+	newStatusHandler1Fn func(client client.Client, logger logging.Logger) statushandler.RequestStatusHandler
 }
 
 // Connect typically produces an ExternalClient by:
@@ -117,10 +119,13 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 		return nil, errors.Wrap(err, errNewHttpClient)
 	}
 
+	s := c.newStatusHandler1Fn(c.kube, l)
+
 	return &external{
 		localKube: c.kube,
 		logger:    l,
 		http:      h,
+		status:    s,
 	}, nil
 }
 
@@ -130,6 +135,7 @@ type external struct {
 	localKube client.Client
 	logger    logging.Logger
 	http      httpClient.Client
+	status    statushandler.RequestStatusHandler
 }
 
 func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
@@ -149,21 +155,12 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.Wrap(err, errFailedToCheckIfUpToDate)
 	}
 
-	statusHandler := statushandler.NewStatusHandler(
-		ctx,
-		cr,
-		c.localKube,
-		observeRequestDetails.Response,
-		observeRequestDetails.ResponseError,
-		c.logger,
-	)
-
 	synced := observeRequestDetails.Synced
 	if synced {
-		statusHandler.ResetFailures()
+		c.status.ResetFailures(ctx, cr, observeRequestDetails.Response)
 	}
 
-	err = statusHandler.SetRequestStatus(cr.Spec.ForProvider.Mappings, cr.Spec.ForProvider)
+	err = c.status.SetRequestStatus(ctx, cr, observeRequestDetails.Response, observeRequestDetails.ResponseError)
 	if err != nil {
 		return managed.ExternalObservation{}, err
 	}
@@ -192,16 +189,7 @@ func (c *external) deployAction(ctx context.Context, cr *v1alpha1.Request, metho
 	}
 
 	res, err := c.http.SendRequest(ctx, mapping.Method, requestDetails.Url, requestDetails.Body, requestDetails.Headers)
-	statusHandler := statushandler.NewStatusHandler(
-		ctx,
-		cr,
-		c.localKube,
-		res,
-		err,
-		c.logger,
-	)
-
-	return statusHandler.SetRequestStatus(cr.Spec.ForProvider.Mappings, cr.Spec.ForProvider)
+	return c.status.SetRequestStatus(ctx, cr, res, err)
 }
 
 func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.ExternalCreation, error) {
