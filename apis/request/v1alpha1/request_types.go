@@ -43,8 +43,8 @@ type Mapping struct {
 }
 
 type Payload struct {
-	BaseUrl string `json:"baseUrl"`
-	Body    string `json:"body"`
+	BaseUrl string `json:"baseUrl,omitempty"`
+	Body    string `json:"body,omitempty"`
 }
 
 // A RequestSpec defines the desired state of a Request.

@@ -1,12 +1,14 @@
 package utils
 
 import (
-	"errors"
+	"net/url"
+
+	"github.com/pkg/errors"
 )
 
 const (
 	errEmptyMethod = "no method is specified"
-	errEmptyURL    = "no url is specified"
+	ErrInvalidURL  = "invalid url %s"
 	ErrStatusCode  = "HTTP %s request failed with status code: %s"
 )
 
@@ -15,8 +17,8 @@ func IsRequestValid(method string, url string) error {
 		return errors.New(errEmptyMethod)
 	}
 
-	if url == "" {
-		return errors.New(errEmptyURL)
+	if !IsUrlValid(url) {
+		return errors.Errorf(ErrInvalidURL, url)
 	}
 
 	return nil
@@ -30,4 +32,9 @@ func IsHTTPSuccess(statusCode int) bool {
 // IsHTTPError checks if an HTTP status code indicates an error.
 func IsHTTPError(statusCode int) bool {
 	return statusCode >= 400 && statusCode < 600
+}
+
+func IsUrlValid(input string) bool {
+	u, err := url.ParseRequestURI(input)
+	return err == nil && u.Scheme != "" && u.Host != ""
 }

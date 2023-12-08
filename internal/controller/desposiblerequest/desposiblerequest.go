@@ -145,8 +145,9 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	}, nil
 }
 
-func (c *external) deployAction(ctx context.Context, cr *v1alpha1.DesposibleRequest, method string, url string, body string, headers map[string][]string) error {
-	res, err := c.http.SendRequest(ctx, method, url, body, headers)
+func (c *external) deployAction(ctx context.Context, cr *v1alpha1.DesposibleRequest) error {
+	res, err := c.http.SendRequest(ctx, cr.Spec.ForProvider.Method,
+		cr.Spec.ForProvider.URL, cr.Spec.ForProvider.Body, cr.Spec.ForProvider.Headers)
 
 	resource := &utils.RequestResource{
 		Resource:       cr,
@@ -168,7 +169,7 @@ func (c *external) deployAction(ctx context.Context, cr *v1alpha1.DesposibleRequ
 
 	if utils.IsHTTPError(res.StatusCode) {
 		utils.SetRequestResourceStatus(*resource, setStatusCode, setHeaders, setBody, resource.SetError(nil))
-		return errors.Errorf(utils.ErrStatusCode, resource.HttpResponse.Method, strconv.Itoa(res.StatusCode))
+		return errors.Errorf(utils.ErrStatusCode, cr.Spec.ForProvider.Method, strconv.Itoa(res.StatusCode))
 	}
 
 	return utils.SetRequestResourceStatus(*resource, setStatusCode, setHeaders, setBody, setSynced)
@@ -184,8 +185,7 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalCreation{}, err
 	}
 
-	return managed.ExternalCreation{}, errors.Wrap(c.deployAction(ctx, cr, cr.Spec.ForProvider.Method,
-		cr.Spec.ForProvider.URL, cr.Spec.ForProvider.Body, cr.Spec.ForProvider.Headers), errFailedToSendHttpDesposibleRequest)
+	return managed.ExternalCreation{}, errors.Wrap(c.deployAction(ctx, cr), errFailedToSendHttpDesposibleRequest)
 }
 
 func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.ExternalUpdate, error) {
@@ -198,8 +198,7 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalUpdate{}, err
 	}
 
-	return managed.ExternalUpdate{}, errors.Wrap(c.deployAction(ctx, cr, cr.Spec.ForProvider.Method,
-		cr.Spec.ForProvider.URL, cr.Spec.ForProvider.Body, cr.Spec.ForProvider.Headers), errFailedToSendHttpDesposibleRequest)
+	return managed.ExternalUpdate{}, errors.Wrap(c.deployAction(ctx, cr), errFailedToSendHttpDesposibleRequest)
 }
 
 func (c *external) Delete(_ context.Context, _ resource.Managed) error {

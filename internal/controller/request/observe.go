@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	errObjectNotFound = "object wasn't created"
+	errObjectNotFound = "object wasn't found"
 	errNotValidJSON   = "%s is not a valid JSON string: %s"
 )
 

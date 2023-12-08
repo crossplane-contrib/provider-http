@@ -4,9 +4,13 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/pkg/errors"
+
 	"github.com/arielsepton/provider-http/apis/request/v1alpha1"
 	"github.com/arielsepton/provider-http/internal/controller/request/requestprocessing"
 	json_util "github.com/arielsepton/provider-http/internal/json"
+	"github.com/arielsepton/provider-http/internal/utils"
+
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
 	"golang.org/x/exp/maps"
 )
@@ -19,10 +23,14 @@ type RequestDetails struct {
 
 // GenerateRequestDetails generates request details.
 func GenerateRequestDetails(methodMapping v1alpha1.Mapping, forProvider v1alpha1.RequestParameters, response v1alpha1.Response, logger logging.Logger) (RequestDetails, error, bool) {
-	jqObject := GenerateRequestObject(forProvider, response)
+	jqObject := generateRequestObject(forProvider, response)
 	url, err := generateURL(methodMapping.URL, jqObject, logger)
 	if err != nil {
 		return RequestDetails{}, err, false
+	}
+
+	if !utils.IsUrlValid(url) {
+		return RequestDetails{}, errors.Errorf(utils.ErrInvalidURL, url), false
 	}
 
 	body, err := generateBody(methodMapping.Body, jqObject, logger)
@@ -38,9 +46,9 @@ func GenerateRequestDetails(methodMapping v1alpha1.Mapping, forProvider v1alpha1
 	return RequestDetails{Body: body, Url: url, Headers: headers}, nil, true
 }
 
-// GenerateRequestObject creates a JSON-compatible map from the specified Request's ForProvider and Response fields.
+// generateRequestObject creates a JSON-compatible map from the specified Request's ForProvider and Response fields.
 // It merges the two maps, converts JSON strings to nested maps, and returns the resulting map.
-func GenerateRequestObject(forProvider v1alpha1.RequestParameters, response v1alpha1.Response) map[string]interface{} {
+func generateRequestObject(forProvider v1alpha1.RequestParameters, response v1alpha1.Response) map[string]interface{} {
 	baseMap, _ := json_util.StructToMap(forProvider)
 	statusMap, _ := json_util.StructToMap(map[string]interface{}{
 		"response": response,
@@ -76,6 +84,10 @@ func generateURL(urlJQFilter string, jqObject map[string]interface{}, logger log
 
 // generateBody applies a mapping body to generate the request body.
 func generateBody(mappingBody string, jqObject map[string]interface{}, logger logging.Logger) (string, error) {
+	if mappingBody == "" {
+		return "", nil
+	}
+
 	jqQuery := requestprocessing.ConvertStringToJQQuery(mappingBody)
 	body, err := requestprocessing.ApplyJQOnStr(jqQuery, jqObject, logger)
 	if err != nil {

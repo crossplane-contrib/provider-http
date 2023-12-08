@@ -24,8 +24,8 @@ type RequestStatusHandler interface {
 // requestStatusHandler sets the request status.
 // it checks wether to set cache, and failures count.
 type requestStatusHandler struct {
-	logger logging.Logger
-	client client.Client
+	logger    logging.Logger
+	localKube client.Client
 }
 
 // SetRequestStatus updates the current Request's status to reflect the details of the last HTTP request that occurred.
@@ -37,7 +37,7 @@ func (r *requestStatusHandler) SetRequestStatus(ctx context.Context, cr *v1alpha
 		Resource:       cr,
 		HttpResponse:   res,
 		RequestContext: ctx,
-		LocalClient:    r.client,
+		LocalClient:    r.localKube,
 	}
 
 	basicSetters := []utils.SetRequestStatusFunc{
@@ -104,7 +104,7 @@ func (r *requestStatusHandler) ResetFailures(ctx context.Context, cr *v1alpha1.R
 		Resource:       cr,
 		HttpResponse:   res,
 		RequestContext: ctx,
-		LocalClient:    r.client,
+		LocalClient:    r.localKube,
 	}
 
 	utils.SetRequestResourceStatus(*resource, resource.ResetFailures())
@@ -113,8 +113,8 @@ func (r *requestStatusHandler) ResetFailures(ctx context.Context, cr *v1alpha1.R
 // NewClient returns a new Request statusHandler
 func NewStatusHandler(client client.Client, logger logging.Logger) RequestStatusHandler {
 	requestStatusHandler := &requestStatusHandler{
-		logger: logger,
-		client: client,
+		logger:    logger,
+		localKube: client,
 	}
 
 	return requestStatusHandler

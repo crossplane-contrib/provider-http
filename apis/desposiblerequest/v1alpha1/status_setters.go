@@ -18,6 +18,8 @@ func (d *DesposibleRequest) SetSynced(synced bool) {
 
 func (d *DesposibleRequest) SetError(err error) {
 	d.Status.Failed++
-	d.Status.Error = err.Error()
 	d.SetSynced(true)
+	if err != nil {
+		d.Status.Error = err.Error()
+	}
 }

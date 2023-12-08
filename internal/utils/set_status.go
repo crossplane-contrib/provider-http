@@ -61,7 +61,7 @@ func (rr *RequestResource) SetBody() SetRequestStatusFunc {
 
 func (rr *RequestResource) SetMethod() SetRequestStatusFunc {
 	return func() error {
-		if resp, ok := rr.Resource.(ResponseSetter); ok {
+		if resp, ok := rr.Resource.(MethodSetter); ok {
 			if rr.HttpResponse.Method != "" {
 				resp.SetMethod(rr.HttpResponse.Method)
 				return rr.LocalClient.Status().Update(rr.RequestContext, rr.Resource)
@@ -116,7 +116,6 @@ type ResponseSetter interface {
 	SetStatusCode(statusCode int)
 	SetHeaders(headers map[string][]string)
 	SetBody(body string)
-	SetMethod(method string)
 }
 
 type CacheSetter interface {
@@ -133,6 +132,10 @@ type ErrorSetter interface {
 
 type ResetFailures interface {
 	ResetFailures()
+}
+
+type MethodSetter interface {
+	SetMethod(method string)
 }
 
 func SetRequestResourceStatus(rr RequestResource, statusFuncs ...SetRequestStatusFunc) error {

@@ -114,7 +114,3 @@ Here's an example of using variables from the response:
           url: (.payload.baseUrl + "/" + (.response.body.id|tostring)) 
       ...
   ```
-
-TODO (REL) : modify this since caching is now available
-
-**Important:** Ensure that every response includes the required parameters, such as `body.id` in this example. This is crucial because each new response overrides the previous one, and missing parameters may lead to unexpected behavior in subsequent requests.

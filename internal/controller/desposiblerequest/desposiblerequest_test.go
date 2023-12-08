@@ -18,12 +18,14 @@ package desposiblerequest
 
 import (
 	"context"
+	"strconv"
 	"testing"
 	"time"
 
 	"github.com/arielsepton/provider-http/apis/desposiblerequest/v1alpha1"
 
 	httpClient "github.com/arielsepton/provider-http/internal/clients/http"
+	"github.com/arielsepton/provider-http/internal/utils"
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
@@ -65,7 +67,7 @@ var testTimeout = &v1.Duration{
 }
 
 const (
-	testURL    = "testchart"
+	testURL    = "https://example-url"
 	testMethod = "GET"
 	testBody   = "{\"key1\": \"value1\"}"
 )
@@ -123,7 +125,8 @@ func Test_httpExternal_Create(t *testing.T) {
 		mg        resource.Managed
 	}
 	type want struct {
-		err error
+		err           error
+		failuresIndex int32
 	}
 
 	cases := map[string]struct {
@@ -151,7 +154,8 @@ func Test_httpExternal_Create(t *testing.T) {
 				mg: httpDesposibleRequest(),
 			},
 			want: want{
-				err: errors.Wrap(errBoom, errFailedToSendHttpDesposibleRequest),
+				failuresIndex: 1,
+				err:           errors.Wrap(errBoom, errFailedToSendHttpDesposibleRequest),
 			},
 		},
 		"Success": {
@@ -256,6 +260,160 @@ func Test_httpExternal_Update(t *testing.T) {
 			_, gotErr := e.Update(context.Background(), tc.args.mg)
 			if diff := cmp.Diff(tc.want.err, gotErr, test.EquateErrors()); diff != "" {
 				t.Fatalf("e.Update(...): -want error, +got error: %s", diff)
+			}
+		})
+	}
+}
+
+func Test_deployAction(t *testing.T) {
+	type args struct {
+		cr        *v1alpha1.DesposibleRequest
+		http      httpClient.Client
+		localKube client.Client
+	}
+	type want struct {
+		err           error
+		failuresIndex int32
+		statusCode    int
+	}
+	type shouldCheckStatus struct {
+		condition bool
+	}
+	cases := map[string]struct {
+		args args
+		want want
+		shouldCheckStatus
+	}{
+		"SuccessUpdateStatusRequestFailure": {
+			args: args{
+				http: &MockHttpClient{
+					MockSendRequest: func(ctx context.Context, method string, url string, body string, headers map[string][]string) (resp httpClient.HttpResponse, err error) {
+						return httpClient.HttpResponse{}, errors.Errorf(utils.ErrInvalidURL, "invalid-url")
+					},
+				},
+				localKube: &test.MockClient{
+					MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
+				},
+				cr: &v1alpha1.DesposibleRequest{
+					Spec: v1alpha1.DesposibleRequestSpec{
+						ForProvider: v1alpha1.DesposibleRequestParameters{
+							URL:     "invalid-url",
+							Method:  testMethod,
+							Headers: testHeaders,
+							Body:    testBody,
+						},
+					},
+					Status: v1alpha1.DesposibleRequestStatus{},
+				},
+			},
+			want: want{
+				err:           errors.Errorf(utils.ErrInvalidURL, "invalid-url"),
+				failuresIndex: 1,
+			},
+		},
+		"SuccessUpdateStatusCodeError": {
+			args: args{
+				http: &MockHttpClient{
+					MockSendRequest: func(ctx context.Context, method string, url string, body string, headers map[string][]string) (resp httpClient.HttpResponse, err error) {
+						return httpClient.HttpResponse{
+							StatusCode: 400,
+							Body:       testBody,
+							Headers:    testHeaders,
+						}, nil
+					},
+				},
+				localKube: &test.MockClient{
+					MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
+				},
+				cr: &v1alpha1.DesposibleRequest{
+					Spec: v1alpha1.DesposibleRequestSpec{
+						ForProvider: v1alpha1.DesposibleRequestParameters{
+							URL:     testURL,
+							Method:  testMethod,
+							Headers: testHeaders,
+							Body:    testBody,
+						},
+					},
+					Status: v1alpha1.DesposibleRequestStatus{},
+				},
+			},
+			want: want{
+				err:           errors.Errorf(utils.ErrStatusCode, testMethod, strconv.Itoa(400)),
+				failuresIndex: 1,
+				statusCode:    400,
+			},
+			shouldCheckStatus: shouldCheckStatus{
+				condition: true,
+			},
+		},
+		"SuccessUpdateStatusSuccessfulRequest": {
+			args: args{
+				http: &MockHttpClient{
+					MockSendRequest: func(ctx context.Context, method string, url string, body string, headers map[string][]string) (resp httpClient.HttpResponse, err error) {
+						return httpClient.HttpResponse{
+							StatusCode: 200,
+							Body:       testBody,
+							Headers:    testHeaders,
+						}, nil
+					},
+				},
+				localKube: &test.MockClient{
+					MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
+				},
+				cr: &v1alpha1.DesposibleRequest{
+					Spec: v1alpha1.DesposibleRequestSpec{
+						ForProvider: v1alpha1.DesposibleRequestParameters{
+							URL:     testURL,
+							Method:  testMethod,
+							Headers: testHeaders,
+							Body:    testBody,
+						},
+					},
+					Status: v1alpha1.DesposibleRequestStatus{},
+				},
+			},
+			want: want{
+				err:        nil,
+				statusCode: 200,
+			},
+			shouldCheckStatus: shouldCheckStatus{
+				condition: true,
+			},
+		},
+	}
+	for name, tc := range cases {
+		tc := tc // Create local copies of loop variables
+
+		t.Run(name, func(t *testing.T) {
+			e := &external{
+				localKube: tc.args.localKube,
+				logger:    logging.NewNopLogger(),
+				http:      tc.args.http,
+			}
+
+			gotErr := e.deployAction(context.Background(), tc.args.cr)
+			if diff := cmp.Diff(tc.want.err, gotErr, test.EquateErrors()); diff != "" {
+				t.Fatalf("deployAction(...): -want error, +got error: %s", diff)
+			}
+
+			if gotErr != nil {
+				if diff := cmp.Diff(tc.args.cr.Status.Failed, tc.want.failuresIndex); diff != "" {
+					t.Fatalf("deployAction(...): -want Status.Failed, +got Status.Failed: %s", diff)
+				}
+			}
+
+			if tc.shouldCheckStatus.condition {
+				if diff := cmp.Diff(tc.args.cr.Spec.ForProvider.Body, tc.args.cr.Status.Response.Body); diff != "" {
+					t.Fatalf("deployAction(...): -want Status.Response.Body, +got Status.Response.Body: %s", diff)
+				}
+
+				if diff := cmp.Diff(tc.want.statusCode, tc.args.cr.Status.Response.StatusCode); diff != "" {
+					t.Fatalf("deployAction(...): -want Status.Response.StatusCode, +got Status.Response.StatusCode: %s", diff)
+				}
+
+				if diff := cmp.Diff(tc.args.cr.Spec.ForProvider.Headers, tc.args.cr.Status.Response.Headers); diff != "" {
+					t.Fatalf("deployAction(...): -want Status.Response.Headers, +got Status.Response.Headers: %s", diff)
+				}
 			}
 		})
 	}
