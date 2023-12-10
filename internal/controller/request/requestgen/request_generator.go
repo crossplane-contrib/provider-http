@@ -11,7 +11,6 @@ import (
 	json_util "github.com/arielsepton/provider-http/internal/json"
 	"github.com/arielsepton/provider-http/internal/utils"
 
-	"github.com/crossplane/crossplane-runtime/pkg/logging"
 	"golang.org/x/exp/maps"
 )
 
@@ -22,9 +21,9 @@ type RequestDetails struct {
 }
 
 // GenerateRequestDetails generates request details.
-func GenerateRequestDetails(methodMapping v1alpha1.Mapping, forProvider v1alpha1.RequestParameters, response v1alpha1.Response, logger logging.Logger) (RequestDetails, error, bool) {
+func GenerateRequestDetails(methodMapping v1alpha1.Mapping, forProvider v1alpha1.RequestParameters, response v1alpha1.Response) (RequestDetails, error, bool) {
 	jqObject := generateRequestObject(forProvider, response)
-	url, err := generateURL(methodMapping.URL, jqObject, logger)
+	url, err := generateURL(methodMapping.URL, jqObject)
 	if err != nil {
 		return RequestDetails{}, err, false
 	}
@@ -33,12 +32,12 @@ func GenerateRequestDetails(methodMapping v1alpha1.Mapping, forProvider v1alpha1
 		return RequestDetails{}, errors.Errorf(utils.ErrInvalidURL, url), false
 	}
 
-	body, err := generateBody(methodMapping.Body, jqObject, logger)
+	body, err := generateBody(methodMapping.Body, jqObject)
 	if err != nil {
 		return RequestDetails{}, err, false
 	}
 
-	headers, err := generateHeaders(coalesceHeaders(methodMapping.Headers, forProvider.Headers), jqObject, logger)
+	headers, err := generateHeaders(coalesceHeaders(methodMapping.Headers, forProvider.Headers), jqObject)
 	if err != nil {
 		return RequestDetails{}, err, false
 	}
@@ -73,8 +72,8 @@ func coalesceHeaders(mappingHeaders, defaultHeaders map[string][]string) map[str
 }
 
 // generateURL applies a JQ filter to generate a URL.
-func generateURL(urlJQFilter string, jqObject map[string]interface{}, logger logging.Logger) (string, error) {
-	getURL, err := requestprocessing.ApplyJQOnStr(urlJQFilter, jqObject, logger)
+func generateURL(urlJQFilter string, jqObject map[string]interface{}) (string, error) {
+	getURL, err := requestprocessing.ApplyJQOnStr(urlJQFilter, jqObject)
 	if err != nil {
 		return "", err
 	}
@@ -83,13 +82,13 @@ func generateURL(urlJQFilter string, jqObject map[string]interface{}, logger log
 }
 
 // generateBody applies a mapping body to generate the request body.
-func generateBody(mappingBody string, jqObject map[string]interface{}, logger logging.Logger) (string, error) {
+func generateBody(mappingBody string, jqObject map[string]interface{}) (string, error) {
 	if mappingBody == "" {
 		return "", nil
 	}
 
 	jqQuery := requestprocessing.ConvertStringToJQQuery(mappingBody)
-	body, err := requestprocessing.ApplyJQOnStr(jqQuery, jqObject, logger)
+	body, err := requestprocessing.ApplyJQOnStr(jqQuery, jqObject)
 	if err != nil {
 		return "", err
 	}
@@ -98,8 +97,8 @@ func generateBody(mappingBody string, jqObject map[string]interface{}, logger lo
 }
 
 // generateHeaders applies JQ queries to generate headers.
-func generateHeaders(headers map[string][]string, jqObject map[string]interface{}, logger logging.Logger) (map[string][]string, error) {
-	generatedHeaders, err := requestprocessing.ApplyJQOnMapStrings(headers, jqObject, logger)
+func generateHeaders(headers map[string][]string, jqObject map[string]interface{}) (map[string][]string, error) {
+	generatedHeaders, err := requestprocessing.ApplyJQOnMapStrings(headers, jqObject)
 	if err != nil {
 		return nil, err
 	}

@@ -46,7 +46,7 @@ const (
 	errNewHttpClient                     = "cannot create new Http client"
 	errProviderNotRetrieved              = "provider could not be retrieved"
 	errFailedToSendHttpDesposibleRequest = "failed to send http request"
-	errFailedToUpdate                    = "failed updating CR"
+	errFailedUpdateStatusConditions      = "failed updating status conditions"
 )
 
 // Setup adds a controller that reconciles DesposibleRequest managed resources.
@@ -89,7 +89,7 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 		return nil, errors.New(errNotDesposibleRequest)
 	}
 
-	l := c.logger.WithValues("despodibleRequest", cr.Name)
+	l := c.logger.WithValues("desposibleRequest", cr.Name)
 
 	if err := c.usage.Track(ctx, mg); err != nil {
 		return nil, errors.Wrap(err, errTrackPCUsage)
@@ -131,9 +131,14 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		}, nil
 	}
 
+	// Get the latest version of the resource before updating
+	if err := c.localKube.Get(ctx, types.NamespacedName{Name: cr.Name, Namespace: cr.Namespace}, cr); err != nil {
+		return managed.ExternalObservation{}, errors.Wrap(err, "failed to get the latest version of the resource")
+	}
+
 	cr.Status.SetConditions(xpv1.Available())
 	if err := c.localKube.Status().Update(ctx, cr); err != nil {
-		return managed.ExternalObservation{}, errors.New(errFailedToUpdate)
+		return managed.ExternalObservation{}, errors.New(errFailedUpdateStatusConditions)
 	}
 
 	return managed.ExternalObservation{

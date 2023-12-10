@@ -84,6 +84,7 @@ func Test_SetRequestStatus(t *testing.T) {
 		cr        *v1alpha1.Request
 		res       httpClient.HttpResponse
 		err       error
+		isSynced  bool
 	}
 	type want struct {
 		err           error
@@ -150,42 +151,63 @@ func Test_SetRequestStatus(t *testing.T) {
 				failuresIndex: 2,
 			},
 		},
+		"ResetFailures": {
+			args: args{
+				cr: testCr,
+				localKube: &test.MockClient{
+					MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
+				},
+				isSynced: true,
+				res: httpClient.HttpResponse{
+					StatusCode: 200,
+					Body:       `{"id":"123","username":"john_doe"}`,
+					Headers:    testHeaders,
+					Method:     testMethod,
+				},
+			},
+			want: want{
+				err:           nil,
+				failuresIndex: 0,
+			},
+		},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			r := &requestStatusHandler{
-				localKube: tc.args.localKube,
-				logger:    logging.NewNopLogger(),
+			r := NewStatusHandler(context.Background(), tc.args.cr, tc.args.res, tc.args.err, tc.args.localKube, logging.NewNopLogger())
+			if tc.args.isSynced {
+				r.ResetFailures()
 			}
-			gotErr := r.SetRequestStatus(context.Background(), tc.args.cr, tc.args.res, tc.args.err)
+
+			gotErr := r.SetRequestStatus()
+
 			if diff := cmp.Diff(tc.want.err, gotErr, test.EquateErrors()); diff != "" {
 				t.Fatalf("e.SetRequestStatus(...): -want error, +got error: %s", diff)
 			}
 
-			if diff := cmp.Diff(tc.args.cr.Status.Failed, tc.want.failuresIndex); diff != "" {
+			if diff := cmp.Diff(tc.want.failuresIndex, tc.args.cr.Status.Failed); diff != "" {
 				t.Fatalf("SetRequestStatus(...): -want Status.Failed, +got Status.Failed: %s", diff)
 			}
 
 			if tc.args.err != nil {
-				if diff := cmp.Diff(tc.args.cr.Status.Error, tc.args.err.Error()); diff != "" {
+				if diff := cmp.Diff(tc.args.err.Error(), tc.args.cr.Status.Error); diff != "" {
 					t.Fatalf("SetRequestStatus(...): -want Status.Error, +got Status.Error: %s", diff)
 				}
 			}
 
 			if gotErr == nil {
-				if diff := cmp.Diff(tc.args.cr.Status.Response.Body, tc.args.res.Body); diff != "" {
+				if diff := cmp.Diff(tc.args.res.Body, tc.args.cr.Status.Response.Body); diff != "" {
 					t.Fatalf("SetRequestStatus(...): -want Status.Response.Body, +got Status.Response.Body: %s", diff)
 				}
 
-				if diff := cmp.Diff(tc.args.cr.Status.Response.StatusCode, tc.args.res.StatusCode); diff != "" {
+				if diff := cmp.Diff(tc.args.res.StatusCode, tc.args.cr.Status.Response.StatusCode); diff != "" {
 					t.Fatalf("SetRequestStatus(...): -want Status.Response.StatusCode, +got Status.Response.StatusCode: %s", diff)
 				}
 
-				if diff := cmp.Diff(tc.args.cr.Status.Response.Headers, tc.args.res.Headers); diff != "" {
+				if diff := cmp.Diff(tc.args.res.Headers, tc.args.cr.Status.Response.Headers); diff != "" {
 					t.Fatalf("SetRequestStatus(...): -want Status.Response.Headers, +got Status.Response.Headers: %s", diff)
 				}
 
-				if diff := cmp.Diff(tc.args.cr.Status.Response.Method, tc.args.res.Method); diff != "" {
+				if diff := cmp.Diff(tc.args.res.Method, tc.args.cr.Status.Response.Method); diff != "" {
 					t.Fatalf("SetRequestStatus(...): -want Status.Response.Method, +got Status.Response.Method: %s", diff)
 				}
 			}

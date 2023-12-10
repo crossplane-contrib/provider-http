@@ -6,7 +6,6 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/crossplane/crossplane-runtime/pkg/logging"
 	"github.com/itchyny/gojq"
 )
 
@@ -20,7 +19,7 @@ const (
 
 var mutex = &sync.Mutex{}
 
-func runJQQuery(jqQuery string, obj interface{}, logger logging.Logger) (interface{}, error) {
+func runJQQuery(jqQuery string, obj interface{}) (interface{}, error) {
 	query, err := gojq.Parse(jqQuery)
 	if err != nil {
 		return nil, err
@@ -42,8 +41,8 @@ func runJQQuery(jqQuery string, obj interface{}, logger logging.Logger) (interfa
 	return queryRes, nil
 }
 
-func ParseString(jqQuery string, obj interface{}, logger logging.Logger) (string, error) {
-	queryRes, err := runJQQuery(jqQuery, obj, logger)
+func ParseString(jqQuery string, obj interface{}) (string, error) {
+	queryRes, err := runJQQuery(jqQuery, obj)
 	if err != nil {
 		return "", err
 	}
@@ -56,8 +55,8 @@ func ParseString(jqQuery string, obj interface{}, logger logging.Logger) (string
 	return str, nil
 }
 
-func ParseMapInterface(jqQuery string, obj interface{}, logger logging.Logger) (map[string]interface{}, error) {
-	queryRes, err := runJQQuery(jqQuery, obj, logger)
+func ParseMapInterface(jqQuery string, obj interface{}) (map[string]interface{}, error) {
+	queryRes, err := runJQQuery(jqQuery, obj)
 	if err != nil {
 		return nil, err
 	}
@@ -75,14 +74,14 @@ func ParseMapInterface(jqQuery string, obj interface{}, logger logging.Logger) (
 	return nil, errors.Errorf(errMapParseFailed, fmt.Sprint(queryRes))
 }
 
-func ParseMapStrings(keyToJQQueries map[string][]string, obj interface{}, logger logging.Logger) (map[string][]string, error) {
+func ParseMapStrings(keyToJQQueries map[string][]string, obj interface{}) (map[string][]string, error) {
 	result := make(map[string][]string, len(keyToJQQueries))
 
 	for key, jqQueries := range keyToJQQueries {
 		results := make([]string, len(jqQueries))
 
 		for i, jqQuery := range jqQueries {
-			queryRes, err := runJQQuery(jqQuery, obj, logger)
+			queryRes, err := runJQQuery(jqQuery, obj)
 			if err != nil {
 				// Use the original query as a fallback
 				results[i] = jqQuery

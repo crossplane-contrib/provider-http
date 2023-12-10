@@ -9,7 +9,6 @@ import (
 
 	"github.com/arielsepton/provider-http/apis/request/v1alpha1"
 	httpClient "github.com/arielsepton/provider-http/internal/clients/http"
-	"github.com/arielsepton/provider-http/internal/controller/request/statushandler"
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
@@ -83,21 +82,23 @@ func (c *MockHttpClient) SendRequest(ctx context.Context, method string, url str
 	return c.MockSendRequest(ctx, method, url, body, headers)
 }
 
-type MockSetRequestStatusFn func(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse, err error) error
+type MockSetRequestStatusFn func() error
 
-type MockResetFailuresFn func(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse) error
+type MockResetFailuresFn func()
+
+type MockInitFn func(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse)
 
 type MockStatusHandler struct {
 	MockSetRequest    MockSetRequestStatusFn
 	MockResetFailures MockResetFailuresFn
 }
 
-func (s *MockStatusHandler) ResetFailures(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse) error {
-	return s.MockResetFailures(ctx, cr, res)
+func (s *MockStatusHandler) ResetFailures() {
+	s.MockResetFailures()
 }
 
 func (s *MockStatusHandler) SetRequestStatus(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse, err error) error {
-	return s.MockSetRequest(ctx, cr, res, err)
+	return s.MockSetRequest()
 }
 
 func Test_httpExternal_Create(t *testing.T) {
@@ -105,7 +106,6 @@ func Test_httpExternal_Create(t *testing.T) {
 		http      httpClient.Client
 		localKube client.Client
 		mg        resource.Managed
-		status    statushandler.RequestStatusHandler
 	}
 	type want struct {
 		err error
@@ -134,38 +134,6 @@ func Test_httpExternal_Create(t *testing.T) {
 					MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
 				},
 				mg: httpRequest(),
-				status: &MockStatusHandler{
-					MockSetRequest: func(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse, err error) error {
-						return errBoom
-					},
-					MockResetFailures: func(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse) error {
-						return nil
-					},
-				},
-			},
-			want: want{
-				err: errors.Wrap(errBoom, errFailedToSendHttpRequest),
-			},
-		},
-		"UpdateStatusFailed": {
-			args: args{
-				http: &MockHttpClient{
-					MockSendRequest: func(ctx context.Context, method string, url string, body string, headers map[string][]string) (resp httpClient.HttpResponse, err error) {
-						return httpClient.HttpResponse{}, nil
-					},
-				},
-				localKube: &test.MockClient{
-					MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
-				},
-				mg: httpRequest(),
-				status: &MockStatusHandler{
-					MockSetRequest: func(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse, err error) error {
-						return errBoom
-					},
-					MockResetFailures: func(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse) error {
-						return nil
-					},
-				},
 			},
 			want: want{
 				err: errors.Wrap(errBoom, errFailedToSendHttpRequest),
@@ -183,14 +151,6 @@ func Test_httpExternal_Create(t *testing.T) {
 					MockCreate:       test.NewMockCreateFn(nil),
 				},
 				mg: httpRequest(),
-				status: &MockStatusHandler{
-					MockSetRequest: func(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse, err error) error {
-						return nil
-					},
-					MockResetFailures: func(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse) error {
-						return nil
-					},
-				},
 			},
 			want: want{
 				err: nil,
@@ -205,7 +165,6 @@ func Test_httpExternal_Create(t *testing.T) {
 				localKube: tc.args.localKube,
 				logger:    logging.NewNopLogger(),
 				http:      tc.args.http,
-				status:    tc.args.status,
 			}
 			_, gotErr := e.Create(context.Background(), tc.args.mg)
 			if diff := cmp.Diff(tc.want.err, gotErr, test.EquateErrors()); diff != "" {
@@ -220,7 +179,6 @@ func Test_httpExternal_Update(t *testing.T) {
 		http      httpClient.Client
 		localKube client.Client
 		mg        resource.Managed
-		status    statushandler.RequestStatusHandler
 	}
 	type want struct {
 		err error
@@ -249,38 +207,6 @@ func Test_httpExternal_Update(t *testing.T) {
 					MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
 				},
 				mg: httpRequest(),
-				status: &MockStatusHandler{
-					MockSetRequest: func(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse, err error) error {
-						return errBoom
-					},
-					MockResetFailures: func(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse) error {
-						return nil
-					},
-				},
-			},
-			want: want{
-				err: errors.Wrap(errBoom, errFailedToSendHttpRequest),
-			},
-		},
-		"UpdateStatusFailed": {
-			args: args{
-				http: &MockHttpClient{
-					MockSendRequest: func(ctx context.Context, method string, url string, body string, headers map[string][]string) (resp httpClient.HttpResponse, err error) {
-						return httpClient.HttpResponse{}, nil
-					},
-				},
-				localKube: &test.MockClient{
-					MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
-				},
-				mg: httpRequest(),
-				status: &MockStatusHandler{
-					MockSetRequest: func(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse, err error) error {
-						return errBoom
-					},
-					MockResetFailures: func(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse) error {
-						return nil
-					},
-				},
 			},
 			want: want{
 				err: errors.Wrap(errBoom, errFailedToSendHttpRequest),
@@ -298,14 +224,6 @@ func Test_httpExternal_Update(t *testing.T) {
 					MockCreate:       test.NewMockCreateFn(nil),
 				},
 				mg: httpRequest(),
-				status: &MockStatusHandler{
-					MockSetRequest: func(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse, err error) error {
-						return nil
-					},
-					MockResetFailures: func(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse) error {
-						return nil
-					},
-				},
 			},
 			want: want{
 				err: nil,
@@ -320,7 +238,6 @@ func Test_httpExternal_Update(t *testing.T) {
 				localKube: tc.args.localKube,
 				logger:    logging.NewNopLogger(),
 				http:      tc.args.http,
-				status:    tc.args.status,
 			}
 			_, gotErr := e.Update(context.Background(), tc.args.mg)
 			if diff := cmp.Diff(tc.want.err, gotErr, test.EquateErrors()); diff != "" {
@@ -335,7 +252,6 @@ func Test_httpExternal_Delete(t *testing.T) {
 		http      httpClient.Client
 		localKube client.Client
 		mg        resource.Managed
-		status    statushandler.RequestStatusHandler
 	}
 	type want struct {
 		err error
@@ -364,38 +280,6 @@ func Test_httpExternal_Delete(t *testing.T) {
 					MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
 				},
 				mg: httpRequest(),
-				status: &MockStatusHandler{
-					MockSetRequest: func(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse, err error) error {
-						return errBoom
-					},
-					MockResetFailures: func(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse) error {
-						return nil
-					},
-				},
-			},
-			want: want{
-				err: errors.Wrap(errBoom, errFailedToSendHttpRequest),
-			},
-		},
-		"UpdateStatusFailed": {
-			args: args{
-				http: &MockHttpClient{
-					MockSendRequest: func(ctx context.Context, method string, url string, body string, headers map[string][]string) (resp httpClient.HttpResponse, err error) {
-						return httpClient.HttpResponse{}, nil
-					},
-				},
-				localKube: &test.MockClient{
-					MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
-				},
-				mg: httpRequest(),
-				status: &MockStatusHandler{
-					MockSetRequest: func(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse, err error) error {
-						return errBoom
-					},
-					MockResetFailures: func(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse) error {
-						return nil
-					},
-				},
 			},
 			want: want{
 				err: errors.Wrap(errBoom, errFailedToSendHttpRequest),
@@ -413,14 +297,6 @@ func Test_httpExternal_Delete(t *testing.T) {
 					MockCreate:       test.NewMockCreateFn(nil),
 				},
 				mg: httpRequest(),
-				status: &MockStatusHandler{
-					MockSetRequest: func(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse, err error) error {
-						return nil
-					},
-					MockResetFailures: func(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse) error {
-						return nil
-					},
-				},
 			},
 			want: want{
 				err: nil,
@@ -435,7 +311,6 @@ func Test_httpExternal_Delete(t *testing.T) {
 				localKube: tc.args.localKube,
 				logger:    logging.NewNopLogger(),
 				http:      tc.args.http,
-				status:    tc.args.status,
 			}
 			gotErr := e.Delete(context.Background(), tc.args.mg)
 			if diff := cmp.Diff(tc.want.err, gotErr, test.EquateErrors()); diff != "" {

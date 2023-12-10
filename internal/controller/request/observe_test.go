@@ -7,7 +7,6 @@ import (
 
 	"github.com/arielsepton/provider-http/apis/request/v1alpha1"
 	httpClient "github.com/arielsepton/provider-http/internal/clients/http"
-	"github.com/arielsepton/provider-http/internal/controller/request/statushandler"
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
 	"github.com/crossplane/crossplane-runtime/pkg/test"
 	"github.com/google/go-cmp/cmp"
@@ -24,7 +23,6 @@ func Test_isUpToDate(t *testing.T) {
 		http      httpClient.Client
 		localKube client.Client
 		mg        *v1alpha1.Request
-		status    statushandler.RequestStatusHandler
 	}
 	type want struct {
 		result ObserveRequestDetails
@@ -48,14 +46,6 @@ func Test_isUpToDate(t *testing.T) {
 				mg: httpRequest(func(r *v1alpha1.Request) {
 					r.Status.Response.Body = ""
 				}),
-				status: &MockStatusHandler{
-					MockSetRequest: func(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse, err error) error {
-						return nil
-					},
-					MockResetFailures: func(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse) error {
-						return nil
-					},
-				},
 			},
 			want: want{
 				err: errNotFound,
@@ -75,14 +65,6 @@ func Test_isUpToDate(t *testing.T) {
 					r.Status.Response.Method = http.MethodPost
 					r.Status.Response.StatusCode = 400
 				}),
-				status: &MockStatusHandler{
-					MockSetRequest: func(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse, err error) error {
-						return nil
-					},
-					MockResetFailures: func(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse) error {
-						return nil
-					},
-				},
 			},
 			want: want{
 				err: errNotFound,
@@ -101,14 +83,6 @@ func Test_isUpToDate(t *testing.T) {
 				mg: httpRequest(func(r *v1alpha1.Request) {
 					r.Status.Response.StatusCode = 404
 				}),
-				status: &MockStatusHandler{
-					MockSetRequest: func(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse, err error) error {
-						return nil
-					},
-					MockResetFailures: func(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse) error {
-						return nil
-					},
-				},
 			},
 			want: want{
 				err: errNotFound,
@@ -129,14 +103,6 @@ func Test_isUpToDate(t *testing.T) {
 				mg: httpRequest(func(r *v1alpha1.Request) {
 					r.Status.Response.Body = `{"username":"john_doe_new_username"}`
 				}),
-				status: &MockStatusHandler{
-					MockSetRequest: func(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse, err error) error {
-						return nil
-					},
-					MockResetFailures: func(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse) error {
-						return nil
-					},
-				},
 			},
 			want: want{
 				err: errors.Errorf(errNotValidJSON, "response body", "not a JSON"),
@@ -159,14 +125,6 @@ func Test_isUpToDate(t *testing.T) {
 				mg: httpRequest(func(r *v1alpha1.Request) {
 					r.Status.Response.Body = `{"username":"john_doe_new_username"}`
 				}),
-				status: &MockStatusHandler{
-					MockSetRequest: func(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse, err error) error {
-						return nil
-					},
-					MockResetFailures: func(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse) error {
-						return nil
-					},
-				},
 			},
 			want: want{
 				err: nil,
@@ -200,14 +158,6 @@ func Test_isUpToDate(t *testing.T) {
 					r.Status.Response.Body = `{"username":"john_doe_new_username"}`
 					r.Status.Response.StatusCode = 200
 				}),
-				status: &MockStatusHandler{
-					MockSetRequest: func(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse, err error) error {
-						return nil
-					},
-					MockResetFailures: func(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse) error {
-						return nil
-					},
-				},
 			},
 			want: want{
 				err: nil,
@@ -232,7 +182,6 @@ func Test_isUpToDate(t *testing.T) {
 				localKube: tc.args.localKube,
 				logger:    logging.NewNopLogger(),
 				http:      tc.args.http,
-				status:    tc.args.status,
 			}
 			got, gotErr := e.isUpToDate(context.Background(), tc.args.mg)
 			if diff := cmp.Diff(tc.want.err, gotErr, test.EquateErrors()); diff != "" {

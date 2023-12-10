@@ -17,89 +17,87 @@ import (
 
 // RequestStatusHandler is the interface to interact with status setting for v1alpha1.Request
 type RequestStatusHandler interface {
-	SetRequestStatus(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse, err error) error
-	ResetFailures(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse) error
+	SetRequestStatus() error
+	ResetFailures()
 }
 
 // requestStatusHandler sets the request status.
 // it checks wether to set cache, and failures count.
 type requestStatusHandler struct {
-	logger    logging.Logger
-	localKube client.Client
+	logger        logging.Logger
+	extraSetters  *[]utils.SetRequestStatusFunc
+	resource      *utils.RequestResource
+	responseError error
+	forProvider   v1alpha1.RequestParameters
 }
 
 // SetRequestStatus updates the current Request's status to reflect the details of the last HTTP request that occurred.
 // It takes the context, the Request resource, the HTTP response, the mapping configuration, and any error that occurred
 // during the HTTP request. The function sets the status fields such as StatusCode, Headers, Body, Method, and Cache,
 // based on the outcome of the HTTP request and the presence of an error.
-func (r *requestStatusHandler) SetRequestStatus(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse, err error) error {
-	resource := &utils.RequestResource{
-		Resource:       cr,
-		HttpResponse:   res,
-		RequestContext: ctx,
-		LocalClient:    r.localKube,
+func (r *requestStatusHandler) SetRequestStatus() error {
+	if r.responseError != nil {
+		return r.setErrorAndReturn(r.responseError)
 	}
 
 	basicSetters := []utils.SetRequestStatusFunc{
-		resource.SetStatusCode(),
-		resource.SetHeaders(),
-		resource.SetBody(),
-		resource.SetMethod(),
+		r.resource.SetStatusCode(),
+		r.resource.SetHeaders(),
+		r.resource.SetBody(),
+		r.resource.SetMethod(),
 	}
 
-	if err != nil {
-		return r.setErrorAndReturn(resource, err)
+	basicSetters = append(basicSetters, *r.extraSetters...)
+
+	if utils.IsHTTPError(r.resource.HttpResponse.StatusCode) {
+		return r.incrementFailuresAndReturn(basicSetters)
 	}
 
-	if utils.IsHTTPError(resource.HttpResponse.StatusCode) {
-		return r.incrementFailuresAndReturn(resource, basicSetters)
+	if utils.IsHTTPSuccess(r.resource.HttpResponse.StatusCode) {
+		r.appendExtraSetters(r.forProvider, &basicSetters)
 	}
 
-	if utils.IsHTTPSuccess(resource.HttpResponse.StatusCode) {
-		r.appendExtraSetters(cr.Spec.ForProvider, *resource, &basicSetters)
-	}
-
-	if settingError := utils.SetRequestResourceStatus(*resource, basicSetters...); settingError != nil {
+	if settingError := utils.SetRequestResourceStatus(*r.resource, basicSetters...); settingError != nil {
 		return errors.Wrap(settingError, utils.ErrFailedToSetStatus)
 	}
 
 	return nil
 }
 
-func (r *requestStatusHandler) setErrorAndReturn(resource *utils.RequestResource, err error) error {
-	if settingError := utils.SetRequestResourceStatus(*resource, resource.SetError(err)); settingError != nil {
+func (r *requestStatusHandler) setErrorAndReturn(err error) error {
+	if settingError := utils.SetRequestResourceStatus(*r.resource, r.resource.SetError(err)); settingError != nil {
 		return errors.Wrap(settingError, utils.ErrFailedToSetStatus)
 	}
 
 	return err
 }
 
-func (r *requestStatusHandler) incrementFailuresAndReturn(resource *utils.RequestResource, basicSetters []utils.SetRequestStatusFunc) error {
-	basicSetters = append(basicSetters, resource.SetError(nil)) // should increment failures counter
+func (r *requestStatusHandler) incrementFailuresAndReturn(combinedSetters []utils.SetRequestStatusFunc) error {
+	combinedSetters = append(combinedSetters, r.resource.SetError(nil)) // should increment failures counter
 
-	if settingError := utils.SetRequestResourceStatus(*resource, basicSetters...); settingError != nil {
+	if settingError := utils.SetRequestResourceStatus(*r.resource, combinedSetters...); settingError != nil {
 		return errors.Wrap(settingError, utils.ErrFailedToSetStatus)
 	}
 
-	return errors.Errorf(utils.ErrStatusCode, resource.HttpResponse.Method, strconv.Itoa(resource.HttpResponse.StatusCode))
+	return errors.Errorf(utils.ErrStatusCode, r.resource.HttpResponse.Method, strconv.Itoa(r.resource.HttpResponse.StatusCode))
 }
 
-func (r *requestStatusHandler) appendExtraSetters(forProvider v1alpha1.RequestParameters, resource utils.RequestResource, basicSetters *[]utils.SetRequestStatusFunc) {
-	if resource.HttpResponse.Method != http.MethodGet {
-		*basicSetters = append(*basicSetters, resource.ResetFailures())
+func (r *requestStatusHandler) appendExtraSetters(forProvider v1alpha1.RequestParameters, combinedSetters *[]utils.SetRequestStatusFunc) {
+	if r.resource.HttpResponse.Method != http.MethodGet {
+		*combinedSetters = append(*combinedSetters, r.resource.ResetFailures())
 	}
 
-	if r.shouldSetCache(forProvider, resource) {
-		*basicSetters = append(*basicSetters, resource.SetCache())
+	if r.shouldSetCache(forProvider) {
+		*combinedSetters = append(*combinedSetters, r.resource.SetCache())
 	}
 }
 
 // shouldSetCache determines whether the cache should be updated based on the provided mapping, HTTP response,
 // and RequestParameters. It generates request details according to the given mapping and response. If the request
 // details are not valid, it means that instead of using the response, the cache should be used.
-func (r *requestStatusHandler) shouldSetCache(forProvider v1alpha1.RequestParameters, resource utils.RequestResource) bool {
+func (r *requestStatusHandler) shouldSetCache(forProvider v1alpha1.RequestParameters) bool {
 	for _, mapping := range forProvider.Mappings {
-		response := responseconverter.HttpResponseToV1alpha1Response(resource.HttpResponse)
+		response := responseconverter.HttpResponseToV1alpha1Response(r.resource.HttpResponse)
 		requestDetails, _, ok := requestgen.GenerateRequestDetails(mapping, forProvider, response)
 		if !(requestgen.IsRequestValid(requestDetails) && ok) {
 			return false
@@ -109,26 +107,27 @@ func (r *requestStatusHandler) shouldSetCache(forProvider v1alpha1.RequestParame
 	return true
 }
 
-func (r *requestStatusHandler) ResetFailures(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse) error {
-	resource := &utils.RequestResource{
-		Resource:       cr,
-		HttpResponse:   res,
-		RequestContext: ctx,
-		LocalClient:    r.localKube,
+func (r *requestStatusHandler) ResetFailures() {
+	if r.extraSetters == nil {
+		r.extraSetters = &[]utils.SetRequestStatusFunc{}
 	}
 
-	if settingError := utils.SetRequestResourceStatus(*resource, resource.ResetFailures()); settingError != nil {
-		return errors.Wrap(settingError, utils.ErrFailedToSetStatus)
-	}
-
-	return nil
+	*r.extraSetters = append(*r.extraSetters, r.resource.ResetFailures())
 }
 
 // NewClient returns a new Request statusHandler
-func NewStatusHandler(client client.Client, logger logging.Logger) RequestStatusHandler {
+func NewStatusHandler(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse, err error, client client.Client, logger logging.Logger) RequestStatusHandler {
 	requestStatusHandler := &requestStatusHandler{
-		logger:    logger,
-		localKube: client,
+		logger:       logger,
+		extraSetters: &[]utils.SetRequestStatusFunc{},
+		resource: &utils.RequestResource{
+			Resource:       cr,
+			HttpResponse:   res,
+			RequestContext: ctx,
+			LocalClient:    client,
+		},
+		responseError: err,
+		forProvider:   cr.Spec.ForProvider,
 	}
 
 	return requestStatusHandler
