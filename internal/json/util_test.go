@@ -46,13 +46,6 @@ var (
 			testDeleteMapping,
 		},
 	}
-
-	testForProviderMap = map[string]any{
-		"payload": map[string]any{
-			"baseUrl": string("https://api.example.com/users"),
-			"body":    `{"username":"john_doe","email":"john.doe@example.com"}`,
-		},
-	}
 )
 
 func Test_Contains(t *testing.T) {

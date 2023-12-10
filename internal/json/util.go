@@ -1,6 +1,9 @@
 package json
 
-import "encoding/json"
+import (
+	"bytes"
+	"encoding/json"
+)
 
 func Contains(container, containee map[string]interface{}) bool {
 	for key, value := range containee {
@@ -18,7 +21,7 @@ func IsJSONString(jsonStr string) bool {
 
 func JsonStringToMap(jsonStr string) map[string]interface{} {
 	var jsonData map[string]interface{}
-	json.Unmarshal([]byte(jsonStr), &jsonData)
+	_ = json.Unmarshal([]byte(jsonStr), &jsonData)
 	return jsonData
 }
 
@@ -63,5 +66,5 @@ func deepEqual(a, b interface{}) bool {
 		return false
 	}
 
-	return string(aBytes) == string(bBytes)
+	return bytes.Equal(aBytes, bBytes)
 }

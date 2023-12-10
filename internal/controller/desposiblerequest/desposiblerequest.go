@@ -46,8 +46,6 @@ const (
 	errNewHttpClient                     = "cannot create new Http client"
 	errProviderNotRetrieved              = "provider could not be retrieved"
 	errFailedToSendHttpDesposibleRequest = "failed to send http request"
-	errFailedToSetStatusCode             = "failed to update status code"
-	errFailedToSetError                  = "failed to update request error"
 	errFailedToUpdate                    = "failed updating CR"
 )
 
@@ -158,7 +156,9 @@ func (c *external) deployAction(ctx context.Context, cr *v1alpha1.DesposibleRequ
 
 	if err != nil {
 		setErr := resource.SetError(err)
-		utils.SetRequestResourceStatus(*resource, setErr)
+		if settingError := utils.SetRequestResourceStatus(*resource, setErr); settingError != nil {
+			return errors.Wrap(settingError, utils.ErrFailedToSetStatus)
+		}
 		return err
 	}
 
@@ -168,7 +168,10 @@ func (c *external) deployAction(ctx context.Context, cr *v1alpha1.DesposibleRequ
 	setSynced := resource.SetSynced()
 
 	if utils.IsHTTPError(res.StatusCode) {
-		utils.SetRequestResourceStatus(*resource, setStatusCode, setHeaders, setBody, resource.SetError(nil))
+		if settingError := utils.SetRequestResourceStatus(*resource, setStatusCode, setHeaders, setBody, resource.SetError(nil)); settingError != nil {
+			return errors.Wrap(settingError, utils.ErrFailedToSetStatus)
+		}
+
 		return errors.Errorf(utils.ErrStatusCode, cr.Spec.ForProvider.Method, strconv.Itoa(res.StatusCode))
 	}
 

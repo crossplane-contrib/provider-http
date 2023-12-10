@@ -10,7 +10,6 @@ import (
 	"github.com/arielsepton/provider-http/internal/controller/request/requestgen"
 	"github.com/arielsepton/provider-http/internal/json"
 	"github.com/arielsepton/provider-http/internal/utils"
-	"github.com/crossplane/crossplane-runtime/pkg/logging"
 	"github.com/pkg/errors"
 )
 
@@ -45,22 +44,30 @@ func FailedObserve() ObserveRequestDetails {
 
 // isUpToDate checks whether desired spec up to date with the observed state for a given request
 func (c *external) isUpToDate(ctx context.Context, cr *v1alpha1.Request) (ObserveRequestDetails, error) {
-	if cr.Status.Response.Body == "" ||
-		(cr.Status.Response.Method == http.MethodPost && utils.IsHTTPError(cr.Status.Response.StatusCode)) {
+	if !c.isObjectValidForObservation(cr) {
 		return FailedObserve(), errors.New(errObjectNotFound)
 	}
 
-	res, err := c.sendObserveRequest(ctx, cr)
-	observeRequestDetails := NewObserve(res, err, false)
-
+	res, responseErr := c.sendObserveRequest(ctx, cr)
 	if res.StatusCode == http.StatusNotFound {
 		return FailedObserve(), errors.New(errObjectNotFound)
 	}
 
-	desiredState, err := c.desiredState(cr, c.logger)
+	desiredState, err := c.desiredState(cr)
 	if err != nil {
 		return FailedObserve(), err
 	}
+
+	return c.compareResponseAndDesiredState(res, responseErr, desiredState)
+}
+
+func (c *external) isObjectValidForObservation(cr *v1alpha1.Request) bool {
+	return cr.Status.Response.Body != "" &&
+		!(cr.Status.Response.Method == http.MethodPost && utils.IsHTTPError(cr.Status.Response.StatusCode))
+}
+
+func (c *external) compareResponseAndDesiredState(res httpClient.HttpResponse, err error, desiredState string) (ObserveRequestDetails, error) {
+	observeRequestDetails := NewObserve(res, err, false)
 
 	if json.IsJSONString(res.Body) && json.IsJSONString(desiredState) {
 		responseBodyMap := json.JsonStringToMap(res.Body)
@@ -81,7 +88,7 @@ func (c *external) isUpToDate(ctx context.Context, cr *v1alpha1.Request) (Observ
 	return observeRequestDetails, nil
 }
 
-func (c *external) desiredState(cr *v1alpha1.Request, logger logging.Logger) (string, error) {
+func (c *external) desiredState(cr *v1alpha1.Request) (string, error) {
 	requestDetails, err := c.requestDetails(cr, http.MethodPut)
 	return requestDetails.Body, err
 }
@@ -101,5 +108,5 @@ func (c *external) requestDetails(cr *v1alpha1.Request, method string) (requestg
 		return requestgen.RequestDetails{}, errors.Errorf(errMappingNotFound, method)
 	}
 
-	return generateValidRequestDetails(cr, mapping, c.logger)
+	return generateValidRequestDetails(cr, mapping)
 }

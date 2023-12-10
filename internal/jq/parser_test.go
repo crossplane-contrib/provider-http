@@ -3,7 +3,6 @@ package jq
 import (
 	"testing"
 
-	"github.com/crossplane/crossplane-runtime/pkg/logging"
 	"github.com/crossplane/crossplane-runtime/pkg/test"
 	"github.com/google/go-cmp/cmp"
 )
@@ -44,7 +43,6 @@ func Test_runJQQuery(t *testing.T) {
 	type args struct {
 		jqQuery  string
 		jqObject interface{}
-		logger   logging.Logger
 	}
 	type want struct {
 		result interface{}
@@ -58,7 +56,6 @@ func Test_runJQQuery(t *testing.T) {
 			args: args{
 				jqQuery:  `(.payload.baseUrl + "/" + .response.body.id)`,
 				jqObject: testJQObject,
-				logger:   logging.NewNopLogger(),
 			},
 			want: want{
 				result: `https://api.example.com/users/123`,
@@ -68,7 +65,7 @@ func Test_runJQQuery(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			got, gotErr := runJQQuery(tc.args.jqQuery, tc.args.jqObject, tc.args.logger)
+			got, gotErr := runJQQuery(tc.args.jqQuery, tc.args.jqObject)
 			if diff := cmp.Diff(tc.want.err, gotErr, test.EquateErrors()); diff != "" {
 				t.Fatalf("runJQQuery(...): -want error, +got error: %s", diff)
 			}
@@ -84,7 +81,6 @@ func Test_ParseString(t *testing.T) {
 	type args struct {
 		jqQuery string
 		obj     interface{}
-		logger  logging.Logger
 	}
 	type want struct {
 		result interface{}
@@ -98,7 +94,6 @@ func Test_ParseString(t *testing.T) {
 			args: args{
 				jqQuery: `(.payload.baseUrl + "/" + .response.body.id)`,
 				obj:     testJQObject,
-				logger:  logging.NewNopLogger(),
 			},
 			want: want{
 				result: `https://api.example.com/users/123`,
@@ -108,7 +103,7 @@ func Test_ParseString(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			got, gotErr := ParseString(tc.args.jqQuery, tc.args.obj, tc.args.logger)
+			got, gotErr := ParseString(tc.args.jqQuery, tc.args.obj)
 			if diff := cmp.Diff(tc.want.err, gotErr, test.EquateErrors()); diff != "" {
 				t.Fatalf("ParseString(...): -want error, +got error: %s", diff)
 			}
@@ -124,7 +119,6 @@ func Test_ParseMapInterface(t *testing.T) {
 	type args struct {
 		jqQuery string
 		obj     interface{}
-		logger  logging.Logger
 	}
 	type want struct {
 		result map[string]interface{}
@@ -138,7 +132,6 @@ func Test_ParseMapInterface(t *testing.T) {
 			args: args{
 				jqQuery: `{ name: .payload.body.username, email: .payload.body.email }`,
 				obj:     testJQObject,
-				logger:  logging.NewNopLogger(),
 			},
 			want: want{
 				result: map[string]any{"email": "john.doe@example.com", "name": "john_doe"},
@@ -148,7 +141,7 @@ func Test_ParseMapInterface(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			got, gotErr := ParseMapInterface(tc.args.jqQuery, tc.args.obj, tc.args.logger)
+			got, gotErr := ParseMapInterface(tc.args.jqQuery, tc.args.obj)
 			if diff := cmp.Diff(tc.want.err, gotErr, test.EquateErrors()); diff != "" {
 				t.Fatalf("ParseMapInterface(...): -want error, +got error: %s", diff)
 			}

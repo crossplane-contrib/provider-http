@@ -157,7 +157,9 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 
 	synced := observeRequestDetails.Synced
 	if synced {
-		c.status.ResetFailures(ctx, cr, observeRequestDetails.Response)
+		if err := c.status.ResetFailures(ctx, cr, observeRequestDetails.Response); err != nil {
+			return managed.ExternalObservation{}, errors.Wrap(err, errFailedUpdateCR)
+		}
 	}
 
 	err = c.status.SetRequestStatus(ctx, cr, observeRequestDetails.Response, observeRequestDetails.ResponseError)
@@ -167,7 +169,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 
 	cr.Status.SetConditions(xpv1.Available())
 	if err := c.localKube.Status().Update(ctx, cr); err != nil {
-		return managed.ExternalObservation{}, errors.New(errFailedUpdateCR)
+		return managed.ExternalObservation{}, errors.Wrap(err, errFailedUpdateCR)
 	}
 
 	return managed.ExternalObservation{
@@ -183,7 +185,7 @@ func (c *external) deployAction(ctx context.Context, cr *v1alpha1.Request, metho
 		return errors.Errorf(errMappingNotFound, method)
 	}
 
-	requestDetails, err := generateValidRequestDetails(cr, mapping, c.logger)
+	requestDetails, err := generateValidRequestDetails(cr, mapping)
 	if err != nil {
 		return err
 	}
@@ -224,13 +226,13 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) error {
 // details are valid, the function returns them. If not, it falls back to using the cached response in the Request's status
 // and attempts to generate request details again. The function returns the generated request details or an error if the
 // generation process fails.
-func generateValidRequestDetails(cr *v1alpha1.Request, mapping *v1alpha1.Mapping, logger logging.Logger) (requestgen.RequestDetails, error) {
-	requestDetails, _, ok := requestgen.GenerateRequestDetails(*mapping, cr.Spec.ForProvider, cr.Status.Response, logger)
+func generateValidRequestDetails(cr *v1alpha1.Request, mapping *v1alpha1.Mapping) (requestgen.RequestDetails, error) {
+	requestDetails, _, ok := requestgen.GenerateRequestDetails(*mapping, cr.Spec.ForProvider, cr.Status.Response)
 	if requestgen.IsRequestValid(requestDetails) && ok {
 		return requestDetails, nil
 	}
 
-	requestDetails, err, _ := requestgen.GenerateRequestDetails(*mapping, cr.Spec.ForProvider, cr.Status.Cache.Response, logger)
+	requestDetails, err, _ := requestgen.GenerateRequestDetails(*mapping, cr.Spec.ForProvider, cr.Status.Cache.Response)
 	if err != nil {
 		return requestgen.RequestDetails{}, err
 	}

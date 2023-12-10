@@ -3,7 +3,6 @@ package requestprocessing
 import (
 	"testing"
 
-	"github.com/crossplane/crossplane-runtime/pkg/logging"
 	"github.com/crossplane/crossplane-runtime/pkg/test"
 	"github.com/google/go-cmp/cmp"
 )
@@ -85,7 +84,6 @@ func Test_ApplyJQOnStr(t *testing.T) {
 	type args struct {
 		jqQuery  string
 		jqObject map[string]any
-		logger   logging.Logger
 	}
 	type want struct {
 		result string
@@ -99,7 +97,6 @@ func Test_ApplyJQOnStr(t *testing.T) {
 			args: args{
 				jqQuery:  `{ name: .payload.body.username, email: .payload.body.email }`,
 				jqObject: testJQObject,
-				logger:   logging.NewNopLogger(),
 			},
 			want: want{
 				result: `{"email":"john.doe@example.com","name":"john_doe"}`,
@@ -110,7 +107,6 @@ func Test_ApplyJQOnStr(t *testing.T) {
 			args: args{
 				jqQuery:  `(.payload.baseUrl + "/" + .response.body.id)`,
 				jqObject: testJQObject,
-				logger:   logging.NewNopLogger(),
 			},
 			want: want{
 				result: `https://api.example.com/users/123`,
@@ -120,7 +116,7 @@ func Test_ApplyJQOnStr(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			got, gotErr := ApplyJQOnStr(tc.args.jqQuery, tc.args.jqObject, tc.args.logger)
+			got, gotErr := ApplyJQOnStr(tc.args.jqQuery, tc.args.jqObject)
 			if diff := cmp.Diff(tc.want.err, gotErr, test.EquateErrors()); diff != "" {
 				t.Fatalf("ApplyJQOnStr(...): -want error, +got error: %s", diff)
 			}
@@ -136,7 +132,6 @@ func Test_ApplyJQOnMapStrings(t *testing.T) {
 	type args struct {
 		keyToJQQueries map[string][]string
 		jqObject       map[string]any
-		logger         logging.Logger
 	}
 	type want struct {
 		result map[string][]string
@@ -150,7 +145,6 @@ func Test_ApplyJQOnMapStrings(t *testing.T) {
 			args: args{
 				keyToJQQueries: testHeaders,
 				jqObject:       testJQObject,
-				logger:         logging.NewNopLogger(),
 			},
 			want: want{
 				result: testHeaders,
@@ -164,7 +158,6 @@ func Test_ApplyJQOnMapStrings(t *testing.T) {
 					"name":   {".payload.body.username"},
 				},
 				jqObject: testJQObject,
-				logger:   logging.NewNopLogger(),
 			},
 			want: want{
 				result: map[string][]string{
@@ -177,7 +170,7 @@ func Test_ApplyJQOnMapStrings(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			got, gotErr := ApplyJQOnMapStrings(tc.args.keyToJQQueries, tc.args.jqObject, tc.args.logger)
+			got, gotErr := ApplyJQOnMapStrings(tc.args.keyToJQQueries, tc.args.jqObject)
 			if diff := cmp.Diff(tc.want.err, gotErr, test.EquateErrors()); diff != "" {
 				t.Fatalf("ApplyJQOnMapStrings(...): -want error, +got error: %s", diff)
 			}

@@ -52,7 +52,9 @@ func Test_isUpToDate(t *testing.T) {
 					MockSetRequest: func(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse, err error) error {
 						return nil
 					},
-					MockResetFailures: func(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse) {},
+					MockResetFailures: func(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse) error {
+						return nil
+					},
 				},
 			},
 			want: want{
@@ -77,7 +79,9 @@ func Test_isUpToDate(t *testing.T) {
 					MockSetRequest: func(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse, err error) error {
 						return nil
 					},
-					MockResetFailures: func(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse) {},
+					MockResetFailures: func(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse) error {
+						return nil
+					},
 				},
 			},
 			want: want{
@@ -101,7 +105,9 @@ func Test_isUpToDate(t *testing.T) {
 					MockSetRequest: func(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse, err error) error {
 						return nil
 					},
-					MockResetFailures: func(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse) {},
+					MockResetFailures: func(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse) error {
+						return nil
+					},
 				},
 			},
 			want: want{
@@ -127,7 +133,9 @@ func Test_isUpToDate(t *testing.T) {
 					MockSetRequest: func(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse, err error) error {
 						return nil
 					},
-					MockResetFailures: func(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse) {},
+					MockResetFailures: func(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse) error {
+						return nil
+					},
 				},
 			},
 			want: want{
@@ -155,7 +163,9 @@ func Test_isUpToDate(t *testing.T) {
 					MockSetRequest: func(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse, err error) error {
 						return nil
 					},
-					MockResetFailures: func(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse) {},
+					MockResetFailures: func(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse) error {
+						return nil
+					},
 				},
 			},
 			want: want{
@@ -194,7 +204,9 @@ func Test_isUpToDate(t *testing.T) {
 					MockSetRequest: func(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse, err error) error {
 						return nil
 					},
-					MockResetFailures: func(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse) {},
+					MockResetFailures: func(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse) error {
+						return nil
+					},
 				},
 			},
 			want: want{

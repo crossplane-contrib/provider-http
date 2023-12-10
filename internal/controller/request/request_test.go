@@ -85,15 +85,15 @@ func (c *MockHttpClient) SendRequest(ctx context.Context, method string, url str
 
 type MockSetRequestStatusFn func(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse, err error) error
 
-type MockResetFailuresFn func(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse)
+type MockResetFailuresFn func(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse) error
 
 type MockStatusHandler struct {
 	MockSetRequest    MockSetRequestStatusFn
 	MockResetFailures MockResetFailuresFn
 }
 
-func (s *MockStatusHandler) ResetFailures(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse) {
-	s.MockResetFailures(ctx, cr, res)
+func (s *MockStatusHandler) ResetFailures(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse) error {
+	return s.MockResetFailures(ctx, cr, res)
 }
 
 func (s *MockStatusHandler) SetRequestStatus(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse, err error) error {
@@ -138,7 +138,9 @@ func Test_httpExternal_Create(t *testing.T) {
 					MockSetRequest: func(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse, err error) error {
 						return errBoom
 					},
-					MockResetFailures: func(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse) {},
+					MockResetFailures: func(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse) error {
+						return nil
+					},
 				},
 			},
 			want: want{
@@ -160,7 +162,9 @@ func Test_httpExternal_Create(t *testing.T) {
 					MockSetRequest: func(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse, err error) error {
 						return errBoom
 					},
-					MockResetFailures: func(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse) {},
+					MockResetFailures: func(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse) error {
+						return nil
+					},
 				},
 			},
 			want: want{
@@ -183,7 +187,9 @@ func Test_httpExternal_Create(t *testing.T) {
 					MockSetRequest: func(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse, err error) error {
 						return nil
 					},
-					MockResetFailures: func(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse) {},
+					MockResetFailures: func(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse) error {
+						return nil
+					},
 				},
 			},
 			want: want{
@@ -247,7 +253,9 @@ func Test_httpExternal_Update(t *testing.T) {
 					MockSetRequest: func(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse, err error) error {
 						return errBoom
 					},
-					MockResetFailures: func(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse) {},
+					MockResetFailures: func(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse) error {
+						return nil
+					},
 				},
 			},
 			want: want{
@@ -269,7 +277,9 @@ func Test_httpExternal_Update(t *testing.T) {
 					MockSetRequest: func(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse, err error) error {
 						return errBoom
 					},
-					MockResetFailures: func(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse) {},
+					MockResetFailures: func(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse) error {
+						return nil
+					},
 				},
 			},
 			want: want{
@@ -292,7 +302,9 @@ func Test_httpExternal_Update(t *testing.T) {
 					MockSetRequest: func(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse, err error) error {
 						return nil
 					},
-					MockResetFailures: func(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse) {},
+					MockResetFailures: func(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse) error {
+						return nil
+					},
 				},
 			},
 			want: want{
@@ -356,7 +368,9 @@ func Test_httpExternal_Delete(t *testing.T) {
 					MockSetRequest: func(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse, err error) error {
 						return errBoom
 					},
-					MockResetFailures: func(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse) {},
+					MockResetFailures: func(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse) error {
+						return nil
+					},
 				},
 			},
 			want: want{
@@ -378,7 +392,9 @@ func Test_httpExternal_Delete(t *testing.T) {
 					MockSetRequest: func(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse, err error) error {
 						return errBoom
 					},
-					MockResetFailures: func(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse) {},
+					MockResetFailures: func(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse) error {
+						return nil
+					},
 				},
 			},
 			want: want{
@@ -401,7 +417,9 @@ func Test_httpExternal_Delete(t *testing.T) {
 					MockSetRequest: func(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse, err error) error {
 						return nil
 					},
-					MockResetFailures: func(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse) {},
+					MockResetFailures: func(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse) error {
+						return nil
+					},
 				},
 			},
 			want: want{
