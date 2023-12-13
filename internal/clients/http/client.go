@@ -3,6 +3,7 @@ package http
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"io"
 	"net/http"
 	"time"
@@ -12,7 +13,7 @@ import (
 
 // Client is the interface to interact with Http
 type Client interface {
-	SendRequest(ctx context.Context, method string, url string, body string, headers map[string][]string) (resp HttpResponse, err error)
+	SendRequest(ctx context.Context, method string, url string, body string, headers map[string][]string, skipTLSVerify bool) (resp HttpResponse, err error)
 }
 
 type client struct {
@@ -21,12 +22,13 @@ type client struct {
 }
 
 type HttpResponse struct {
-	ResponseBody string
-	Headers      map[string][]string
-	StatusCode   int
+	Body       string
+	Headers    map[string][]string
+	StatusCode int
+	Method     string
 }
 
-func (hc *client) SendRequest(ctx context.Context, method string, url string, body string, headers map[string][]string) (resp HttpResponse, err error) {
+func (hc *client) SendRequest(ctx context.Context, method string, url string, body string, headers map[string][]string, skipTLSVerify bool) (resp HttpResponse, err error) {
 	requestBody := []byte(body)
 	request, err := http.NewRequestWithContext(ctx, method, url, bytes.NewBuffer(requestBody))
 
@@ -41,6 +43,10 @@ func (hc *client) SendRequest(ctx context.Context, method string, url string, bo
 	}
 
 	client := &http.Client{
+		Transport: &http.Transport{
+			// #nosec G402
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: skipTLSVerify},
+		},
 		Timeout: hc.timeout,
 	}
 
@@ -55,9 +61,10 @@ func (hc *client) SendRequest(ctx context.Context, method string, url string, bo
 	}
 
 	beautifiedResponse := HttpResponse{
-		ResponseBody: string(responsebody),
-		Headers:      response.Header,
-		StatusCode:   response.StatusCode,
+		Body:       string(responsebody),
+		Headers:    response.Header,
+		StatusCode: response.StatusCode,
+		Method:     response.Request.Method,
 	}
 
 	err = response.Body.Close()

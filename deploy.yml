@@ -1,32 +1,37 @@
-# apiVersion: pkg.crossplane.io/v1
-# kind: Provider
-# metadata:
-#   name: http-provider
-# spec:
-#   package: ghcr.io/arielsepton/provider-http:v1.0.1
-#   controllerConfigRef:
-#     name: debug-config  
-
-# ---
-
-# apiVersion: pkg.crossplane.io/v1alpha1
-# kind: ControllerConfig
-# metadata:
-#   name: debug-config
-# spec:
-#   args:
-#     - --debug
+# HTTP_PROVIDER
+apiVersion: pkg.crossplane.io/v1
+kind: Provider
+metadata:
+  name: http-provider
+spec:
+  package: ghcr.io/arielsepton/provider-http:v1.0.1
+  controllerConfigRef:
+    name: debug-config  
 
 
-# apiVersion: pkg.crossplane.io/v1
-# kind: Provider
-# metadata:
-#   name: provider-helm
-# spec:
-#   package: xpkg.upbound.io/crossplane-contrib/provider-helm:v0.15.0
+---
+# DEBUG_CONTROLLER_CONFIG
+apiVersion: pkg.crossplane.io/v1alpha1
+kind: ControllerConfig
+metadata:
+  name: debug-config
+spec:
+  args:
+    - --debug
 
 
+---
+# PROVIDER_HELM
+apiVersion: pkg.crossplane.io/v1
+kind: Provider
+metadata:
+  name: provider-helm
+spec:
+  package: xpkg.upbound.io/crossplane-contrib/provider-helm:v0.15.0
 
+
+---
+# PROVIDER_CONFIG_HELM_PROVIDER
 apiVersion: helm.crossplane.io/v1beta1
 kind: ProviderConfig
 metadata:

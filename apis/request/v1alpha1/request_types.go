@@ -25,82 +25,93 @@ import (
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 )
 
-// DesposibleRequestParameters are the configurable fields of a DesposibleRequest.
-type DesposibleRequestParameters struct {
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="Field 'forProvider.url' is immutable"
-	URL string `json:"url"`
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="Field 'forProvider.method' is immutable"
-	Method string `json:"method"`
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="Field 'forProvider.headers' is immutable"
-	Headers map[string][]string `json:"headers,omitempty"`
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="Field 'forProvider.body' is immutable"
-	Body string `json:"body,omitempty"`
+// RequestParameters are the configurable fields of a Request.
+type RequestParameters struct {
+	Mappings []Mapping           `json:"mappings"`
+	Payload  Payload             `json:"payload"`
+	Headers  map[string][]string `json:"headers,omitempty"`
 
 	WaitTimeout *metav1.Duration `json:"waitTimeout,omitempty"`
-
-	// RollbackRetriesLimit is max number of attempts to retry HTTP request by sending again the request.
-	RollbackRetriesLimit *int32 `json:"rollbackLimit,omitempty"`
 
 	// InsecureSkipTLSVerify, when set to true, skips TLS certificate checks for the HTTP request
 	InsecureSkipTLSVerify bool `json:"insecureSkipTLSVerify,omitempty"`
 }
 
-// A DesposibleRequestSpec defines the desired state of a DesposibleRequest.
-type DesposibleRequestSpec struct {
-	xpv1.ResourceSpec `json:",inline"`
-
-	ForProvider DesposibleRequestParameters `json:"forProvider"`
+type Mapping struct {
+	// +kubebuilder:validation:Enum=POST;GET;PUT;DELETE
+	Method  string              `json:"method"`
+	Body    string              `json:"body,omitempty"`
+	URL     string              `json:"url"`
+	Headers map[string][]string `json:"headers,omitempty"`
 }
 
+type Payload struct {
+	BaseUrl string `json:"baseUrl,omitempty"`
+	Body    string `json:"body,omitempty"`
+}
+
+// A RequestSpec defines the desired state of a Request.
+type RequestSpec struct {
+	xpv1.ResourceSpec `json:",inline"`
+	ForProvider       RequestParameters `json:"forProvider"`
+}
+
+// RequestObservation are the observable fields of a Request.
 type Response struct {
 	StatusCode int                 `json:"statusCode,omitempty"`
 	Body       string              `json:"body,omitempty"`
 	Headers    map[string][]string `json:"headers,omitempty"`
+	Method     string              `json:"method,omitempty"`
 }
 
-// A DesposibleRequestStatus represents the observed state of a DesposibleRequest.
-type DesposibleRequestStatus struct {
+// A RequestStatus represents the observed state of a Request.
+type RequestStatus struct {
 	xpv1.ResourceStatus `json:",inline"`
 	Response            Response `json:"response,omitempty"`
+	Cache               Cache    `json:"cache,omitempty"`
 	Failed              int32    `json:"failed,omitempty"`
 	Error               string   `json:"error,omitempty"`
-	Synced              bool     `json:"synced,omitempty"`
+}
+
+type Cache struct {
+	LastUpdated string   `json:"lastUpdated,omitempty"`
+	Response    Response `json:"response,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 
-// A DesposibleRequest is an example API type.
+// A Request is an example API type.
 // +kubebuilder:printcolumn:name="READY",type="string",JSONPath=".status.conditions[?(@.type=='Ready')].status"
 // +kubebuilder:printcolumn:name="SYNCED",type="string",JSONPath=".status.conditions[?(@.type=='Synced')].status"
 // +kubebuilder:printcolumn:name="EXTERNAL-NAME",type="string",JSONPath=".metadata.annotations.crossplane\\.io/external-name"
 // +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:scope=Cluster,categories={crossplane,managed,http}
-type DesposibleRequest struct {
+type Request struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   DesposibleRequestSpec   `json:"spec"`
-	Status DesposibleRequestStatus `json:"status,omitempty"`
+	Spec   RequestSpec   `json:"spec"`
+	Status RequestStatus `json:"status,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 
-// DesposibleRequestList contains a list of DesposibleRequest
-type DesposibleRequestList struct {
+// RequestList contains a list of Request
+type RequestList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []DesposibleRequest `json:"items"`
+	Items           []Request `json:"items"`
 }
 
-// DesposibleRequest type metadata.
+// Request type metadata.
 var (
-	DesposibleRequestKind             = reflect.TypeOf(DesposibleRequest{}).Name()
-	DesposibleRequestGroupKind        = schema.GroupKind{Group: Group, Kind: DesposibleRequestKind}.String()
-	DesposibleRequestKindAPIVersion   = DesposibleRequestKind + "." + SchemeGroupVersion.String()
-	DesposibleRequestGroupVersionKind = SchemeGroupVersion.WithKind(DesposibleRequestKind)
+	RequestKind             = reflect.TypeOf(Request{}).Name()
+	RequestGroupKind        = schema.GroupKind{Group: Group, Kind: RequestKind}.String()
+	RequestKindAPIVersion   = RequestKind + "." + SchemeGroupVersion.String()
+	RequestGroupVersionKind = SchemeGroupVersion.WithKind(RequestKind)
 )
 
 func init() {
-	SchemeBuilder.Register(&DesposibleRequest{}, &DesposibleRequestList{})
+	SchemeBuilder.Register(&Request{}, &RequestList{})
 }
