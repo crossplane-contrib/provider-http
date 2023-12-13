@@ -42,7 +42,13 @@ func (hc *client) SendRequest(ctx context.Context, method string, url string, bo
 		}
 	}
 
-	client := hc.initClient(skipTLSVerify)
+	client := &http.Client{
+		Transport: &http.Transport{
+			// #nosec G402
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: skipTLSVerify},
+		},
+		Timeout: hc.timeout,
+	}
 
 	response, err := client.Do(request)
 	if err != nil {
@@ -67,22 +73,6 @@ func (hc *client) SendRequest(ctx context.Context, method string, url string, bo
 	}
 
 	return beautifiedResponse, nil
-}
-
-func (hc *client) initClient(skipTLSVerify bool) *http.Client {
-	if skipTLSVerify {
-		// Skip TLS verification
-		return &http.Client{
-			Transport: &http.Transport{
-				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-			},
-			Timeout: hc.timeout,
-		}
-	}
-
-	return &http.Client{
-		Timeout: hc.timeout,
-	}
 }
 
 // NewClient returns a new Http Client
