@@ -74,6 +74,10 @@ spec:
                         type: string
                       type: array
                     type: object
+                  insecureSkipTLSVerify:
+                    description: InsecureSkipTLSVerify, when set to true, skips TLS
+                      certificate checks for the HTTP request
+                    type: boolean
                   mappings:
                     items:
                       properties:

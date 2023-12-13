@@ -4,6 +4,7 @@ metadata:
   name: laundry-by-dan
 spec:
   forProvider:
+    insecureSkipTLSVerify: true
     headers:
       Content-Type:
         - application/json

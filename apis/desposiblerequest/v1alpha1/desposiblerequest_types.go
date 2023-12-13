@@ -27,21 +27,28 @@ import (
 
 // DesposibleRequestParameters are the configurable fields of a DesposibleRequest.
 type DesposibleRequestParameters struct {
-	URL         string              `json:"url"`
-	Method      string              `json:"method"`
-	Headers     map[string][]string `json:"headers,omitempty"`
-	Body        string              `json:"body,omitempty"`
-	WaitTimeout *metav1.Duration    `json:"waitTimeout,omitempty"`
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="Field 'forProvider.url' is immutable"
+	URL string `json:"url"`
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="Field 'forProvider.method' is immutable"
+	Method string `json:"method"`
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="Field 'forProvider.headers' is immutable"
+	Headers map[string][]string `json:"headers,omitempty"`
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="Field 'forProvider.body' is immutable"
+	Body string `json:"body,omitempty"`
+
+	WaitTimeout *metav1.Duration `json:"waitTimeout,omitempty"`
 
 	// RollbackRetriesLimit is max number of attempts to retry HTTP request by sending again the request.
 	RollbackRetriesLimit *int32 `json:"rollbackLimit,omitempty"`
+
+	// InsecureSkipTLSVerify, when set to true, skips TLS certificate checks for the HTTP request
+	InsecureSkipTLSVerify bool `json:"insecureSkipTLSVerify,omitempty"`
 }
 
 // A DesposibleRequestSpec defines the desired state of a DesposibleRequest.
 type DesposibleRequestSpec struct {
 	xpv1.ResourceSpec `json:",inline"`
 
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="Field 'ForProvider' is immutable"
 	ForProvider DesposibleRequestParameters `json:"forProvider"`
 }
 

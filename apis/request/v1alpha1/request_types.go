@@ -32,6 +32,9 @@ type RequestParameters struct {
 	Headers  map[string][]string `json:"headers,omitempty"`
 
 	WaitTimeout *metav1.Duration `json:"waitTimeout,omitempty"`
+
+	// InsecureSkipTLSVerify, when set to true, skips TLS certificate checks for the HTTP request
+	InsecureSkipTLSVerify bool `json:"insecureSkipTLSVerify,omitempty"`
 }
 
 type Mapping struct {

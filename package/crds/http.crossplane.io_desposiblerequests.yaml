@@ -71,14 +71,27 @@ spec:
                 properties:
                   body:
                     type: string
+                    x-kubernetes-validations:
+                    - message: Field 'forProvider.body' is immutable
+                      rule: self == oldSelf
                   headers:
                     additionalProperties:
                       items:
                         type: string
                       type: array
                     type: object
+                    x-kubernetes-validations:
+                    - message: Field 'forProvider.headers' is immutable
+                      rule: self == oldSelf
+                  insecureSkipTLSVerify:
+                    description: InsecureSkipTLSVerify, when set to true, skips TLS
+                      certificate checks for the HTTP request
+                    type: boolean
                   method:
                     type: string
+                    x-kubernetes-validations:
+                    - message: Field 'forProvider.method' is immutable
+                      rule: self == oldSelf
                   rollbackLimit:
                     description: RollbackRetriesLimit is max number of attempts to
                       retry HTTP request by sending again the request.
@@ -86,15 +99,15 @@ spec:
                     type: integer
                   url:
                     type: string
+                    x-kubernetes-validations:
+                    - message: Field 'forProvider.url' is immutable
+                      rule: self == oldSelf
                   waitTimeout:
                     type: string
                 required:
                 - method
                 - url
                 type: object
-                x-kubernetes-validations:
-                - message: Field 'ForProvider' is immutable
-                  rule: self == oldSelf
               managementPolicy:
                 default: FullControl
                 description: 'THIS IS AN ALPHA FIELD. Do not use it in production.

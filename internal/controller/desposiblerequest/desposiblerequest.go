@@ -150,7 +150,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 
 func (c *external) deployAction(ctx context.Context, cr *v1alpha1.DesposibleRequest) error {
 	res, err := c.http.SendRequest(ctx, cr.Spec.ForProvider.Method,
-		cr.Spec.ForProvider.URL, cr.Spec.ForProvider.Body, cr.Spec.ForProvider.Headers)
+		cr.Spec.ForProvider.URL, cr.Spec.ForProvider.Body, cr.Spec.ForProvider.Headers, cr.Spec.ForProvider.InsecureSkipTLSVerify)
 
 	resource := &utils.RequestResource{
 		Resource:       cr,

@@ -99,7 +99,7 @@ func (c *external) sendObserveRequest(ctx context.Context, cr *v1alpha1.Request)
 		return httpClient.HttpResponse{}, err
 	}
 
-	return c.http.SendRequest(ctx, http.MethodGet, requestDetails.Url, requestDetails.Body, requestDetails.Headers)
+	return c.http.SendRequest(ctx, http.MethodGet, requestDetails.Url, requestDetails.Body, requestDetails.Headers, cr.Spec.ForProvider.InsecureSkipTLSVerify)
 }
 
 func (c *external) requestDetails(cr *v1alpha1.Request, method string) (requestgen.RequestDetails, error) {
