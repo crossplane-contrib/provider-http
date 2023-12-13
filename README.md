@@ -10,7 +10,7 @@ To install `provider-http`, you have two options:
 1. Using the Crossplane CLI in a Kubernetes cluster where Crossplane is installed:
 
     ```console
-    kubectl crossplane install provider crossplanecontrib/provider-http:master
+    kubectl crossplane install provider ghcr.io/arielsepton/provider-http:v1.2.0
     ```
 
 2. Manually creating a Provider by applying the following YAML:
@@ -21,7 +21,7 @@ To install `provider-http`, you have two options:
     metadata:
       name: provider-http
     spec:
-      package: "crossplanecontrib/provider-http:master"
+      package: "ghcr.io/arielsepton/provider-http:v1.2.0"
     ```
 
 
