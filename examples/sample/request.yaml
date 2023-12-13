@@ -5,9 +5,12 @@ metadata:
 spec:
   forProvider:
     insecureSkipTLSVerify: true
+    waitTimeout: 5m
+
     headers:
       Content-Type:
         - application/json
+
     payload:
       baseUrl: "http://host.docker.internal:5000/todo"
       body: |
@@ -16,6 +19,7 @@ spec:
           "reminder": "Every 1 hour", 
           "responsible": "Dan"
         }
+    
     mappings:
       - method: "POST"
         body: |
@@ -40,5 +44,6 @@ spec:
         url: (.payload.baseUrl + "/" + (.response.body.id|tostring)) 
       - method: "DELETE"
         url: (.payload.baseUrl + "/" + (.response.body.id|tostring)) 
+  
   providerConfigRef:
     name: http-conf

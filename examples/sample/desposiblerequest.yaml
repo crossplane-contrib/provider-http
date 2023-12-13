@@ -5,6 +5,9 @@ metadata:
 spec:
   deletionPolicy: Orphan
   forProvider:
+    insecureSkipTLSVerify: true
+    waitTimeout: 5m
+    rollbackLimit: 5
     url: https://api.example.com/health
     method: POST
     body: |
