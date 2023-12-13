@@ -16,7 +16,8 @@ spec:
         "additional_info": "optional"
       }
     headers:
-      User-Agent: "Crossplane Health Checker"
+      User-Agent: 
+        - "Crossplane Health Checker"
   providerConfigRef:
     name: http-conf
 # TODO: check if it's possible to modify the deletionPolicy to be orphan by default.
