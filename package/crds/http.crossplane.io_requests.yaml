@@ -5,7 +5,7 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.11.3
   creationTimestamp: null
-  name: desposiblerequests.http.crossplane.io
+  name: requests.http.crossplane.io
 spec:
   group: http.crossplane.io
   names:
@@ -13,10 +13,10 @@ spec:
     - crossplane
     - managed
     - http
-    kind: DesposibleRequest
-    listKind: DesposibleRequestList
-    plural: desposiblerequests
-    singular: desposiblerequest
+    kind: Request
+    listKind: RequestList
+    plural: requests
+    singular: request
   scope: Cluster
   versions:
   - additionalPrinterColumns:
@@ -35,7 +35,7 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: A DesposibleRequest is an example API type.
+        description: A Request is an example API type.
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -50,7 +50,7 @@ spec:
           metadata:
             type: object
           spec:
-            description: A DesposibleRequestSpec defines the desired state of a DesposibleRequest.
+            description: A RequestSpec defines the desired state of a Request.
             properties:
               deletionPolicy:
                 default: Delete
@@ -66,47 +66,55 @@ spec:
                 - Delete
                 type: string
               forProvider:
-                description: DesposibleRequestParameters are the configurable fields
-                  of a DesposibleRequest.
+                description: RequestParameters are the configurable fields of a Request.
                 properties:
-                  body:
-                    type: string
-                    x-kubernetes-validations:
-                    - message: Field 'forProvider.body' is immutable
-                      rule: self == oldSelf
                   headers:
                     additionalProperties:
                       items:
                         type: string
                       type: array
                     type: object
-                    x-kubernetes-validations:
-                    - message: Field 'forProvider.headers' is immutable
-                      rule: self == oldSelf
                   insecureSkipTLSVerify:
                     description: InsecureSkipTLSVerify, when set to true, skips TLS
                       certificate checks for the HTTP request
                     type: boolean
-                  method:
-                    type: string
-                    x-kubernetes-validations:
-                    - message: Field 'forProvider.method' is immutable
-                      rule: self == oldSelf
-                  rollbackLimit:
-                    description: RollbackRetriesLimit is max number of attempts to
-                      retry HTTP request by sending again the request.
-                    format: int32
-                    type: integer
-                  url:
-                    type: string
-                    x-kubernetes-validations:
-                    - message: Field 'forProvider.url' is immutable
-                      rule: self == oldSelf
+                  mappings:
+                    items:
+                      properties:
+                        body:
+                          type: string
+                        headers:
+                          additionalProperties:
+                            items:
+                              type: string
+                            type: array
+                          type: object
+                        method:
+                          enum:
+                          - POST
+                          - GET
+                          - PUT
+                          - DELETE
+                          type: string
+                        url:
+                          type: string
+                      required:
+                      - method
+                      - url
+                      type: object
+                    type: array
+                  payload:
+                    properties:
+                      baseUrl:
+                        type: string
+                      body:
+                        type: string
+                    type: object
                   waitTimeout:
                     type: string
                 required:
-                - method
-                - url
+                - mappings
+                - payload
                 type: object
               managementPolicy:
                 default: FullControl
@@ -295,9 +303,30 @@ spec:
             - forProvider
             type: object
           status:
-            description: A DesposibleRequestStatus represents the observed state of
-              a DesposibleRequest.
+            description: A RequestStatus represents the observed state of a Request.
             properties:
+              cache:
+                properties:
+                  lastUpdated:
+                    type: string
+                  response:
+                    description: RequestObservation are the observable fields of a
+                      Request.
+                    properties:
+                      body:
+                        type: string
+                      headers:
+                        additionalProperties:
+                          items:
+                            type: string
+                          type: array
+                        type: object
+                      method:
+                        type: string
+                      statusCode:
+                        type: integer
+                    type: object
+                type: object
               conditions:
                 description: Conditions of the resource.
                 items:
@@ -337,6 +366,7 @@ spec:
                 format: int32
                 type: integer
               response:
+                description: RequestObservation are the observable fields of a Request.
                 properties:
                   body:
                     type: string
@@ -346,11 +376,11 @@ spec:
                         type: string
                       type: array
                     type: object
+                  method:
+                    type: string
                   statusCode:
                     type: integer
                 type: object
-              synced:
-                type: boolean
             type: object
         required:
         - spec

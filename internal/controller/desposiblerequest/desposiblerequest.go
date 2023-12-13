@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The Crossplane Authors.
+Copyright 2023 The Crossplane Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ package desposiblerequest
 
 import (
 	"context"
+	"strconv"
 	"time"
 
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
@@ -36,10 +37,7 @@ import (
 	"github.com/arielsepton/provider-http/apis/desposiblerequest/v1alpha1"
 	apisv1alpha1 "github.com/arielsepton/provider-http/apis/v1alpha1"
 	httpClient "github.com/arielsepton/provider-http/internal/clients/http"
-)
-
-const (
-	defaultWaitTimeout = 5 * time.Minute
+	"github.com/arielsepton/provider-http/internal/utils"
 )
 
 const (
@@ -48,12 +46,7 @@ const (
 	errNewHttpClient                     = "cannot create new Http client"
 	errProviderNotRetrieved              = "provider could not be retrieved"
 	errFailedToSendHttpDesposibleRequest = "failed to send http request"
-	errEmptyMethod                       = "no method is specified"
-	errEmptyURL                          = "no url is specified"
-	errFailedToSetStatusCode             = "failed to update status code"
-	errFailedToSetError                  = "failed to update request error"
-	errFailedToSetHeaders                = "failed to update headers"
-	errFailedToSetBody                   = "failed to update body"
+	errFailedUpdateStatusConditions      = "failed updating status conditions"
 )
 
 // Setup adds a controller that reconciles DesposibleRequest managed resources.
@@ -96,7 +89,7 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 		return nil, errors.New(errNotDesposibleRequest)
 	}
 
-	l := c.logger.WithValues("request", cr.Name)
+	l := c.logger.WithValues("desposibleRequest", cr.Name)
 
 	if err := c.usage.Track(ctx, mg); err != nil {
 		return nil, errors.Wrap(err, errTrackPCUsage)
@@ -108,7 +101,7 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 		return nil, errors.Wrap(err, errProviderNotRetrieved)
 	}
 
-	h, err := c.newHttpClientFn(l, waitTimeout(cr))
+	h, err := c.newHttpClientFn(l, utils.WaitTimeout(cr.Spec.ForProvider.WaitTimeout))
 	if err != nil {
 		return nil, errors.Wrap(err, errNewHttpClient)
 	}
@@ -138,26 +131,61 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		}, nil
 	}
 
+	// Get the latest version of the resource before updating
+	if err := c.localKube.Get(ctx, types.NamespacedName{Name: cr.Name, Namespace: cr.Namespace}, cr); err != nil {
+		return managed.ExternalObservation{}, errors.Wrap(err, "failed to get the latest version of the resource")
+	}
+
 	cr.Status.SetConditions(xpv1.Available())
 	if err := c.localKube.Status().Update(ctx, cr); err != nil {
-		return managed.ExternalObservation{}, errors.New("failed updating CR")
+		return managed.ExternalObservation{}, errors.New(errFailedUpdateStatusConditions)
 	}
 
 	return managed.ExternalObservation{
 		ResourceExists:    true,
-		ResourceUpToDate:  !(shouldRetry(cr) && !retriesLimitReached(cr)),
+		ResourceUpToDate:  !(utils.ShouldRetry(cr.Spec.ForProvider.RollbackRetriesLimit, cr.Status.Failed) && !utils.RetriesLimitReached(cr.Status.Failed, cr.Spec.ForProvider.RollbackRetriesLimit)),
 		ConnectionDetails: nil,
 	}, nil
 }
 
-func (c *external) deployAction(ctx context.Context, cr *v1alpha1.DesposibleRequest, method string, url string, body string, headers map[string][]string) error {
-	res, err := c.http.SendRequest(ctx, method, url, body, headers)
+func (c *external) deployAction(ctx context.Context, cr *v1alpha1.DesposibleRequest) error {
+	res, err := c.http.SendRequest(ctx, cr.Spec.ForProvider.Method,
+		cr.Spec.ForProvider.URL, cr.Spec.ForProvider.Body, cr.Spec.ForProvider.Headers, cr.Spec.ForProvider.InsecureSkipTLSVerify)
 
-	if err != nil {
-		return c.handleDeployActionError(ctx, cr, err)
+	resource := &utils.RequestResource{
+		Resource:       cr,
+		RequestContext: ctx,
+		HttpResponse:   res,
+		LocalClient:    c.localKube,
 	}
 
-	return c.setDesposibleRequestStatus(ctx, cr, res)
+	// Get the latest version of the resource before updating
+	if err := c.localKube.Get(ctx, types.NamespacedName{Name: cr.Name, Namespace: cr.Namespace}, cr); err != nil {
+		return errors.Wrap(err, "failed to get the latest version of the resource")
+	}
+
+	if err != nil {
+		setErr := resource.SetError(err)
+		if settingError := utils.SetRequestResourceStatus(*resource, setErr); settingError != nil {
+			return errors.Wrap(settingError, utils.ErrFailedToSetStatus)
+		}
+		return err
+	}
+
+	setStatusCode := resource.SetStatusCode()
+	setHeaders := resource.SetHeaders()
+	setBody := resource.SetBody()
+	setSynced := resource.SetSynced()
+
+	if utils.IsHTTPError(res.StatusCode) {
+		if settingError := utils.SetRequestResourceStatus(*resource, setStatusCode, setHeaders, setBody, resource.SetError(nil)); settingError != nil {
+			return errors.Wrap(settingError, utils.ErrFailedToSetStatus)
+		}
+
+		return errors.Errorf(utils.ErrStatusCode, cr.Spec.ForProvider.Method, strconv.Itoa(res.StatusCode))
+	}
+
+	return utils.SetRequestResourceStatus(*resource, setStatusCode, setHeaders, setBody, setSynced)
 }
 
 func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.ExternalCreation, error) {
@@ -166,12 +194,11 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalCreation{}, errors.New(errNotDesposibleRequest)
 	}
 
-	if err := isDesposibleRequestValid(cr.Spec.ForProvider.Method, cr.Spec.ForProvider.URL); err != nil {
+	if err := utils.IsRequestValid(cr.Spec.ForProvider.Method, cr.Spec.ForProvider.URL); err != nil {
 		return managed.ExternalCreation{}, err
 	}
 
-	return managed.ExternalCreation{}, errors.Wrap(c.deployAction(ctx, cr, cr.Spec.ForProvider.Method,
-		cr.Spec.ForProvider.URL, cr.Spec.ForProvider.Body, cr.Spec.ForProvider.Headers), errFailedToSendHttpDesposibleRequest)
+	return managed.ExternalCreation{}, errors.Wrap(c.deployAction(ctx, cr), errFailedToSendHttpDesposibleRequest)
 }
 
 func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.ExternalUpdate, error) {
@@ -180,61 +207,13 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalUpdate{}, errors.New(errNotDesposibleRequest)
 	}
 
-	if err := isDesposibleRequestValid(cr.Spec.ForProvider.Method, cr.Spec.ForProvider.URL); err != nil {
+	if err := utils.IsRequestValid(cr.Spec.ForProvider.Method, cr.Spec.ForProvider.URL); err != nil {
 		return managed.ExternalUpdate{}, err
 	}
 
-	return managed.ExternalUpdate{}, errors.Wrap(c.deployAction(ctx, cr, cr.Spec.ForProvider.Method,
-		cr.Spec.ForProvider.URL, cr.Spec.ForProvider.Body, cr.Spec.ForProvider.Headers), errFailedToSendHttpDesposibleRequest)
+	return managed.ExternalUpdate{}, errors.Wrap(c.deployAction(ctx, cr), errFailedToSendHttpDesposibleRequest)
 }
 
 func (c *external) Delete(_ context.Context, _ resource.Managed) error {
 	return nil
-}
-
-func shouldRetry(cr *v1alpha1.DesposibleRequest) bool {
-	return rollBackEnabled(cr) && cr.Status.Failed != 0
-}
-
-func rollBackEnabled(cr *v1alpha1.DesposibleRequest) bool {
-	return cr.Spec.ForProvider.RollbackRetriesLimit != nil
-}
-
-func retriesLimitReached(cr *v1alpha1.DesposibleRequest) bool {
-	return cr.Status.Failed >= *cr.Spec.ForProvider.RollbackRetriesLimit
-}
-
-func isDesposibleRequestValid(method string, url string) error {
-	if method == "" {
-		return errors.New(errEmptyMethod)
-	}
-
-	if url == "" {
-		return errors.New(errEmptyURL)
-	}
-
-	return nil
-}
-
-func waitTimeout(cr *v1alpha1.DesposibleRequest) time.Duration {
-	if cr.Spec.ForProvider.WaitTimeout != nil {
-		return cr.Spec.ForProvider.WaitTimeout.Duration
-	}
-	return defaultWaitTimeout
-}
-
-func (c *external) handleDeployActionError(ctx context.Context, cr *v1alpha1.DesposibleRequest, err error) error {
-	cr.Status.Failed++
-
-	cr.Status.Error = err.Error()
-	if err := c.localKube.Status().Update(ctx, cr); err != nil {
-		return errors.Wrap(err, errFailedToSetError)
-	}
-
-	cr.Status.Synced = true
-	if err := c.localKube.Status().Update(ctx, cr); err != nil {
-		return errors.Wrap(err, errFailedToSetStatusCode)
-	}
-
-	return err
 }
