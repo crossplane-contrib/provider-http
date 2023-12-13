@@ -159,6 +159,11 @@ func (c *external) deployAction(ctx context.Context, cr *v1alpha1.DesposibleRequ
 		LocalClient:    c.localKube,
 	}
 
+	// Get the latest version of the resource before updating
+	if err := c.localKube.Get(ctx, types.NamespacedName{Name: cr.Name, Namespace: cr.Namespace}, cr); err != nil {
+		return errors.Wrap(err, "failed to get the latest version of the resource")
+	}
+
 	if err != nil {
 		setErr := resource.SetError(err)
 		if settingError := utils.SetRequestResourceStatus(*resource, setErr); settingError != nil {
