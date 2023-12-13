@@ -150,7 +150,15 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.Wrap(err, errFailedToCheckIfUpToDate)
 	}
 
-	statusHandler := statushandler.NewStatusHandler(ctx, cr, observeRequestDetails.Response, observeRequestDetails.ResponseError, c.localKube, c.logger)
+	// Get the latest version of the resource before updating
+	if err := c.localKube.Get(ctx, types.NamespacedName{Name: cr.Name, Namespace: cr.Namespace}, cr); err != nil {
+		return managed.ExternalObservation{}, errors.Wrap(err, "failed to get the latest version of the resource")
+	}
+
+	statusHandler, err := statushandler.NewStatusHandler(ctx, cr, observeRequestDetails.Response, observeRequestDetails.ResponseError, c.localKube, c.logger)
+	if err != nil {
+		return managed.ExternalObservation{}, err
+	}
 
 	synced := observeRequestDetails.Synced
 	if synced {
@@ -182,8 +190,12 @@ func (c *external) deployAction(ctx context.Context, cr *v1alpha1.Request, metho
 		return err
 	}
 
-	res, err := c.http.SendRequest(ctx, mapping.Method, requestDetails.Url, requestDetails.Body, requestDetails.Headers)
-	statusHandler := statushandler.NewStatusHandler(ctx, cr, res, err, c.localKube, c.logger)
+	res, err := c.http.SendRequest(ctx, mapping.Method, requestDetails.Url, requestDetails.Body, requestDetails.Headers, cr.Spec.ForProvider.InsecureSkipTLSVerify)
+
+	statusHandler, err := statushandler.NewStatusHandler(ctx, cr, res, err, c.localKube, c.logger)
+	if err != nil {
+		return err
+	}
 
 	return statusHandler.SetRequestStatus()
 }

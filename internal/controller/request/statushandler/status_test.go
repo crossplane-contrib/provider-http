@@ -99,6 +99,7 @@ func Test_SetRequestStatus(t *testing.T) {
 				cr: testCr,
 				localKube: &test.MockClient{
 					MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
+					MockGet:          test.NewMockGetFn(nil),
 				},
 				res: httpClient.HttpResponse{
 					StatusCode: 200,
@@ -118,6 +119,7 @@ func Test_SetRequestStatus(t *testing.T) {
 				cr: testCr,
 				localKube: &test.MockClient{
 					MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
+					MockGet:          test.NewMockGetFn(nil),
 				},
 				res: httpClient.HttpResponse{
 					StatusCode: 400,
@@ -137,6 +139,7 @@ func Test_SetRequestStatus(t *testing.T) {
 				cr: testCr,
 				localKube: &test.MockClient{
 					MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
+					MockGet:          test.NewMockGetFn(nil),
 				},
 				res: httpClient.HttpResponse{
 					StatusCode: 200,
@@ -156,6 +159,7 @@ func Test_SetRequestStatus(t *testing.T) {
 				cr: testCr,
 				localKube: &test.MockClient{
 					MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
+					MockGet:          test.NewMockGetFn(nil),
 				},
 				isSynced: true,
 				res: httpClient.HttpResponse{
@@ -173,7 +177,7 @@ func Test_SetRequestStatus(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			r := NewStatusHandler(context.Background(), tc.args.cr, tc.args.res, tc.args.err, tc.args.localKube, logging.NewNopLogger())
+			r, _ := NewStatusHandler(context.Background(), tc.args.cr, tc.args.res, tc.args.err, tc.args.localKube, logging.NewNopLogger())
 			if tc.args.isSynced {
 				r.ResetFailures()
 			}

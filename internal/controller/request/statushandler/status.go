@@ -12,6 +12,7 @@ import (
 	"github.com/arielsepton/provider-http/internal/utils"
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
 	"github.com/pkg/errors"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -116,7 +117,12 @@ func (r *requestStatusHandler) ResetFailures() {
 }
 
 // NewClient returns a new Request statusHandler
-func NewStatusHandler(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse, err error, client client.Client, logger logging.Logger) RequestStatusHandler {
+func NewStatusHandler(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse, err error, localKube client.Client, logger logging.Logger) (RequestStatusHandler, error) {
+	// Get the latest version of the resource before updating
+	if err := localKube.Get(ctx, types.NamespacedName{Name: cr.Name, Namespace: cr.Namespace}, cr); err != nil {
+		return nil, errors.Wrap(err, "failed to get the latest version of the resource")
+	}
+
 	requestStatusHandler := &requestStatusHandler{
 		logger:       logger,
 		extraSetters: &[]utils.SetRequestStatusFunc{},
@@ -124,11 +130,11 @@ func NewStatusHandler(ctx context.Context, cr *v1alpha1.Request, res httpClient.
 			Resource:       cr,
 			HttpResponse:   res,
 			RequestContext: ctx,
-			LocalClient:    client,
+			LocalClient:    localKube,
 		},
 		responseError: err,
 		forProvider:   cr.Spec.ForProvider,
 	}
 
-	return requestStatusHandler
+	return requestStatusHandler, nil
 }

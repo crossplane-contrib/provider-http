@@ -72,14 +72,14 @@ type notHttpRequest struct {
 	resource.Managed
 }
 
-type MockSendRequestFn func(ctx context.Context, method string, url string, body string, headers map[string][]string) (resp httpClient.HttpResponse, err error)
+type MockSendRequestFn func(ctx context.Context, method string, url string, body string, headers map[string][]string, skipTLSVerify bool) (resp httpClient.HttpResponse, err error)
 
 type MockHttpClient struct {
 	MockSendRequest MockSendRequestFn
 }
 
-func (c *MockHttpClient) SendRequest(ctx context.Context, method string, url string, body string, headers map[string][]string) (resp httpClient.HttpResponse, err error) {
-	return c.MockSendRequest(ctx, method, url, body, headers)
+func (c *MockHttpClient) SendRequest(ctx context.Context, method string, url string, body string, headers map[string][]string, skipTLSVerify bool) (resp httpClient.HttpResponse, err error) {
+	return c.MockSendRequest(ctx, method, url, body, headers, skipTLSVerify)
 }
 
 type MockSetRequestStatusFn func() error
@@ -126,12 +126,13 @@ func Test_httpExternal_Create(t *testing.T) {
 		"RequestFailed": {
 			args: args{
 				http: &MockHttpClient{
-					MockSendRequest: func(ctx context.Context, method string, url string, body string, headers map[string][]string) (resp httpClient.HttpResponse, err error) {
+					MockSendRequest: func(ctx context.Context, method string, url string, body string, headers map[string][]string, skipTLSVerify bool) (resp httpClient.HttpResponse, err error) {
 						return httpClient.HttpResponse{}, errBoom
 					},
 				},
 				localKube: &test.MockClient{
 					MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
+					MockGet:          test.NewMockGetFn(nil),
 				},
 				mg: httpRequest(),
 			},
@@ -142,13 +143,14 @@ func Test_httpExternal_Create(t *testing.T) {
 		"Success": {
 			args: args{
 				http: &MockHttpClient{
-					MockSendRequest: func(ctx context.Context, method string, url string, body string, headers map[string][]string) (resp httpClient.HttpResponse, err error) {
+					MockSendRequest: func(ctx context.Context, method string, url string, body string, headers map[string][]string, skipTLSVerify bool) (resp httpClient.HttpResponse, err error) {
 						return httpClient.HttpResponse{}, nil
 					},
 				},
 				localKube: &test.MockClient{
 					MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
 					MockCreate:       test.NewMockCreateFn(nil),
+					MockGet:          test.NewMockGetFn(nil),
 				},
 				mg: httpRequest(),
 			},
@@ -199,12 +201,13 @@ func Test_httpExternal_Update(t *testing.T) {
 		"RequestFailed": {
 			args: args{
 				http: &MockHttpClient{
-					MockSendRequest: func(ctx context.Context, method string, url string, body string, headers map[string][]string) (resp httpClient.HttpResponse, err error) {
+					MockSendRequest: func(ctx context.Context, method string, url string, body string, headers map[string][]string, skipTLSVerify bool) (resp httpClient.HttpResponse, err error) {
 						return httpClient.HttpResponse{}, errBoom
 					},
 				},
 				localKube: &test.MockClient{
 					MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
+					MockGet:          test.NewMockGetFn(nil),
 				},
 				mg: httpRequest(),
 			},
@@ -215,13 +218,14 @@ func Test_httpExternal_Update(t *testing.T) {
 		"Success": {
 			args: args{
 				http: &MockHttpClient{
-					MockSendRequest: func(ctx context.Context, method string, url string, body string, headers map[string][]string) (resp httpClient.HttpResponse, err error) {
+					MockSendRequest: func(ctx context.Context, method string, url string, body string, headers map[string][]string, skipTLSVerify bool) (resp httpClient.HttpResponse, err error) {
 						return httpClient.HttpResponse{}, nil
 					},
 				},
 				localKube: &test.MockClient{
 					MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
 					MockCreate:       test.NewMockCreateFn(nil),
+					MockGet:          test.NewMockGetFn(nil),
 				},
 				mg: httpRequest(),
 			},
@@ -272,12 +276,13 @@ func Test_httpExternal_Delete(t *testing.T) {
 		"RequestFailed": {
 			args: args{
 				http: &MockHttpClient{
-					MockSendRequest: func(ctx context.Context, method string, url string, body string, headers map[string][]string) (resp httpClient.HttpResponse, err error) {
+					MockSendRequest: func(ctx context.Context, method string, url string, body string, headers map[string][]string, skipTLSVerify bool) (resp httpClient.HttpResponse, err error) {
 						return httpClient.HttpResponse{}, errBoom
 					},
 				},
 				localKube: &test.MockClient{
 					MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
+					MockGet:          test.NewMockGetFn(nil),
 				},
 				mg: httpRequest(),
 			},
@@ -288,13 +293,14 @@ func Test_httpExternal_Delete(t *testing.T) {
 		"Success": {
 			args: args{
 				http: &MockHttpClient{
-					MockSendRequest: func(ctx context.Context, method string, url string, body string, headers map[string][]string) (resp httpClient.HttpResponse, err error) {
+					MockSendRequest: func(ctx context.Context, method string, url string, body string, headers map[string][]string, skipTLSVerify bool) (resp httpClient.HttpResponse, err error) {
 						return httpClient.HttpResponse{}, nil
 					},
 				},
 				localKube: &test.MockClient{
 					MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
 					MockCreate:       test.NewMockCreateFn(nil),
+					MockGet:          test.NewMockGetFn(nil),
 				},
 				mg: httpRequest(),
 			},
