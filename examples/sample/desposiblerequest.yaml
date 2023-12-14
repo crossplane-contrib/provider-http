@@ -8,7 +8,7 @@ spec:
     insecureSkipTLSVerify: true
     waitTimeout: 5m
     rollbackLimit: 5
-    url: https://api.example.com/health
+    url:  http://todo.default.svc.cluster.local/health-check
     method: POST
     body: |
       {

@@ -1,25 +1,22 @@
 apiVersion: http.crossplane.io/v1alpha1
 kind: Request
 metadata:
-  name: laundry-by-dan
+  name: laundry
 spec:
   forProvider:
     insecureSkipTLSVerify: true
     waitTimeout: 5m
-
     headers:
       Content-Type:
         - application/json
-
     payload:
-      baseUrl: "http://host.docker.internal:5000/todo"
+      baseUrl: http://todo.default.svc.cluster.local/todos
       body: |
         {
           "name": "Do Laundry", 
           "reminder": "Every 1 hour", 
           "responsible": "Dan"
         }
-    
     mappings:
       - method: "POST"
         body: |
