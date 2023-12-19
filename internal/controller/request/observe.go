@@ -19,17 +19,17 @@ const (
 )
 
 type ObserveRequestDetails struct {
-	Response      httpClient.HttpResponse
+	Details       httpClient.HttpDetails
 	ResponseError error
 	Synced        bool
 }
 
 // NewObserveRequestDetails is a constructor function that initializes
 // an instance of ObserveRequestDetails with default values.
-func NewObserve(res httpClient.HttpResponse, resErr error, synced bool) ObserveRequestDetails {
+func NewObserve(details httpClient.HttpDetails, resErr error, synced bool) ObserveRequestDetails {
 	return ObserveRequestDetails{
 		Synced:        synced,
-		Response:      res,
+		Details:       details,
 		ResponseError: resErr,
 	}
 }
@@ -48,8 +48,13 @@ func (c *external) isUpToDate(ctx context.Context, cr *v1alpha1.Request) (Observ
 		return FailedObserve(), errors.New(errObjectNotFound)
 	}
 
-	res, responseErr := c.sendObserveRequest(ctx, cr)
-	if res.StatusCode == http.StatusNotFound {
+	requestDetails, err := c.requestDetails(cr, http.MethodGet)
+	if err != nil {
+		return FailedObserve(), err
+	}
+
+	details, responseErr := c.http.SendRequest(ctx, http.MethodGet, requestDetails.Url, requestDetails.Body, requestDetails.Headers, cr.Spec.ForProvider.InsecureSkipTLSVerify)
+	if details.HttpResponse.StatusCode == http.StatusNotFound {
 		return FailedObserve(), errors.New(errObjectNotFound)
 	}
 
@@ -58,48 +63,39 @@ func (c *external) isUpToDate(ctx context.Context, cr *v1alpha1.Request) (Observ
 		return FailedObserve(), err
 	}
 
-	return c.compareResponseAndDesiredState(res, responseErr, desiredState)
+	return c.compareResponseAndDesiredState(details, responseErr, desiredState)
 }
 
 func (c *external) isObjectValidForObservation(cr *v1alpha1.Request) bool {
 	return cr.Status.Response.Body != "" &&
-		!(cr.Status.Response.Method == http.MethodPost && utils.IsHTTPError(cr.Status.Response.StatusCode))
+		!(cr.Status.RequestDetails.Method == http.MethodPost && utils.IsHTTPError(cr.Status.Response.StatusCode))
 }
 
-func (c *external) compareResponseAndDesiredState(res httpClient.HttpResponse, err error, desiredState string) (ObserveRequestDetails, error) {
-	observeRequestDetails := NewObserve(res, err, false)
+func (c *external) compareResponseAndDesiredState(details httpClient.HttpDetails, err error, desiredState string) (ObserveRequestDetails, error) {
+	observeRequestDetails := NewObserve(details, err, false)
 
-	if json.IsJSONString(res.Body) && json.IsJSONString(desiredState) {
-		responseBodyMap := json.JsonStringToMap(res.Body)
+	if json.IsJSONString(details.HttpResponse.Body) && json.IsJSONString(desiredState) {
+		responseBodyMap := json.JsonStringToMap(details.HttpResponse.Body)
 		desiredStateMap := json.JsonStringToMap(desiredState)
-		observeRequestDetails.Synced = json.Contains(responseBodyMap, desiredStateMap) && utils.IsHTTPSuccess(res.StatusCode)
+		observeRequestDetails.Synced = json.Contains(responseBodyMap, desiredStateMap) && utils.IsHTTPSuccess(details.HttpResponse.StatusCode)
 		return observeRequestDetails, nil
 	}
 
-	if !json.IsJSONString(res.Body) && json.IsJSONString(desiredState) {
-		return FailedObserve(), errors.Errorf(errNotValidJSON, "response body", res.Body)
+	if !json.IsJSONString(details.HttpResponse.Body) && json.IsJSONString(desiredState) {
+		return FailedObserve(), errors.Errorf(errNotValidJSON, "response body", details.HttpResponse.Body)
 	}
 
-	if json.IsJSONString(res.Body) && !json.IsJSONString(desiredState) {
+	if json.IsJSONString(details.HttpResponse.Body) && !json.IsJSONString(desiredState) {
 		return FailedObserve(), errors.Errorf(errNotValidJSON, "PUT mapping result", desiredState)
 	}
 
-	observeRequestDetails.Synced = strings.Contains(res.Body, desiredState) && utils.IsHTTPSuccess(res.StatusCode)
+	observeRequestDetails.Synced = strings.Contains(details.HttpResponse.Body, desiredState) && utils.IsHTTPSuccess(details.HttpResponse.StatusCode)
 	return observeRequestDetails, nil
 }
 
 func (c *external) desiredState(cr *v1alpha1.Request) (string, error) {
 	requestDetails, err := c.requestDetails(cr, http.MethodPut)
 	return requestDetails.Body, err
-}
-
-func (c *external) sendObserveRequest(ctx context.Context, cr *v1alpha1.Request) (httpClient.HttpResponse, error) {
-	requestDetails, err := c.requestDetails(cr, http.MethodGet)
-	if err != nil {
-		return httpClient.HttpResponse{}, err
-	}
-
-	return c.http.SendRequest(ctx, http.MethodGet, requestDetails.Url, requestDetails.Body, requestDetails.Headers, cr.Spec.ForProvider.InsecureSkipTLSVerify)
 }
 
 func (c *external) requestDetails(cr *v1alpha1.Request, method string) (requestgen.RequestDetails, error) {

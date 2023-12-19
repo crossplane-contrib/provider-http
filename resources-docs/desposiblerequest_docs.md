@@ -41,22 +41,24 @@ The status field of the `DisposableRequest` resource will provide information ab
 Example `DesposibleRequest` status:
   ```yaml
   status:
-  conditions:
-    ...
-  response:
-    body: >-
-      {
-        "id":"65565b69681e0b47dcea4464",
-        "key":"value"
-      }
-    headers:
-      Content-Length:
-        - '104'
-      Content-Type:
-        - application/json
-      Date:
-        - Thu, 16 Nov 2023 18:11:53 GMT
-      Server:
-        - uvicorn
-    statusCode: 200
+    conditions:
+      ...
+    requestDetails:
+      ...
+    response:
+      body: >-
+        {
+          "id":"65565b69681e0b47dcea4464",
+          "key":"value"
+        }
+      headers:
+        Content-Length:
+          - '104'
+        Content-Type:
+          - application/json
+        Date:
+          - Thu, 16 Nov 2023 18:11:53 GMT
+        Server:
+          - uvicorn
+      statusCode: 200
   ```

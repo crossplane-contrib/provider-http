@@ -17,6 +17,7 @@ type RequestResource struct {
 	Resource       client.Object
 	RequestContext context.Context
 	HttpResponse   httpClient.HttpResponse
+	HttpRequest    httpClient.HttpRequest
 	LocalClient    client.Client
 }
 
@@ -50,11 +51,11 @@ func (rr *RequestResource) SetBody() SetRequestStatusFunc {
 	}
 }
 
-func (rr *RequestResource) SetMethod() SetRequestStatusFunc {
+func (rr *RequestResource) SetRequestDetails() SetRequestStatusFunc {
 	return func() {
-		if resp, ok := rr.Resource.(MethodSetter); ok {
-			if rr.HttpResponse.Method != "" {
-				resp.SetMethod(rr.HttpResponse.Method)
+		if resp, ok := rr.Resource.(RequestDetailsSetter); ok {
+			if rr.HttpRequest.Method != "" {
+				resp.SetRequestDetails(rr.HttpRequest.URL, rr.HttpRequest.Method, rr.HttpRequest.Body, rr.HttpRequest.Headers)
 			}
 		}
 	}
@@ -71,7 +72,7 @@ func (rr *RequestResource) SetSynced() SetRequestStatusFunc {
 func (rr *RequestResource) SetCache() SetRequestStatusFunc {
 	return func() {
 		if cached, ok := rr.Resource.(CacheSetter); ok {
-			cached.SetCache(rr.HttpResponse.StatusCode, rr.HttpResponse.Headers, rr.HttpResponse.Body, rr.HttpResponse.Method)
+			cached.SetCache(rr.HttpResponse.StatusCode, rr.HttpResponse.Headers, rr.HttpResponse.Body)
 		}
 	}
 }
@@ -99,7 +100,7 @@ type ResponseSetter interface {
 }
 
 type CacheSetter interface {
-	SetCache(statusCode int, headers map[string][]string, body string, method string)
+	SetCache(statusCode int, headers map[string][]string, body string)
 }
 
 type SyncedSetter interface {
@@ -114,8 +115,8 @@ type ResetFailures interface {
 	ResetFailures()
 }
 
-type MethodSetter interface {
-	SetMethod(method string)
+type RequestDetailsSetter interface {
+	SetRequestDetails(url, method, body string, headers map[string][]string)
 }
 
 func SetRequestResourceStatus(rr RequestResource, statusFuncs ...SetRequestStatusFunc) error {

@@ -60,7 +60,6 @@ var (
 		HttpResponse: httpClient.HttpResponse{
 			StatusCode: 200,
 			Body:       `{"id":"123","username":"john_doe"}`,
-			Method:     "GET",
 		},
 		LocalClient: &test.MockClient{
 			MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
@@ -97,7 +96,10 @@ var (
 		HttpResponse: httpClient.HttpResponse{
 			StatusCode: 200,
 			Body:       `{"ids":"123","username":"john_doe"}`,
-			Method:     "GET",
+		},
+		HttpRequest: httpClient.HttpRequest{
+			Method: "GET",
+			URL:    "https://example",
 		},
 		LocalClient: &test.MockClient{
 			MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
@@ -123,7 +125,7 @@ func Test_SetRequestResourceStatus(t *testing.T) {
 				rr: testRequestResource,
 				statusFuncs: []SetRequestStatusFunc{
 					testRequestResource.SetBody(),
-					testRequestResource.SetMethod(),
+					testRequestResource.SetRequestDetails(),
 					testRequestResource.SetHeaders(),
 					testRequestResource.SetStatusCode(),
 					testRequestResource.ResetFailures(),
@@ -140,7 +142,7 @@ func Test_SetRequestResourceStatus(t *testing.T) {
 				rr: testRequestResource,
 				statusFuncs: []SetRequestStatusFunc{
 					testRequestResource.SetBody(),
-					testRequestResource.SetMethod(),
+					testRequestResource.SetRequestDetails(),
 					testRequestResource.SetHeaders(),
 					testRequestResource.SetStatusCode(),
 					testRequestResource.ResetFailures(),
@@ -173,14 +175,6 @@ func Test_SetRequestResourceStatus(t *testing.T) {
 				t.Fatalf("SetRequestResourceStatus(...): -want response status code, +got response status code: %s", diff)
 			}
 
-			if diff := cmp.Diff(tc.args.rr.HttpResponse.Method, testRequestCr.Status.Response.Method); diff != "" {
-				t.Fatalf("SetRequestResourceStatus(...): -want response method, +got response method: %s", diff)
-			}
-
-			if diff := cmp.Diff(tc.args.rr.HttpResponse.Method, testRequestCr.Status.Cache.Response.Method); diff != "" {
-				t.Fatalf("SetRequestResourceStatus(...): -want cache method, +got cahce method: %s", diff)
-			}
-
 			if diff := cmp.Diff(tc.args.rr.HttpResponse.StatusCode, testRequestCr.Status.Cache.Response.StatusCode); diff != "" {
 				t.Fatalf("SetRequestResourceStatus(...): -want cache status code, +got cahce status code: %s", diff)
 			}
@@ -195,6 +189,14 @@ func Test_SetRequestResourceStatus(t *testing.T) {
 
 			if diff := cmp.Diff(tc.want.failures, testRequestCr.Status.Failed); diff != "" {
 				t.Fatalf("SetRequestResourceStatus(...): -want failures amount, +got failures amount: %s", diff)
+			}
+
+			if diff := cmp.Diff(tc.args.rr.HttpRequest.Method, testRequestCr.Status.RequestDetails.Method); diff != "" {
+				t.Fatalf("SetRequestResourceStatus(...): -want request method, +got request method: %s", diff)
+			}
+
+			if diff := cmp.Diff(tc.args.rr.HttpRequest.URL, testRequestCr.Status.RequestDetails.URL); diff != "" {
+				t.Fatalf("SetRequestResourceStatus(...): -want request url, +got request url: %s", diff)
 			}
 		})
 	}

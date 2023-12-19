@@ -45,7 +45,7 @@ func (r *requestStatusHandler) SetRequestStatus() error {
 		r.resource.SetStatusCode(),
 		r.resource.SetHeaders(),
 		r.resource.SetBody(),
-		r.resource.SetMethod(),
+		r.resource.SetRequestDetails(),
 	}
 
 	basicSetters = append(basicSetters, *r.extraSetters...)
@@ -80,11 +80,11 @@ func (r *requestStatusHandler) incrementFailuresAndReturn(combinedSetters []util
 		return errors.Wrap(settingError, utils.ErrFailedToSetStatus)
 	}
 
-	return errors.Errorf(utils.ErrStatusCode, r.resource.HttpResponse.Method, strconv.Itoa(r.resource.HttpResponse.StatusCode))
+	return errors.Errorf(utils.ErrStatusCode, r.resource.HttpRequest.Method, strconv.Itoa(r.resource.HttpResponse.StatusCode))
 }
 
 func (r *requestStatusHandler) appendExtraSetters(forProvider v1alpha1.RequestParameters, combinedSetters *[]utils.SetRequestStatusFunc) {
-	if r.resource.HttpResponse.Method != http.MethodGet {
+	if r.resource.HttpRequest.Method != http.MethodGet {
 		*combinedSetters = append(*combinedSetters, r.resource.ResetFailures())
 	}
 
@@ -117,7 +117,7 @@ func (r *requestStatusHandler) ResetFailures() {
 }
 
 // NewClient returns a new Request statusHandler
-func NewStatusHandler(ctx context.Context, cr *v1alpha1.Request, res httpClient.HttpResponse, err error, localKube client.Client, logger logging.Logger) (RequestStatusHandler, error) {
+func NewStatusHandler(ctx context.Context, cr *v1alpha1.Request, requestDetails httpClient.HttpDetails, err error, localKube client.Client, logger logging.Logger) (RequestStatusHandler, error) {
 	// Get the latest version of the resource before updating
 	if err := localKube.Get(ctx, types.NamespacedName{Name: cr.Name, Namespace: cr.Namespace}, cr); err != nil {
 		return nil, errors.Wrap(err, "failed to get the latest version of the resource")
@@ -128,7 +128,8 @@ func NewStatusHandler(ctx context.Context, cr *v1alpha1.Request, res httpClient.
 		extraSetters: &[]utils.SetRequestStatusFunc{},
 		resource: &utils.RequestResource{
 			Resource:       cr,
-			HttpResponse:   res,
+			HttpResponse:   requestDetails.HttpResponse,
+			HttpRequest:    requestDetails.HttpRequest,
 			RequestContext: ctx,
 			LocalClient:    localKube,
 		},

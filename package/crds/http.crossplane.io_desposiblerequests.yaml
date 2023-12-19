@@ -17,7 +17,7 @@ spec:
     listKind: DesposibleRequestList
     plural: desposiblerequests
     singular: desposiblerequest
-  scope: Cluster
+  scope: Namespaced
   versions:
   - additionalPrinterColumns:
     - jsonPath: .status.conditions[?(@.type=='Ready')].status
@@ -336,6 +336,24 @@ spec:
               failed:
                 format: int32
                 type: integer
+              requestDetails:
+                properties:
+                  body:
+                    type: string
+                  headers:
+                    additionalProperties:
+                      items:
+                        type: string
+                      type: array
+                    type: object
+                  method:
+                    type: string
+                  url:
+                    type: string
+                required:
+                - method
+                - url
+                type: object
               response:
                 properties:
                   body:

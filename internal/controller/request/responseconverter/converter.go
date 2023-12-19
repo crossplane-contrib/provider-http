@@ -11,6 +11,5 @@ func HttpResponseToV1alpha1Response(httpResponse httpClient.HttpResponse) v1alph
 		StatusCode: httpResponse.StatusCode,
 		Body:       httpResponse.Body,
 		Headers:    httpResponse.Headers,
-		Method:     httpResponse.Method,
 	}
 }

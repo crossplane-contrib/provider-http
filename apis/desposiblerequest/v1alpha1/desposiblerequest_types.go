@@ -58,6 +58,13 @@ type Response struct {
 	Headers    map[string][]string `json:"headers,omitempty"`
 }
 
+type Mapping struct {
+	Method  string              `json:"method"`
+	Body    string              `json:"body,omitempty"`
+	URL     string              `json:"url"`
+	Headers map[string][]string `json:"headers,omitempty"`
+}
+
 // A DesposibleRequestStatus represents the observed state of a DesposibleRequest.
 type DesposibleRequestStatus struct {
 	xpv1.ResourceStatus `json:",inline"`
@@ -65,6 +72,8 @@ type DesposibleRequestStatus struct {
 	Failed              int32    `json:"failed,omitempty"`
 	Error               string   `json:"error,omitempty"`
 	Synced              bool     `json:"synced,omitempty"`
+
+	RequestDetails Mapping `json:"requestDetails,omitempty"`
 }
 
 // +kubebuilder:object:root=true
@@ -75,7 +84,7 @@ type DesposibleRequestStatus struct {
 // +kubebuilder:printcolumn:name="EXTERNAL-NAME",type="string",JSONPath=".metadata.annotations.crossplane\\.io/external-name"
 // +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:scope=Cluster,categories={crossplane,managed,http}
+// +kubebuilder:resource:scope=Namespaced,categories={crossplane,managed,http}
 type DesposibleRequest struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

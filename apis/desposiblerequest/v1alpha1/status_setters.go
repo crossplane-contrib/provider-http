@@ -23,3 +23,10 @@ func (d *DesposibleRequest) SetError(err error) {
 		d.Status.Error = err.Error()
 	}
 }
+
+func (d *DesposibleRequest) SetRequestDetails(url, method, body string, headers map[string][]string) {
+	d.Status.RequestDetails.Body = body
+	d.Status.RequestDetails.URL = url
+	d.Status.RequestDetails.Headers = headers
+	d.Status.RequestDetails.Method = method
+}

@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"time"
@@ -13,7 +15,7 @@ import (
 
 // Client is the interface to interact with Http
 type Client interface {
-	SendRequest(ctx context.Context, method string, url string, body string, headers map[string][]string, skipTLSVerify bool) (resp HttpResponse, err error)
+	SendRequest(ctx context.Context, method string, url string, body string, headers map[string][]string, skipTLSVerify bool) (resp HttpDetails, err error)
 }
 
 type client struct {
@@ -25,15 +27,35 @@ type HttpResponse struct {
 	Body       string
 	Headers    map[string][]string
 	StatusCode int
-	Method     string
 }
 
-func (hc *client) SendRequest(ctx context.Context, method string, url string, body string, headers map[string][]string, skipTLSVerify bool) (resp HttpResponse, err error) {
+type HttpRequest struct {
+	Method  string              `json:"method"`
+	Body    string              `json:"body,omitempty"`
+	URL     string              `json:"url"`
+	Headers map[string][]string `json:"headers,omitempty"`
+}
+
+type HttpDetails struct {
+	HttpResponse HttpResponse
+	HttpRequest  HttpRequest
+}
+
+func (hc *client) SendRequest(ctx context.Context, method string, url string, body string, headers map[string][]string, skipTLSVerify bool) (details HttpDetails, err error) {
 	requestBody := []byte(body)
 	request, err := http.NewRequestWithContext(ctx, method, url, bytes.NewBuffer(requestBody))
 
+	requestDetails := HttpRequest{
+		URL:     url,
+		Body:    body,
+		Headers: headers,
+		Method:  method,
+	}
+
 	if err != nil {
-		return HttpResponse{}, err
+		return HttpDetails{
+			HttpRequest: requestDetails,
+		}, err
 	}
 
 	for key, values := range headers {
@@ -52,27 +74,37 @@ func (hc *client) SendRequest(ctx context.Context, method string, url string, bo
 
 	response, err := client.Do(request)
 	if err != nil {
-		return HttpResponse{}, err
+		return HttpDetails{
+			HttpRequest: requestDetails,
+		}, err
 	}
 
 	responsebody, err := io.ReadAll(response.Body)
 	if err != nil {
-		return HttpResponse{}, err
+		return HttpDetails{
+			HttpRequest: requestDetails,
+		}, err
 	}
 
 	beautifiedResponse := HttpResponse{
 		Body:       string(responsebody),
 		Headers:    response.Header,
 		StatusCode: response.StatusCode,
-		Method:     response.Request.Method,
 	}
 
 	err = response.Body.Close()
 	if err != nil {
-		return HttpResponse{}, err
+		return HttpDetails{
+			HttpRequest: requestDetails,
+		}, err
 	}
 
-	return beautifiedResponse, nil
+	hc.log.Info(fmt.Sprint("http request sent: ", toJSON(requestDetails)))
+
+	return HttpDetails{
+		HttpResponse: beautifiedResponse,
+		HttpRequest:  requestDetails,
+	}, nil
 }
 
 // NewClient returns a new Http Client
@@ -81,4 +113,13 @@ func NewClient(log logging.Logger, timeout time.Duration) (Client, error) {
 		log:     log,
 		timeout: timeout,
 	}, nil
+}
+
+func toJSON(request HttpRequest) string {
+	jsonBytes, err := json.Marshal(request)
+	if err != nil {
+		return ""
+	}
+
+	return string(jsonBytes)
 }

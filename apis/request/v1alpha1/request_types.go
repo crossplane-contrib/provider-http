@@ -61,7 +61,6 @@ type Response struct {
 	StatusCode int                 `json:"statusCode,omitempty"`
 	Body       string              `json:"body,omitempty"`
 	Headers    map[string][]string `json:"headers,omitempty"`
-	Method     string              `json:"method,omitempty"`
 }
 
 // A RequestStatus represents the observed state of a Request.
@@ -71,6 +70,7 @@ type RequestStatus struct {
 	Cache               Cache    `json:"cache,omitempty"`
 	Failed              int32    `json:"failed,omitempty"`
 	Error               string   `json:"error,omitempty"`
+	RequestDetails      Mapping  `json:"requestDetails,omitempty"`
 }
 
 type Cache struct {
@@ -86,7 +86,7 @@ type Cache struct {
 // +kubebuilder:printcolumn:name="EXTERNAL-NAME",type="string",JSONPath=".metadata.annotations.crossplane\\.io/external-name"
 // +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:scope=Cluster,categories={crossplane,managed,http}
+// +kubebuilder:resource:scope=Namespaced,categories={crossplane,managed,http}
 type Request struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

@@ -32,7 +32,6 @@ func Test_HttpResponseToV1alpha1Response(t *testing.T) {
 					Body:       `{"email":"john.doe@example.com","name":"john_doe"}`,
 					Headers:    testHeaders,
 					StatusCode: 200,
-					Method:     "POST",
 				},
 			},
 			want: want{
@@ -40,7 +39,6 @@ func Test_HttpResponseToV1alpha1Response(t *testing.T) {
 					Body:       `{"email":"john.doe@example.com","name":"john_doe"}`,
 					Headers:    testHeaders,
 					StatusCode: 200,
-					Method:     "POST",
 				},
 			},
 		},

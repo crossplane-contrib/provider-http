@@ -149,15 +149,19 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 }
 
 func (c *external) deployAction(ctx context.Context, cr *v1alpha1.DesposibleRequest) error {
-	res, err := c.http.SendRequest(ctx, cr.Spec.ForProvider.Method,
+	details, err := c.http.SendRequest(ctx, cr.Spec.ForProvider.Method,
 		cr.Spec.ForProvider.URL, cr.Spec.ForProvider.Body, cr.Spec.ForProvider.Headers, cr.Spec.ForProvider.InsecureSkipTLSVerify)
 
+	res := details.HttpResponse
 	resource := &utils.RequestResource{
 		Resource:       cr,
 		RequestContext: ctx,
-		HttpResponse:   res,
+		HttpResponse:   details.HttpResponse,
 		LocalClient:    c.localKube,
+		HttpRequest:    details.HttpRequest,
 	}
+
+	setRequestDetails := resource.SetRequestDetails()
 
 	// Get the latest version of the resource before updating
 	if err := c.localKube.Get(ctx, types.NamespacedName{Name: cr.Name, Namespace: cr.Namespace}, cr); err != nil {
@@ -166,7 +170,7 @@ func (c *external) deployAction(ctx context.Context, cr *v1alpha1.DesposibleRequ
 
 	if err != nil {
 		setErr := resource.SetError(err)
-		if settingError := utils.SetRequestResourceStatus(*resource, setErr); settingError != nil {
+		if settingError := utils.SetRequestResourceStatus(*resource, setErr, setRequestDetails); settingError != nil {
 			return errors.Wrap(settingError, utils.ErrFailedToSetStatus)
 		}
 		return err
@@ -178,14 +182,14 @@ func (c *external) deployAction(ctx context.Context, cr *v1alpha1.DesposibleRequ
 	setSynced := resource.SetSynced()
 
 	if utils.IsHTTPError(res.StatusCode) {
-		if settingError := utils.SetRequestResourceStatus(*resource, setStatusCode, setHeaders, setBody, resource.SetError(nil)); settingError != nil {
+		if settingError := utils.SetRequestResourceStatus(*resource, setStatusCode, setHeaders, setBody, setRequestDetails, resource.SetError(nil)); settingError != nil {
 			return errors.Wrap(settingError, utils.ErrFailedToSetStatus)
 		}
 
 		return errors.Errorf(utils.ErrStatusCode, cr.Spec.ForProvider.Method, strconv.Itoa(res.StatusCode))
 	}
 
-	return utils.SetRequestResourceStatus(*resource, setStatusCode, setHeaders, setBody, setSynced)
+	return utils.SetRequestResourceStatus(*resource, setStatusCode, setHeaders, setBody, setSynced, setRequestDetails)
 }
 
 func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.ExternalCreation, error) {
