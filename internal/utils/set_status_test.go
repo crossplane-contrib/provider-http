@@ -223,6 +223,7 @@ func Test_DesposibleRequest_SetRequestResourceStatus(t *testing.T) {
 					testDesposibleResource.SetHeaders(),
 					testDesposibleResource.SetStatusCode(),
 					testDesposibleResource.SetSynced(),
+					testDesposibleResource.ResetFailures(),
 				},
 			},
 			want: want{
