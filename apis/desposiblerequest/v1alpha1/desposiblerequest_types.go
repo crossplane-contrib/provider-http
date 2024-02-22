@@ -44,7 +44,9 @@ type DesposibleRequestParameters struct {
 	// InsecureSkipTLSVerify, when set to true, skips TLS certificate checks for the HTTP request
 	InsecureSkipTLSVerify bool `json:"insecureSkipTLSVerify,omitempty"`
 
-	// ExpectedResponse is a jq filter that returns a boolean to determine that the response is expected from the HTTP request.
+	// ExpectedResponse is a jq filter expression used to evaluate the HTTP response and determine if it matches the expected criteria.
+	// The expression should return a boolean; if true, the response is considered expected.
+	// Example: '.Body.job_status == "success"'
 	ExpectedResponse string `json:"expectedResponse,omitempty"`
 }
 
