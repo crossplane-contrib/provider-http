@@ -75,8 +75,11 @@ spec:
                     - message: Field 'forProvider.body' is immutable
                       rule: self == oldSelf
                   expectedResponse:
-                    description: ExpectedResponse is a jq filter that returns a boolean
-                      to determine that the response is expected from the HTTP request.
+                    description: 'ExpectedResponse is a jq filter expression used
+                      to evaluate the HTTP response and determine if it matches the
+                      expected criteria. The expression should return a boolean; if
+                      true, the response is considered expected. Example: ''.Body.job_status
+                      == "success"'''
                     type: string
                   headers:
                     additionalProperties:
