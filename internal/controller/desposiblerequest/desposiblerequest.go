@@ -50,7 +50,7 @@ const (
 	errProviderNotRetrieved              = "provider could not be retrieved"
 	errFailedToSendHttpDesposibleRequest = "failed to send http request"
 	errFailedUpdateStatusConditions      = "failed updating status conditions"
-	ErrExpectedFormat  = "JQ filter should return a boolean, but returned error: %s"
+	ErrExpectedFormat                    = "JQ filter should return a boolean, but returned error: %s"
 )
 
 // Setup adds a controller that reconciles DesposibleRequest managed resources.
@@ -165,7 +165,6 @@ func (c *external) deployAction(ctx context.Context, cr *v1alpha1.DesposibleRequ
 		HttpRequest:    details.HttpRequest,
 	}
 
-
 	// Get the latest version of the resource before updating
 	if err := c.localKube.Get(ctx, types.NamespacedName{Name: cr.Name, Namespace: cr.Namespace}, cr); err != nil {
 		return errors.Wrap(err, "failed to get the latest version of the resource")
@@ -191,13 +190,12 @@ func (c *external) deployAction(ctx context.Context, cr *v1alpha1.DesposibleRequ
 	if err != nil {
 		return err
 	}
-	
+
 	if !isExpectedResponse {
 		limit := utils.GetRollbackRetriesLimit(cr.Spec.ForProvider.RollbackRetriesLimit)
-		return utils.SetRequestResourceStatus(*resource, resource.SetStatusCode(), resource.SetHeaders(), resource.SetBody(), 
-			resource.SetError(errors.New("Response does not match the expected format, retries limit " + fmt.Sprint(limit))), resource.SetRequestDetails())
+		return utils.SetRequestResourceStatus(*resource, resource.SetStatusCode(), resource.SetHeaders(), resource.SetBody(),
+			resource.SetError(errors.New("Response does not match the expected format, retries limit "+fmt.Sprint(limit))), resource.SetRequestDetails())
 	}
-
 
 	return utils.SetRequestResourceStatus(*resource, resource.SetStatusCode(), resource.SetHeaders(), resource.SetBody(), resource.SetSynced(), resource.SetRequestDetails())
 }
@@ -205,24 +203,23 @@ func (c *external) deployAction(ctx context.Context, cr *v1alpha1.DesposibleRequ
 func (c *external) isResponseAsExpected(cr *v1alpha1.DesposibleRequest, res httpClient.HttpResponse) (bool, error) {
 	if cr.Spec.ForProvider.ExpectedResponse != "" {
 		if cr.Status.Response.StatusCode != 0 {
-	
+
 			responseMap, _ := json_util.StructToMap(res)
 			json_util.ConvertJSONStringsToMaps(&responseMap)
-			
+
 			isExpected, err := jq.ParseBool(cr.Spec.ForProvider.ExpectedResponse, responseMap)
 			if err != nil {
 				return false, errors.Errorf(ErrExpectedFormat, err.Error())
 			}
-	
+
 			return isExpected, nil
 		}
-		
+
 		return false, nil
 	}
 
 	return true, nil
 }
-
 
 func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.ExternalCreation, error) {
 	cr, ok := mg.(*v1alpha1.DesposibleRequest)

@@ -75,7 +75,7 @@ type DesposibleRequestStatus struct {
 	Failed              int32    `json:"failed,omitempty"`
 	Error               string   `json:"error,omitempty"`
 	Synced              bool     `json:"synced,omitempty"`
-	Sampled              int32    `json:"sampled,omitempty"`
+	Sampled             int32    `json:"sampled,omitempty"`
 
 	RequestDetails Mapping `json:"requestDetails,omitempty"`
 }
