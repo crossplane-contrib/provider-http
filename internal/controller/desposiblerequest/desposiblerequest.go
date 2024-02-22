@@ -201,24 +201,28 @@ func (c *external) deployAction(ctx context.Context, cr *v1alpha1.DesposibleRequ
 }
 
 func (c *external) isResponseAsExpected(cr *v1alpha1.DesposibleRequest, res httpClient.HttpResponse) (bool, error) {
-	if cr.Spec.ForProvider.ExpectedResponse != "" {
-		if cr.Status.Response.StatusCode != 0 {
+	// If no expected response is defined, consider it as expected.
+	if cr.Spec.ForProvider.ExpectedResponse == "" {
+		return true, nil
+	}
 
-			responseMap, _ := json_util.StructToMap(res)
-			json_util.ConvertJSONStringsToMaps(&responseMap)
-
-			isExpected, err := jq.ParseBool(cr.Spec.ForProvider.ExpectedResponse, responseMap)
-			if err != nil {
-				return false, errors.Errorf(ErrExpectedFormat, err.Error())
-			}
-
-			return isExpected, nil
-		}
-
+	if cr.Status.Response.StatusCode == 0 {
 		return false, nil
 	}
 
-	return true, nil
+	responseMap, err := json_util.StructToMap(res)
+	if err != nil {
+		return false, errors.Wrap(err, "failed to convert response to map")
+	}
+
+	json_util.ConvertJSONStringsToMaps(&responseMap)
+
+	isExpected, err := jq.ParseBool(cr.Spec.ForProvider.ExpectedResponse, responseMap)
+	if err != nil {
+		return false, errors.Errorf(ErrExpectedFormat, err.Error())
+	}
+
+	return isExpected, nil
 }
 
 func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.ExternalCreation, error) {
