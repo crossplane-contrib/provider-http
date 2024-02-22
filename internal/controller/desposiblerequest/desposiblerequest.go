@@ -165,7 +165,6 @@ func (c *external) deployAction(ctx context.Context, cr *v1alpha1.DesposibleRequ
 		HttpRequest:    details.HttpRequest,
 	}
 
-	setRequestDetails := resource.SetRequestDetails()
 
 	// Get the latest version of the resource before updating
 	if err := c.localKube.Get(ctx, types.NamespacedName{Name: cr.Name, Namespace: cr.Namespace}, cr); err != nil {
@@ -174,19 +173,14 @@ func (c *external) deployAction(ctx context.Context, cr *v1alpha1.DesposibleRequ
 
 	if err != nil {
 		setErr := resource.SetError(err)
-		if settingError := utils.SetRequestResourceStatus(*resource, setErr, setRequestDetails); settingError != nil {
+		if settingError := utils.SetRequestResourceStatus(*resource, setErr, resource.SetRequestDetails()); settingError != nil {
 			return errors.Wrap(settingError, utils.ErrFailedToSetStatus)
 		}
 		return err
 	}
 
-	setStatusCode := resource.SetStatusCode()
-	setHeaders := resource.SetHeaders()
-	setBody := resource.SetBody()
-	setSynced := resource.SetSynced()
-
 	if utils.IsHTTPError(res.StatusCode) {
-		if settingError := utils.SetRequestResourceStatus(*resource, setStatusCode, setHeaders, setBody, setRequestDetails, resource.SetError(nil)); settingError != nil {
+		if settingError := utils.SetRequestResourceStatus(*resource, resource.SetStatusCode(), resource.SetHeaders(), resource.SetBody(), resource.SetRequestDetails(), resource.SetError(nil)); settingError != nil {
 			return errors.Wrap(settingError, utils.ErrFailedToSetStatus)
 		}
 
@@ -199,16 +193,13 @@ func (c *external) deployAction(ctx context.Context, cr *v1alpha1.DesposibleRequ
 	}
 	
 	if !isExpectedResponse {
-		limit := int32(1)
-		if cr.Spec.ForProvider.RollbackRetriesLimit != nil {
-			limit = *cr.Spec.ForProvider.RollbackRetriesLimit
-		} 
-		return utils.SetRequestResourceStatus(*resource, setStatusCode, setHeaders, setBody, 
-			resource.SetError(errors.New("Response does not match the expected format, retries limit " + fmt.Sprint(limit))), setRequestDetails)
+		limit := utils.GetRollbackRetriesLimit(cr.Spec.ForProvider.RollbackRetriesLimit)
+		return utils.SetRequestResourceStatus(*resource, resource.SetStatusCode(), resource.SetHeaders(), resource.SetBody(), 
+			resource.SetError(errors.New("Response does not match the expected format, retries limit " + fmt.Sprint(limit))), resource.SetRequestDetails())
 	}
 
 
-	return utils.SetRequestResourceStatus(*resource, setStatusCode, setHeaders, setBody, setSynced, setRequestDetails)
+	return utils.SetRequestResourceStatus(*resource, resource.SetStatusCode(), resource.SetHeaders(), resource.SetBody(), resource.SetSynced(), resource.SetRequestDetails())
 }
 
 func (c *external) isResponseAsExpected(cr *v1alpha1.DesposibleRequest, res httpClient.HttpResponse) (bool, error) {
@@ -232,12 +223,6 @@ func (c *external) isResponseAsExpected(cr *v1alpha1.DesposibleRequest, res http
 	return true, nil
 }
 
-// func (c *external) handleUnexpectedResponse(cr *v1alpha1.DesposibleRequest, resource *utils.RequestResource) error {
-//     limit := utils.GetRollbackRetriesLimit(cr.Spec.ForProvider.RollbackRetriesLimit)
-//     return utils.SetRequestResourceStatus(*resource, resource.SetStatusCode(), resource.SetHeaders(), resource.SetBody(),
-//         resource.SetError(errors.New("Response does not match the expected format, retries limit "+fmt.Sprint(limit))),
-//         resource.SetRequestDetails())
-// }
 
 func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.ExternalCreation, error) {
 	cr, ok := mg.(*v1alpha1.DesposibleRequest)
