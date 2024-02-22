@@ -77,7 +77,7 @@ type DesposibleRequestStatus struct {
 	Failed              int32    `json:"failed,omitempty"`
 	Error               string   `json:"error,omitempty"`
 	Synced              bool     `json:"synced,omitempty"`
-	RequestDetails Mapping `json:"requestDetails,omitempty"`
+	RequestDetails      Mapping  `json:"requestDetails,omitempty"`
 }
 
 // +kubebuilder:object:root=true
