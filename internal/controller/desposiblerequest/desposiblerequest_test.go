@@ -104,13 +104,13 @@ func httpDesposibleRequest(rm ...httpDesposibleRequestModifier) *v1alpha1.Despos
 	return r
 }
 
-type MockSendRequestFn func(ctx context.Context, method string, url string, body string, headers map[string][]string, skipTLSVerify bool) (resp httpClient.HttpResponse, err error)
+type MockSendRequestFn func(ctx context.Context, method string, url string, body string, headers map[string][]string, skipTLSVerify bool) (resp httpClient.HttpDetails, err error)
 
 type MockHttpClient struct {
 	MockSendRequest MockSendRequestFn
 }
 
-func (c *MockHttpClient) SendRequest(ctx context.Context, method string, url string, body string, headers map[string][]string, skipTLSVerify bool) (resp httpClient.HttpResponse, err error) {
+func (c *MockHttpClient) SendRequest(ctx context.Context, method string, url string, body string, headers map[string][]string, skipTLSVerify bool) (resp httpClient.HttpDetails, err error) {
 	return c.MockSendRequest(ctx, method, url, body, headers, skipTLSVerify)
 }
 
@@ -144,8 +144,8 @@ func Test_httpExternal_Create(t *testing.T) {
 		"DesposibleRequestFailed": {
 			args: args{
 				http: &MockHttpClient{
-					MockSendRequest: func(ctx context.Context, method string, url string, body string, headers map[string][]string, skipTLSVerify bool) (resp httpClient.HttpResponse, err error) {
-						return httpClient.HttpResponse{}, errBoom
+					MockSendRequest: func(ctx context.Context, method string, url string, body string, headers map[string][]string, skipTLSVerify bool) (resp httpClient.HttpDetails, err error) {
+						return httpClient.HttpDetails{}, errBoom
 					},
 				},
 				localKube: &test.MockClient{
@@ -162,8 +162,8 @@ func Test_httpExternal_Create(t *testing.T) {
 		"Success": {
 			args: args{
 				http: &MockHttpClient{
-					MockSendRequest: func(ctx context.Context, method string, url string, body string, headers map[string][]string, skipTLSVerify bool) (resp httpClient.HttpResponse, err error) {
-						return httpClient.HttpResponse{}, nil
+					MockSendRequest: func(ctx context.Context, method string, url string, body string, headers map[string][]string, skipTLSVerify bool) (resp httpClient.HttpDetails, err error) {
+						return httpClient.HttpDetails{}, nil
 					},
 				},
 				localKube: &test.MockClient{
@@ -220,8 +220,8 @@ func Test_httpExternal_Update(t *testing.T) {
 		"DesposibleRequestFailed": {
 			args: args{
 				http: &MockHttpClient{
-					MockSendRequest: func(ctx context.Context, method string, url string, body string, headers map[string][]string, skipTLSVerify bool) (resp httpClient.HttpResponse, err error) {
-						return httpClient.HttpResponse{}, errBoom
+					MockSendRequest: func(ctx context.Context, method string, url string, body string, headers map[string][]string, skipTLSVerify bool) (resp httpClient.HttpDetails, err error) {
+						return httpClient.HttpDetails{}, errBoom
 					},
 				},
 				localKube: &test.MockClient{
@@ -237,8 +237,8 @@ func Test_httpExternal_Update(t *testing.T) {
 		"Success": {
 			args: args{
 				http: &MockHttpClient{
-					MockSendRequest: func(ctx context.Context, method string, url string, body string, headers map[string][]string, skipTLSVerify bool) (resp httpClient.HttpResponse, err error) {
-						return httpClient.HttpResponse{}, nil
+					MockSendRequest: func(ctx context.Context, method string, url string, body string, headers map[string][]string, skipTLSVerify bool) (resp httpClient.HttpDetails, err error) {
+						return httpClient.HttpDetails{}, nil
 					},
 				},
 				localKube: &test.MockClient{
@@ -291,8 +291,8 @@ func Test_deployAction(t *testing.T) {
 		"SuccessUpdateStatusRequestFailure": {
 			args: args{
 				http: &MockHttpClient{
-					MockSendRequest: func(ctx context.Context, method string, url string, body string, headers map[string][]string, skipTLSVerify bool) (resp httpClient.HttpResponse, err error) {
-						return httpClient.HttpResponse{}, errors.Errorf(utils.ErrInvalidURL, "invalid-url")
+					MockSendRequest: func(ctx context.Context, method string, url string, body string, headers map[string][]string, skipTLSVerify bool) (resp httpClient.HttpDetails, err error) {
+						return httpClient.HttpDetails{}, errors.Errorf(utils.ErrInvalidURL, "invalid-url")
 					},
 				},
 				localKube: &test.MockClient{
@@ -319,11 +319,13 @@ func Test_deployAction(t *testing.T) {
 		"SuccessUpdateStatusCodeError": {
 			args: args{
 				http: &MockHttpClient{
-					MockSendRequest: func(ctx context.Context, method string, url string, body string, headers map[string][]string, skipTLSVerify bool) (resp httpClient.HttpResponse, err error) {
-						return httpClient.HttpResponse{
-							StatusCode: 400,
-							Body:       testBody,
-							Headers:    testHeaders,
+					MockSendRequest: func(ctx context.Context, method string, url string, body string, headers map[string][]string, skipTLSVerify bool) (resp httpClient.HttpDetails, err error) {
+						return httpClient.HttpDetails{
+							HttpResponse: httpClient.HttpResponse{
+								StatusCode: 400,
+								Body:       testBody,
+								Headers:    testHeaders,
+							},
 						}, nil
 					},
 				},
@@ -355,11 +357,13 @@ func Test_deployAction(t *testing.T) {
 		"SuccessUpdateStatusSuccessfulRequest": {
 			args: args{
 				http: &MockHttpClient{
-					MockSendRequest: func(ctx context.Context, method string, url string, body string, headers map[string][]string, skipTLSVerify bool) (resp httpClient.HttpResponse, err error) {
-						return httpClient.HttpResponse{
-							StatusCode: 200,
-							Body:       testBody,
-							Headers:    testHeaders,
+					MockSendRequest: func(ctx context.Context, method string, url string, body string, headers map[string][]string, skipTLSVerify bool) (resp httpClient.HttpDetails, err error) {
+						return httpClient.HttpDetails{
+							HttpResponse: httpClient.HttpResponse{
+								StatusCode: 200,
+								Body:       testBody,
+								Headers:    testHeaders,
+							},
 						}, nil
 					},
 				},

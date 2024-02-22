@@ -61,7 +61,6 @@ type Response struct {
 	StatusCode int                 `json:"statusCode,omitempty"`
 	Body       string              `json:"body,omitempty"`
 	Headers    map[string][]string `json:"headers,omitempty"`
-	Method     string              `json:"method,omitempty"`
 }
 
 // A RequestStatus represents the observed state of a Request.
@@ -71,6 +70,7 @@ type RequestStatus struct {
 	Cache               Cache    `json:"cache,omitempty"`
 	Failed              int32    `json:"failed,omitempty"`
 	Error               string   `json:"error,omitempty"`
+	RequestDetails      Mapping  `json:"requestDetails,omitempty"`
 }
 
 type Cache struct {

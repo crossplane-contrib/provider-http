@@ -20,12 +20,6 @@ var testHeaders2 = map[string][]string{
 	"countries": {"USA", "UK", "India", "Germany"},
 }
 
-const (
-	testURL    = "https://example.com/another"
-	testMethod = "GET"
-	testBody   = "{\"key1\": \"value1\"}"
-)
-
 var (
 	testPostMapping = v1alpha1.Mapping{
 		Method:  "POST",
@@ -108,7 +102,6 @@ func Test_GenerateRequestDetails(t *testing.T) {
 					StatusCode: 200,
 					Body:       `{"id":"123","username":"john_doe"}`,
 					Headers:    testHeaders,
-					Method:     testMethod,
 				},
 				logger: logging.NewNopLogger(),
 			},
@@ -130,7 +123,6 @@ func Test_GenerateRequestDetails(t *testing.T) {
 					StatusCode: 200,
 					Body:       `{"id":"123","username":"john_doe"}`,
 					Headers:    testHeaders,
-					Method:     testMethod,
 				},
 				logger: logging.NewNopLogger(),
 			},
@@ -151,7 +143,6 @@ func Test_GenerateRequestDetails(t *testing.T) {
 					StatusCode: 200,
 					Body:       `{"id":"123","username":"john_doe"}`,
 					Headers:    testHeaders,
-					Method:     testMethod,
 				},
 				logger: logging.NewNopLogger(),
 			},
@@ -334,7 +325,6 @@ func Test_generateRequestObject(t *testing.T) {
 					StatusCode: 200,
 					Body:       `{"id": "123"}`,
 					Headers:    nil,
-					Method:     "POST",
 				},
 			},
 			want: want{
@@ -377,7 +367,6 @@ func Test_generateRequestObject(t *testing.T) {
 					},
 					"response": map[string]any{
 						"body":       map[string]any{"id": "123"},
-						"method":     "POST",
 						"statusCode": float64(200),
 					},
 				},

@@ -28,9 +28,7 @@ var testHeaders = map[string][]string{
 }
 
 const (
-	testURL    = "https://example.com/another"
-	testMethod = "GET"
-	testBody   = "{\"key1\": \"value1\"}"
+	testMethod = "POST"
 )
 
 var (
@@ -78,16 +76,23 @@ var testCr = &v1alpha1.Request{
 	},
 }
 
+var testRequest = httpClient.HttpRequest{
+	Method: testMethod,
+	Body:   "{ username: .payload.body.username, email: .payload.body.email }",
+	URL:    ".payload.baseUrl",
+}
+
 func Test_SetRequestStatus(t *testing.T) {
 	type args struct {
-		localKube client.Client
-		cr        *v1alpha1.Request
-		res       httpClient.HttpResponse
-		err       error
-		isSynced  bool
+		localKube      client.Client
+		cr             *v1alpha1.Request
+		requestDetails httpClient.HttpDetails
+		err            error
+		isSynced       bool
 	}
 	type want struct {
 		err           error
+		httpRequest   httpClient.HttpRequest
 		failuresIndex int32
 	}
 	cases := map[string]struct {
@@ -101,16 +106,19 @@ func Test_SetRequestStatus(t *testing.T) {
 					MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
 					MockGet:          test.NewMockGetFn(nil),
 				},
-				res: httpClient.HttpResponse{
-					StatusCode: 200,
-					Body:       `{"id":"123","username":"john_doe"}`,
-					Headers:    testHeaders,
-					Method:     testMethod,
+				requestDetails: httpClient.HttpDetails{
+					HttpResponse: httpClient.HttpResponse{
+						StatusCode: 200,
+						Body:       `{"id":"123","username":"john_doe"}`,
+						Headers:    testHeaders,
+					},
+					HttpRequest: testRequest,
 				},
 				err: nil,
 			},
 			want: want{
 				err:           nil,
+				httpRequest:   testRequest,
 				failuresIndex: 0,
 			},
 		},
@@ -121,16 +129,19 @@ func Test_SetRequestStatus(t *testing.T) {
 					MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
 					MockGet:          test.NewMockGetFn(nil),
 				},
-				res: httpClient.HttpResponse{
-					StatusCode: 400,
-					Body:       `{"id":"123","username":"john_doe"}`,
-					Headers:    testHeaders,
-					Method:     testMethod,
+				requestDetails: httpClient.HttpDetails{
+					HttpResponse: httpClient.HttpResponse{
+						StatusCode: 400,
+						Body:       `{"id":"123","username":"john_doe"}`,
+						Headers:    testHeaders,
+					},
+					HttpRequest: testRequest,
 				},
 				err: nil,
 			},
 			want: want{
 				err:           errors.Errorf(utils.ErrStatusCode, testMethod, strconv.Itoa(400)),
+				httpRequest:   testRequest,
 				failuresIndex: 1,
 			},
 		},
@@ -141,16 +152,19 @@ func Test_SetRequestStatus(t *testing.T) {
 					MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
 					MockGet:          test.NewMockGetFn(nil),
 				},
-				res: httpClient.HttpResponse{
-					StatusCode: 200,
-					Body:       `{"id":"123","username":"john_doe"}`,
-					Headers:    testHeaders,
-					Method:     testMethod,
+				requestDetails: httpClient.HttpDetails{
+					HttpResponse: httpClient.HttpResponse{
+						StatusCode: 200,
+						Body:       `{"id":"123","username":"john_doe"}`,
+						Headers:    testHeaders,
+					},
+					HttpRequest: testRequest,
 				},
 				err: errBoom,
 			},
 			want: want{
 				err:           errBoom,
+				httpRequest:   testRequest,
 				failuresIndex: 2,
 			},
 		},
@@ -162,22 +176,25 @@ func Test_SetRequestStatus(t *testing.T) {
 					MockGet:          test.NewMockGetFn(nil),
 				},
 				isSynced: true,
-				res: httpClient.HttpResponse{
-					StatusCode: 200,
-					Body:       `{"id":"123","username":"john_doe"}`,
-					Headers:    testHeaders,
-					Method:     testMethod,
+				requestDetails: httpClient.HttpDetails{
+					HttpResponse: httpClient.HttpResponse{
+						StatusCode: 200,
+						Body:       `{"id":"123","username":"john_doe"}`,
+						Headers:    testHeaders,
+					},
+					HttpRequest: testRequest,
 				},
 			},
 			want: want{
 				err:           nil,
+				httpRequest:   testRequest,
 				failuresIndex: 0,
 			},
 		},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			r, _ := NewStatusHandler(context.Background(), tc.args.cr, tc.args.res, tc.args.err, tc.args.localKube, logging.NewNopLogger())
+			r, _ := NewStatusHandler(context.Background(), tc.args.cr, tc.args.requestDetails, tc.args.err, tc.args.localKube, logging.NewNopLogger())
 			if tc.args.isSynced {
 				r.ResetFailures()
 			}
@@ -192,6 +209,22 @@ func Test_SetRequestStatus(t *testing.T) {
 				t.Fatalf("SetRequestStatus(...): -want Status.Failed, +got Status.Failed: %s", diff)
 			}
 
+			if diff := cmp.Diff(tc.want.httpRequest.Body, tc.args.cr.Status.RequestDetails.Body); diff != "" {
+				t.Fatalf("SetRequestStatus(...): -want RequestDetails.Body, +got RequestDetails.Body: %s", diff)
+			}
+
+			if diff := cmp.Diff(tc.want.httpRequest.URL, tc.args.cr.Status.RequestDetails.URL); diff != "" {
+				t.Fatalf("SetRequestStatus(...): -want RequestDetails.URL, +got RequestDetails.URL: %s", diff)
+			}
+
+			if diff := cmp.Diff(tc.want.httpRequest.Headers, tc.args.cr.Status.RequestDetails.Headers); diff != "" {
+				t.Fatalf("SetRequestStatus(...): -want RequestDetails.Headers, +got RequestDetails.Headers: %s", diff)
+			}
+
+			if diff := cmp.Diff(tc.want.httpRequest.Method, tc.args.cr.Status.RequestDetails.Method); diff != "" {
+				t.Fatalf("SetRequestStatus(...): -want RequestDetails.Method, +got RequestDetails.Method: %s", diff)
+			}
+
 			if tc.args.err != nil {
 				if diff := cmp.Diff(tc.args.err.Error(), tc.args.cr.Status.Error); diff != "" {
 					t.Fatalf("SetRequestStatus(...): -want Status.Error, +got Status.Error: %s", diff)
@@ -199,21 +232,18 @@ func Test_SetRequestStatus(t *testing.T) {
 			}
 
 			if gotErr == nil {
-				if diff := cmp.Diff(tc.args.res.Body, tc.args.cr.Status.Response.Body); diff != "" {
+				if diff := cmp.Diff(tc.args.requestDetails.HttpResponse.Body, tc.args.cr.Status.Response.Body); diff != "" {
 					t.Fatalf("SetRequestStatus(...): -want Status.Response.Body, +got Status.Response.Body: %s", diff)
 				}
 
-				if diff := cmp.Diff(tc.args.res.StatusCode, tc.args.cr.Status.Response.StatusCode); diff != "" {
+				if diff := cmp.Diff(tc.args.requestDetails.HttpResponse.StatusCode, tc.args.cr.Status.Response.StatusCode); diff != "" {
 					t.Fatalf("SetRequestStatus(...): -want Status.Response.StatusCode, +got Status.Response.StatusCode: %s", diff)
 				}
 
-				if diff := cmp.Diff(tc.args.res.Headers, tc.args.cr.Status.Response.Headers); diff != "" {
+				if diff := cmp.Diff(tc.args.requestDetails.HttpResponse.Headers, tc.args.cr.Status.Response.Headers); diff != "" {
 					t.Fatalf("SetRequestStatus(...): -want Status.Response.Headers, +got Status.Response.Headers: %s", diff)
 				}
 
-				if diff := cmp.Diff(tc.args.res.Method, tc.args.cr.Status.Response.Method); diff != "" {
-					t.Fatalf("SetRequestStatus(...): -want Status.Response.Method, +got Status.Response.Method: %s", diff)
-				}
 			}
 		})
 	}

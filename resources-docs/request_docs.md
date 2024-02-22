@@ -74,26 +74,30 @@ The status field of the `Request` resource provides information about the execut
 Example `Request` status:
   ```yaml
   status:
-  conditions:
-    ...
-  response:
-    body: >-
-      {
-        "id":"65565b69681e0b47dcea4464",
-        "todo_name":"Do Laundry",
-        "reminder":"Every 1 hour",
-        "responsible":"Dan"
-      }
-    headers:
-      Content-Length:
-        - '104'
-      Content-Type:
-        - application/json
-      Date:
-        - Thu, 16 Nov 2023 18:11:53 GMT
-      Server:
-        - uvicorn
-    statusCode: 200
+    conditions:
+      ...
+    cache:
+      ...
+    requestDetails:
+      ...
+    response:
+      body: >-
+        {
+          "id":"65565b69681e0b47dcea4464",
+          "todo_name":"Do Laundry",
+          "reminder":"Every 1 hour",
+          "responsible":"Dan"
+        }
+      headers:
+        Content-Length:
+          - '104'
+        Content-Type:
+          - application/json
+        Date:
+          - Thu, 16 Nov 2023 18:11:53 GMT
+        Server:
+          - uvicorn
+      statusCode: 200
   ```
 
 
