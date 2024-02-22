@@ -2,7 +2,6 @@ apiVersion: http.crossplane.io/v1alpha1
 kind: Request
 metadata:
   name: laundry
-  namespace: default
 spec:
   forProvider:
     insecureSkipTLSVerify: true
