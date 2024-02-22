@@ -18,6 +18,7 @@ package desposiblerequest
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"time"
 
@@ -27,6 +28,8 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/arielsepton/provider-http/internal/jq"
+	json_util "github.com/arielsepton/provider-http/internal/json"
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/pkg/controller"
 	"github.com/crossplane/crossplane-runtime/pkg/event"
@@ -47,6 +50,7 @@ const (
 	errProviderNotRetrieved              = "provider could not be retrieved"
 	errFailedToSendHttpDesposibleRequest = "failed to send http request"
 	errFailedUpdateStatusConditions      = "failed updating status conditions"
+	ErrExpectedFormat  = "JQ filter should return a boolean, but returned error: %s"
 )
 
 // Setup adds a controller that reconciles DesposibleRequest managed resources.
@@ -189,8 +193,51 @@ func (c *external) deployAction(ctx context.Context, cr *v1alpha1.DesposibleRequ
 		return errors.Errorf(utils.ErrStatusCode, cr.Spec.ForProvider.Method, strconv.Itoa(res.StatusCode))
 	}
 
+	isExpectedResponse, err := c.isResponseAsExpected(cr, res)
+	if err != nil {
+		return err
+	}
+	
+	if !isExpectedResponse {
+		limit := int32(1)
+		if cr.Spec.ForProvider.RollbackRetriesLimit != nil {
+			limit = *cr.Spec.ForProvider.RollbackRetriesLimit
+		} 
+		return utils.SetRequestResourceStatus(*resource, setStatusCode, setHeaders, setBody, 
+			resource.SetError(errors.New("Response does not match the expected format, retries limit " + fmt.Sprint(limit))), setRequestDetails)
+	}
+
+
 	return utils.SetRequestResourceStatus(*resource, setStatusCode, setHeaders, setBody, setSynced, setRequestDetails)
 }
+
+func (c *external) isResponseAsExpected(cr *v1alpha1.DesposibleRequest, res httpClient.HttpResponse) (bool, error) {
+	if cr.Spec.ForProvider.ExpectedResponse != "" {
+		if cr.Status.Response.StatusCode != 0 {
+	
+			responseMap, _ := json_util.StructToMap(res)
+			json_util.ConvertJSONStringsToMaps(&responseMap)
+			
+			isExpected, err := jq.ParseBool(cr.Spec.ForProvider.ExpectedResponse, responseMap)
+			if err != nil {
+				return false, errors.Errorf(ErrExpectedFormat, err.Error())
+			}
+	
+			return isExpected, nil
+		}
+		
+		return false, nil
+	}
+
+	return true, nil
+}
+
+// func (c *external) handleUnexpectedResponse(cr *v1alpha1.DesposibleRequest, resource *utils.RequestResource) error {
+//     limit := utils.GetRollbackRetriesLimit(cr.Spec.ForProvider.RollbackRetriesLimit)
+//     return utils.SetRequestResourceStatus(*resource, resource.SetStatusCode(), resource.SetHeaders(), resource.SetBody(),
+//         resource.SetError(errors.New("Response does not match the expected format, retries limit "+fmt.Sprint(limit))),
+//         resource.SetRequestDetails())
+// }
 
 func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.ExternalCreation, error) {
 	cr, ok := mg.(*v1alpha1.DesposibleRequest)

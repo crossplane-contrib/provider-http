@@ -28,3 +28,11 @@ func WaitTimeout(timeout *v1.Duration) time.Duration {
 	}
 	return defaultWaitTimeout
 }
+
+func GetRollbackRetriesLimit(rollbackRetriesLimit *int32) int32 {
+    limit := int32(1)
+    if rollbackRetriesLimit != nil {
+        limit = *rollbackRetriesLimit
+    }
+    return limit
+}

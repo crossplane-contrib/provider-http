@@ -17,7 +17,7 @@ spec:
     listKind: DesposibleRequestList
     plural: desposiblerequests
     singular: desposiblerequest
-  scope: Namespaced
+  scope: Cluster
   versions:
   - additionalPrinterColumns:
     - jsonPath: .status.conditions[?(@.type=='Ready')].status
@@ -74,6 +74,10 @@ spec:
                     x-kubernetes-validations:
                     - message: Field 'forProvider.body' is immutable
                       rule: self == oldSelf
+                  expectedResponse:
+                    description: ExpectedResponse is a jq filter that returns a boolean
+                      to determine that the response is expected from the HTTP request.
+                    type: string
                   headers:
                     additionalProperties:
                       items:
@@ -92,7 +96,7 @@ spec:
                     x-kubernetes-validations:
                     - message: Field 'forProvider.method' is immutable
                       rule: self == oldSelf
-                  rollbackLimit:
+                  rollbackRetriesLimit:
                     description: RollbackRetriesLimit is max number of attempts to
                       retry HTTP request by sending again the request.
                     format: int32
@@ -367,6 +371,9 @@ spec:
                   statusCode:
                     type: integer
                 type: object
+              sampled:
+                format: int32
+                type: integer
               synced:
                 type: boolean
             type: object

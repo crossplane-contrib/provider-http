@@ -39,10 +39,13 @@ type DesposibleRequestParameters struct {
 	WaitTimeout *metav1.Duration `json:"waitTimeout,omitempty"`
 
 	// RollbackRetriesLimit is max number of attempts to retry HTTP request by sending again the request.
-	RollbackRetriesLimit *int32 `json:"rollbackLimit,omitempty"`
+	RollbackRetriesLimit *int32 `json:"rollbackRetriesLimit,omitempty"`
 
 	// InsecureSkipTLSVerify, when set to true, skips TLS certificate checks for the HTTP request
 	InsecureSkipTLSVerify bool `json:"insecureSkipTLSVerify,omitempty"`
+
+	// ExpectedResponse is a jq filter that returns a boolean to determine that the response is expected from the HTTP request.
+	ExpectedResponse string `json:"expectedResponse,omitempty"`
 }
 
 // A DesposibleRequestSpec defines the desired state of a DesposibleRequest.
@@ -72,6 +75,7 @@ type DesposibleRequestStatus struct {
 	Failed              int32    `json:"failed,omitempty"`
 	Error               string   `json:"error,omitempty"`
 	Synced              bool     `json:"synced,omitempty"`
+	Sampled              int32    `json:"sampled,omitempty"`
 
 	RequestDetails Mapping `json:"requestDetails,omitempty"`
 }
@@ -84,7 +88,7 @@ type DesposibleRequestStatus struct {
 // +kubebuilder:printcolumn:name="EXTERNAL-NAME",type="string",JSONPath=".metadata.annotations.crossplane\\.io/external-name"
 // +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:scope=Namespaced,categories={crossplane,managed,http}
+// +kubebuilder:resource:scope=Cluster,categories={crossplane,managed,http}
 type DesposibleRequest struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

@@ -14,11 +14,13 @@ func (d *DesposibleRequest) SetBody(body string) {
 
 func (d *DesposibleRequest) SetSynced(synced bool) {
 	d.Status.Synced = synced
+	d.Status.Failed = 0
+	d.Status.Error = ""
 }
 
 func (d *DesposibleRequest) SetError(err error) {
 	d.Status.Failed++
-	d.SetSynced(true)
+	d.Status.Synced = true
 	if err != nil {
 		d.Status.Error = err.Error()
 	}

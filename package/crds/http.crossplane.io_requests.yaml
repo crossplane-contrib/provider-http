@@ -17,7 +17,7 @@ spec:
     listKind: RequestList
     plural: requests
     singular: request
-  scope: Namespaced
+  scope: Cluster
   versions:
   - additionalPrinterColumns:
     - jsonPath: .status.conditions[?(@.type=='Ready')].status
