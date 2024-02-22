@@ -2,7 +2,6 @@ apiVersion: http.crossplane.io/v1alpha1
 kind: DesposibleRequest
 metadata:
   name: health-check
-  namespace: default
 spec:
   deletionPolicy: Orphan
   forProvider:
