@@ -36,8 +36,8 @@ func Test_isUpToDate(t *testing.T) {
 		"ObjectNotFoundEmptyBody": {
 			args: args{
 				http: &MockHttpClient{
-					MockSendRequest: func(ctx context.Context, method string, url string, body string, headers map[string][]string, skipTLSVerify bool) (resp httpClient.HttpResponse, err error) {
-						return httpClient.HttpResponse{}, nil
+					MockSendRequest: func(ctx context.Context, method string, url string, body string, headers map[string][]string, skipTLSVerify bool) (resp httpClient.HttpDetails, err error) {
+						return httpClient.HttpDetails{}, nil
 					},
 				},
 				localKube: &test.MockClient{
@@ -54,15 +54,15 @@ func Test_isUpToDate(t *testing.T) {
 		"ObjectNotFoundPostFailed": {
 			args: args{
 				http: &MockHttpClient{
-					MockSendRequest: func(ctx context.Context, method string, url string, body string, headers map[string][]string, skipTLSVerify bool) (resp httpClient.HttpResponse, err error) {
-						return httpClient.HttpResponse{}, nil
+					MockSendRequest: func(ctx context.Context, method string, url string, body string, headers map[string][]string, skipTLSVerify bool) (resp httpClient.HttpDetails, err error) {
+						return httpClient.HttpDetails{}, nil
 					},
 				},
 				localKube: &test.MockClient{
 					MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
 				},
 				mg: httpRequest(func(r *v1alpha1.Request) {
-					r.Status.Response.Method = http.MethodPost
+					r.Status.RequestDetails.Method = http.MethodPost
 					r.Status.Response.StatusCode = 400
 				}),
 			},
@@ -73,8 +73,8 @@ func Test_isUpToDate(t *testing.T) {
 		"ObjectNotFound404StatusCode": {
 			args: args{
 				http: &MockHttpClient{
-					MockSendRequest: func(ctx context.Context, method string, url string, body string, headers map[string][]string, skipTLSVerify bool) (resp httpClient.HttpResponse, err error) {
-						return httpClient.HttpResponse{}, nil
+					MockSendRequest: func(ctx context.Context, method string, url string, body string, headers map[string][]string, skipTLSVerify bool) (resp httpClient.HttpDetails, err error) {
+						return httpClient.HttpDetails{}, nil
 					},
 				},
 				localKube: &test.MockClient{
@@ -91,9 +91,11 @@ func Test_isUpToDate(t *testing.T) {
 		"FailBodyNotJSON": {
 			args: args{
 				http: &MockHttpClient{
-					MockSendRequest: func(ctx context.Context, method string, url string, body string, headers map[string][]string, skipTLSVerify bool) (resp httpClient.HttpResponse, err error) {
-						return httpClient.HttpResponse{
-							Body: "not a JSON",
+					MockSendRequest: func(ctx context.Context, method string, url string, body string, headers map[string][]string, skipTLSVerify bool) (resp httpClient.HttpDetails, err error) {
+						return httpClient.HttpDetails{
+							HttpResponse: httpClient.HttpResponse{
+								Body: "not a JSON",
+							},
 						}, nil
 					},
 				},
@@ -111,11 +113,12 @@ func Test_isUpToDate(t *testing.T) {
 		"SuccessNotSynced": {
 			args: args{
 				http: &MockHttpClient{
-					MockSendRequest: func(ctx context.Context, method string, url string, body string, headers map[string][]string, skipTLSVerify bool) (resp httpClient.HttpResponse, err error) {
-						return httpClient.HttpResponse{
-							Body:       `{"username":"old_name"}`,
-							StatusCode: 200,
-							Method:     http.MethodGet,
+					MockSendRequest: func(ctx context.Context, method string, url string, body string, headers map[string][]string, skipTLSVerify bool) (resp httpClient.HttpDetails, err error) {
+						return httpClient.HttpDetails{
+							HttpResponse: httpClient.HttpResponse{
+								Body:       `{"username":"old_name"}`,
+								StatusCode: 200,
+							},
 						}, nil
 					},
 				},
@@ -129,11 +132,12 @@ func Test_isUpToDate(t *testing.T) {
 			want: want{
 				err: nil,
 				result: ObserveRequestDetails{
-					Response: httpClient.HttpResponse{
-						Body:       `{"username":"old_name"}`,
-						Headers:    nil,
-						StatusCode: 200,
-						Method:     "GET",
+					Details: httpClient.HttpDetails{
+						HttpResponse: httpClient.HttpResponse{
+							Body:       `{"username":"old_name"}`,
+							Headers:    nil,
+							StatusCode: 200,
+						},
 					},
 					ResponseError: nil,
 					Synced:        false,
@@ -143,11 +147,12 @@ func Test_isUpToDate(t *testing.T) {
 		"SuccessJSONBody": {
 			args: args{
 				http: &MockHttpClient{
-					MockSendRequest: func(ctx context.Context, method string, url string, body string, headers map[string][]string, skipTLSVerify bool) (resp httpClient.HttpResponse, err error) {
-						return httpClient.HttpResponse{
-							Body:       `{"username":"john_doe_new_username"}`,
-							StatusCode: 200,
-							Method:     http.MethodGet,
+					MockSendRequest: func(ctx context.Context, method string, url string, body string, headers map[string][]string, skipTLSVerify bool) (resp httpClient.HttpDetails, err error) {
+						return httpClient.HttpDetails{
+							HttpResponse: httpClient.HttpResponse{
+								Body:       `{"username":"john_doe_new_username"}`,
+								StatusCode: 200,
+							},
 						}, nil
 					},
 				},
@@ -162,11 +167,12 @@ func Test_isUpToDate(t *testing.T) {
 			want: want{
 				err: nil,
 				result: ObserveRequestDetails{
-					Response: httpClient.HttpResponse{
-						Body:       `{"username":"john_doe_new_username"}`,
-						Headers:    nil,
-						StatusCode: 200,
-						Method:     "GET",
+					Details: httpClient.HttpDetails{
+						HttpResponse: httpClient.HttpResponse{
+							Body:       `{"username":"john_doe_new_username"}`,
+							Headers:    nil,
+							StatusCode: 200,
+						},
 					},
 					ResponseError: nil,
 					Synced:        true,

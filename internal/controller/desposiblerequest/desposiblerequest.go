@@ -18,6 +18,7 @@ package desposiblerequest
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"time"
 
@@ -27,6 +28,8 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/arielsepton/provider-http/internal/jq"
+	json_util "github.com/arielsepton/provider-http/internal/json"
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/pkg/controller"
 	"github.com/crossplane/crossplane-runtime/pkg/event"
@@ -47,6 +50,7 @@ const (
 	errProviderNotRetrieved              = "provider could not be retrieved"
 	errFailedToSendHttpDesposibleRequest = "failed to send http request"
 	errFailedUpdateStatusConditions      = "failed updating status conditions"
+	ErrExpectedFormat                    = "JQ filter should return a boolean, but returned error: %s"
 )
 
 // Setup adds a controller that reconciles DesposibleRequest managed resources.
@@ -149,14 +153,16 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 }
 
 func (c *external) deployAction(ctx context.Context, cr *v1alpha1.DesposibleRequest) error {
-	res, err := c.http.SendRequest(ctx, cr.Spec.ForProvider.Method,
+	details, err := c.http.SendRequest(ctx, cr.Spec.ForProvider.Method,
 		cr.Spec.ForProvider.URL, cr.Spec.ForProvider.Body, cr.Spec.ForProvider.Headers, cr.Spec.ForProvider.InsecureSkipTLSVerify)
 
+	res := details.HttpResponse
 	resource := &utils.RequestResource{
 		Resource:       cr,
 		RequestContext: ctx,
-		HttpResponse:   res,
+		HttpResponse:   details.HttpResponse,
 		LocalClient:    c.localKube,
+		HttpRequest:    details.HttpRequest,
 	}
 
 	// Get the latest version of the resource before updating
@@ -166,26 +172,57 @@ func (c *external) deployAction(ctx context.Context, cr *v1alpha1.DesposibleRequ
 
 	if err != nil {
 		setErr := resource.SetError(err)
-		if settingError := utils.SetRequestResourceStatus(*resource, setErr); settingError != nil {
+		if settingError := utils.SetRequestResourceStatus(*resource, setErr, resource.SetRequestDetails()); settingError != nil {
 			return errors.Wrap(settingError, utils.ErrFailedToSetStatus)
 		}
 		return err
 	}
 
-	setStatusCode := resource.SetStatusCode()
-	setHeaders := resource.SetHeaders()
-	setBody := resource.SetBody()
-	setSynced := resource.SetSynced()
-
 	if utils.IsHTTPError(res.StatusCode) {
-		if settingError := utils.SetRequestResourceStatus(*resource, setStatusCode, setHeaders, setBody, resource.SetError(nil)); settingError != nil {
+		if settingError := utils.SetRequestResourceStatus(*resource, resource.SetStatusCode(), resource.SetHeaders(), resource.SetBody(), resource.SetRequestDetails(), resource.SetError(nil)); settingError != nil {
 			return errors.Wrap(settingError, utils.ErrFailedToSetStatus)
 		}
 
 		return errors.Errorf(utils.ErrStatusCode, cr.Spec.ForProvider.Method, strconv.Itoa(res.StatusCode))
 	}
 
-	return utils.SetRequestResourceStatus(*resource, setStatusCode, setHeaders, setBody, setSynced)
+	isExpectedResponse, err := c.isResponseAsExpected(cr, res)
+	if err != nil {
+		return err
+	}
+
+	if !isExpectedResponse {
+		limit := utils.GetRollbackRetriesLimit(cr.Spec.ForProvider.RollbackRetriesLimit)
+		return utils.SetRequestResourceStatus(*resource, resource.SetStatusCode(), resource.SetHeaders(), resource.SetBody(),
+			resource.SetError(errors.New("Response does not match the expected format, retries limit "+fmt.Sprint(limit))), resource.SetRequestDetails())
+	}
+
+	return utils.SetRequestResourceStatus(*resource, resource.SetStatusCode(), resource.SetHeaders(), resource.SetBody(), resource.SetSynced(), resource.SetRequestDetails())
+}
+
+func (c *external) isResponseAsExpected(cr *v1alpha1.DesposibleRequest, res httpClient.HttpResponse) (bool, error) {
+	// If no expected response is defined, consider it as expected.
+	if cr.Spec.ForProvider.ExpectedResponse == "" {
+		return true, nil
+	}
+
+	if cr.Status.Response.StatusCode == 0 {
+		return false, nil
+	}
+
+	responseMap, err := json_util.StructToMap(res)
+	if err != nil {
+		return false, errors.Wrap(err, "failed to convert response to map")
+	}
+
+	json_util.ConvertJSONStringsToMaps(&responseMap)
+
+	isExpected, err := jq.ParseBool(cr.Spec.ForProvider.ExpectedResponse, responseMap)
+	if err != nil {
+		return false, errors.Errorf(ErrExpectedFormat, err.Error())
+	}
+
+	return isExpected, nil
 }
 
 func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.ExternalCreation, error) {

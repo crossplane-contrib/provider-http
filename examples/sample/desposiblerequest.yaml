@@ -5,9 +5,11 @@ metadata:
 spec:
   deletionPolicy: Orphan
   forProvider:
+    # The 'expectedResponse' field is optional. If used, also set 'rollbackRetriesLimit', which determines the number of HTTP requests to be sent until the jq query returns true.    
+    # expectedResponse: '.Body.job_status == "success"'
     insecureSkipTLSVerify: true
     waitTimeout: 5m
-    rollbackLimit: 5
+    rollbackRetriesLimit: 5
     url:  http://todo.default.svc.cluster.local/health-check
     method: POST
     body: |

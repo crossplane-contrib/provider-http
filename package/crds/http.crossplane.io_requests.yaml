@@ -321,8 +321,6 @@ spec:
                             type: string
                           type: array
                         type: object
-                      method:
-                        type: string
                       statusCode:
                         type: integer
                     type: object
@@ -365,6 +363,29 @@ spec:
               failed:
                 format: int32
                 type: integer
+              requestDetails:
+                properties:
+                  body:
+                    type: string
+                  headers:
+                    additionalProperties:
+                      items:
+                        type: string
+                      type: array
+                    type: object
+                  method:
+                    enum:
+                    - POST
+                    - GET
+                    - PUT
+                    - DELETE
+                    type: string
+                  url:
+                    type: string
+                required:
+                - method
+                - url
+                type: object
               response:
                 description: RequestObservation are the observable fields of a Request.
                 properties:
@@ -376,8 +397,6 @@ spec:
                         type: string
                       type: array
                     type: object
-                  method:
-                    type: string
                   statusCode:
                     type: integer
                 type: object

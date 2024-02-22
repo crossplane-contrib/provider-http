@@ -55,6 +55,20 @@ func ParseString(jqQuery string, obj interface{}) (string, error) {
 	return str, nil
 }
 
+func ParseBool(jqQuery string, obj interface{}) (bool, error) {
+	queryRes, err := runJQQuery(jqQuery, obj)
+	if err != nil {
+		return false, err
+	}
+
+	boolean, ok := queryRes.(bool)
+	if !ok {
+		return false, errors.Errorf(errStringParseFailed, fmt.Sprint(queryRes))
+	}
+
+	return boolean, nil
+}
+
 func ParseMapInterface(jqQuery string, obj interface{}) (map[string]interface{}, error) {
 	queryRes, err := runJQQuery(jqQuery, obj)
 	if err != nil {

@@ -39,10 +39,15 @@ type DesposibleRequestParameters struct {
 	WaitTimeout *metav1.Duration `json:"waitTimeout,omitempty"`
 
 	// RollbackRetriesLimit is max number of attempts to retry HTTP request by sending again the request.
-	RollbackRetriesLimit *int32 `json:"rollbackLimit,omitempty"`
+	RollbackRetriesLimit *int32 `json:"rollbackRetriesLimit,omitempty"`
 
 	// InsecureSkipTLSVerify, when set to true, skips TLS certificate checks for the HTTP request
 	InsecureSkipTLSVerify bool `json:"insecureSkipTLSVerify,omitempty"`
+
+	// ExpectedResponse is a jq filter expression used to evaluate the HTTP response and determine if it matches the expected criteria.
+	// The expression should return a boolean; if true, the response is considered expected.
+	// Example: '.Body.job_status == "success"'
+	ExpectedResponse string `json:"expectedResponse,omitempty"`
 }
 
 // A DesposibleRequestSpec defines the desired state of a DesposibleRequest.
@@ -58,6 +63,13 @@ type Response struct {
 	Headers    map[string][]string `json:"headers,omitempty"`
 }
 
+type Mapping struct {
+	Method  string              `json:"method"`
+	Body    string              `json:"body,omitempty"`
+	URL     string              `json:"url"`
+	Headers map[string][]string `json:"headers,omitempty"`
+}
+
 // A DesposibleRequestStatus represents the observed state of a DesposibleRequest.
 type DesposibleRequestStatus struct {
 	xpv1.ResourceStatus `json:",inline"`
@@ -65,6 +77,7 @@ type DesposibleRequestStatus struct {
 	Failed              int32    `json:"failed,omitempty"`
 	Error               string   `json:"error,omitempty"`
 	Synced              bool     `json:"synced,omitempty"`
+	RequestDetails      Mapping  `json:"requestDetails,omitempty"`
 }
 
 // +kubebuilder:object:root=true

@@ -74,6 +74,13 @@ spec:
                     x-kubernetes-validations:
                     - message: Field 'forProvider.body' is immutable
                       rule: self == oldSelf
+                  expectedResponse:
+                    description: 'ExpectedResponse is a jq filter expression used
+                      to evaluate the HTTP response and determine if it matches the
+                      expected criteria. The expression should return a boolean; if
+                      true, the response is considered expected. Example: ''.Body.job_status
+                      == "success"'''
+                    type: string
                   headers:
                     additionalProperties:
                       items:
@@ -92,7 +99,7 @@ spec:
                     x-kubernetes-validations:
                     - message: Field 'forProvider.method' is immutable
                       rule: self == oldSelf
-                  rollbackLimit:
+                  rollbackRetriesLimit:
                     description: RollbackRetriesLimit is max number of attempts to
                       retry HTTP request by sending again the request.
                     format: int32
@@ -336,6 +343,24 @@ spec:
               failed:
                 format: int32
                 type: integer
+              requestDetails:
+                properties:
+                  body:
+                    type: string
+                  headers:
+                    additionalProperties:
+                      items:
+                        type: string
+                      type: array
+                    type: object
+                  method:
+                    type: string
+                  url:
+                    type: string
+                required:
+                - method
+                - url
+                type: object
               response:
                 properties:
                   body:
