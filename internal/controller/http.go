@@ -22,9 +22,9 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/controller"
 	ctrl "sigs.k8s.io/controller-runtime"
 
-	"github.com/arielsepton/provider-http/internal/controller/config"
-	desposiblerequest "github.com/arielsepton/provider-http/internal/controller/desposiblerequest"
-	request "github.com/arielsepton/provider-http/internal/controller/request"
+	"github.com/crossplane-contrib/provider-http/internal/controller/config"
+	desposiblerequest "github.com/crossplane-contrib/provider-http/internal/controller/desposiblerequest"
+	request "github.com/crossplane-contrib/provider-http/internal/controller/request"
 )
 
 // Setup creates all http controllers with the supplied logger and adds them to

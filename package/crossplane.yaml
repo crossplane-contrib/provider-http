@@ -4,7 +4,25 @@ metadata:
   name: provider-http
   annotations:
     meta.crossplane.io/maintainer: Crossplane Maintainers <info@crossplane.io>
-    meta.crossplane.io/source: github.com/arielsepton/provider-http
+    meta.crossplane.io/source: github.com/crossplane-contrib/provider-http
     meta.crossplane.io/license: Apache-2.0
     meta.crossplane.io/description: |
-      A http that can be used to create Crossplane providers.
+      A Crossplane provider facilitating seamless integration of HTTP interactions.
+
+    meta.crossplane.io/readme: |
+      `provider-http` is a Crossplane Provider designed to leverage HTTP interactions for effective resource management.
+
+      ## Resources
+
+      - **`DisposableRequest` Resource:**
+        - Enables one-time HTTP interactions.
+      
+      - **`Request` Resource:**
+        - Enables resource management through HTTP requests.
+
+      Explore the available resources and their specifications in the [Docs](https://github.com/crossplane-contrib/provider-http/tree/main/resources-docs).
+
+      ## Get Involved
+
+      If you have any questions, encounter issues, or want to contribute, join our community discussions on [slack.crossplane.io](https://slack.crossplane.io). Feel free to create issues or contribute to the development at [crossplane-contrib/provider-http](https://github.com/crossplane-contrib/provider-http).
+

@@ -34,12 +34,12 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
 
-	"github.com/arielsepton/provider-http/apis/request/v1alpha1"
-	apisv1alpha1 "github.com/arielsepton/provider-http/apis/v1alpha1"
-	httpClient "github.com/arielsepton/provider-http/internal/clients/http"
-	"github.com/arielsepton/provider-http/internal/controller/request/requestgen"
-	"github.com/arielsepton/provider-http/internal/controller/request/statushandler"
-	"github.com/arielsepton/provider-http/internal/utils"
+	"github.com/crossplane-contrib/provider-http/apis/request/v1alpha1"
+	apisv1alpha1 "github.com/crossplane-contrib/provider-http/apis/v1alpha1"
+	httpClient "github.com/crossplane-contrib/provider-http/internal/clients/http"
+	"github.com/crossplane-contrib/provider-http/internal/controller/request/requestgen"
+	"github.com/crossplane-contrib/provider-http/internal/controller/request/statushandler"
+	"github.com/crossplane-contrib/provider-http/internal/utils"
 )
 
 const (

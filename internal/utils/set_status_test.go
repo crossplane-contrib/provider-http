@@ -4,9 +4,9 @@ import (
 	"context"
 	"testing"
 
-	v1alpha1_desposible "github.com/arielsepton/provider-http/apis/desposiblerequest/v1alpha1"
-	v1alpha1_request "github.com/arielsepton/provider-http/apis/request/v1alpha1"
-	httpClient "github.com/arielsepton/provider-http/internal/clients/http"
+	v1alpha1_desposible "github.com/crossplane-contrib/provider-http/apis/desposiblerequest/v1alpha1"
+	v1alpha1_request "github.com/crossplane-contrib/provider-http/apis/request/v1alpha1"
+	httpClient "github.com/crossplane-contrib/provider-http/internal/clients/http"
 	"github.com/pkg/errors"
 
 	"github.com/crossplane/crossplane-runtime/pkg/test"
