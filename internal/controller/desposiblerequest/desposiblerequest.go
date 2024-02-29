@@ -28,8 +28,8 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/arielsepton/provider-http/internal/jq"
-	json_util "github.com/arielsepton/provider-http/internal/json"
+	"github.com/crossplane-contrib/provider-http/internal/jq"
+	json_util "github.com/crossplane-contrib/provider-http/internal/json"
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/pkg/controller"
 	"github.com/crossplane/crossplane-runtime/pkg/event"
@@ -37,10 +37,10 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
 
-	"github.com/arielsepton/provider-http/apis/desposiblerequest/v1alpha1"
-	apisv1alpha1 "github.com/arielsepton/provider-http/apis/v1alpha1"
-	httpClient "github.com/arielsepton/provider-http/internal/clients/http"
-	"github.com/arielsepton/provider-http/internal/utils"
+	"github.com/crossplane-contrib/provider-http/apis/desposiblerequest/v1alpha1"
+	apisv1alpha1 "github.com/crossplane-contrib/provider-http/apis/v1alpha1"
+	httpClient "github.com/crossplane-contrib/provider-http/internal/clients/http"
+	"github.com/crossplane-contrib/provider-http/internal/utils"
 )
 
 const (

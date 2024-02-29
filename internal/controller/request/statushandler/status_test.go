@@ -7,9 +7,9 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/arielsepton/provider-http/apis/request/v1alpha1"
-	httpClient "github.com/arielsepton/provider-http/internal/clients/http"
-	"github.com/arielsepton/provider-http/internal/utils"
+	"github.com/crossplane-contrib/provider-http/apis/request/v1alpha1"
+	httpClient "github.com/crossplane-contrib/provider-http/internal/clients/http"
+	"github.com/crossplane-contrib/provider-http/internal/utils"
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
 	"github.com/crossplane/crossplane-runtime/pkg/test"
 	"github.com/google/go-cmp/cmp"

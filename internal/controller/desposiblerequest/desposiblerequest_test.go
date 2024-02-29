@@ -22,10 +22,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/arielsepton/provider-http/apis/desposiblerequest/v1alpha1"
+	"github.com/crossplane-contrib/provider-http/apis/desposiblerequest/v1alpha1"
 
-	httpClient "github.com/arielsepton/provider-http/internal/clients/http"
-	"github.com/arielsepton/provider-http/internal/utils"
+	httpClient "github.com/crossplane-contrib/provider-http/internal/clients/http"
+	"github.com/crossplane-contrib/provider-http/internal/utils"
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"

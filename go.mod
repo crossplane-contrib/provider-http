@@ -1,4 +1,4 @@
-module github.com/arielsepton/provider-http
+module github.com/crossplane-contrib/provider-http
 
 go 1.19
 

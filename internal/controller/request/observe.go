@@ -5,11 +5,11 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/arielsepton/provider-http/apis/request/v1alpha1"
-	httpClient "github.com/arielsepton/provider-http/internal/clients/http"
-	"github.com/arielsepton/provider-http/internal/controller/request/requestgen"
-	"github.com/arielsepton/provider-http/internal/json"
-	"github.com/arielsepton/provider-http/internal/utils"
+	"github.com/crossplane-contrib/provider-http/apis/request/v1alpha1"
+	httpClient "github.com/crossplane-contrib/provider-http/internal/clients/http"
+	"github.com/crossplane-contrib/provider-http/internal/controller/request/requestgen"
+	"github.com/crossplane-contrib/provider-http/internal/json"
+	"github.com/crossplane-contrib/provider-http/internal/utils"
 	"github.com/pkg/errors"
 )
 

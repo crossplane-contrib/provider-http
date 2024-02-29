@@ -3,7 +3,7 @@ package json
 import (
 	"testing"
 
-	"github.com/arielsepton/provider-http/apis/request/v1alpha1"
+	"github.com/crossplane-contrib/provider-http/apis/request/v1alpha1"
 	"github.com/google/go-cmp/cmp"
 )
 

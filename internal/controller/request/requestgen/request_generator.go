@@ -6,10 +6,10 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/arielsepton/provider-http/apis/request/v1alpha1"
-	"github.com/arielsepton/provider-http/internal/controller/request/requestprocessing"
-	json_util "github.com/arielsepton/provider-http/internal/json"
-	"github.com/arielsepton/provider-http/internal/utils"
+	"github.com/crossplane-contrib/provider-http/apis/request/v1alpha1"
+	"github.com/crossplane-contrib/provider-http/internal/controller/request/requestprocessing"
+	json_util "github.com/crossplane-contrib/provider-http/internal/json"
+	"github.com/crossplane-contrib/provider-http/internal/utils"
 
 	"golang.org/x/exp/maps"
 )

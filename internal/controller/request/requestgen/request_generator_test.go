@@ -3,7 +3,7 @@ package requestgen
 import (
 	"testing"
 
-	"github.com/arielsepton/provider-http/apis/request/v1alpha1"
+	"github.com/crossplane-contrib/provider-http/apis/request/v1alpha1"
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
 	"github.com/crossplane/crossplane-runtime/pkg/test"
 	"github.com/google/go-cmp/cmp"
