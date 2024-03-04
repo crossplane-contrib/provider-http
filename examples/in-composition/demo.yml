@@ -4,4 +4,4 @@ metadata:
   namespace: default
   name: my-helm-and-http
 spec:
-  MyDemoVersion: "1.18"
+  wordpressVersion: 15.2.5
