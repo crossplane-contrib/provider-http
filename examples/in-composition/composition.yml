@@ -34,7 +34,7 @@ spec:
   - name: httprequestincompo
     base:
       apiVersion: http.crossplane.io/v1alpha1
-      kind: DesposibleRequest 
+      kind: DisposableRequest 
       spec:
           deletionPolicy: Orphan
           forProvider:

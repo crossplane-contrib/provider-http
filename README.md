@@ -29,7 +29,7 @@ To install `provider-http`, you have two options:
 
 `provider-http` supports the following resources:
 
-- **DisposableRequest:** Initiates a one-time HTTP request. See [DisposableRequest CRD documentation](resources-docs/desposiblerequest_docs.md).
+- **DisposableRequest:** Initiates a one-time HTTP request. See [DisposableRequest CRD documentation](resources-docs/disposablerequest_docs.md).
 - **Request:** Manages a resource through HTTP requests. See [Request CRD documentation](resources-docs/request_docs.md).
 
 ## Usage
