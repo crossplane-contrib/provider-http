@@ -38,7 +38,7 @@ Here is an example `DisposableRequest` resource definition:
 ### Status
 The status field of the `DisposableRequest` resource will provide information about the execution status and results of the HTTP request.
 
-Example `DesposibleRequest` status:
+Example `DisposableRequest` status:
   ```yaml
   status:
     conditions:

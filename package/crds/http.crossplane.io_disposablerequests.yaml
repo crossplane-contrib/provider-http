@@ -5,7 +5,7 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.11.3
   creationTimestamp: null
-  name: desposiblerequests.http.crossplane.io
+  name: disposablerequests.http.crossplane.io
 spec:
   group: http.crossplane.io
   names:
@@ -13,10 +13,10 @@ spec:
     - crossplane
     - managed
     - http
-    kind: DesposibleRequest
-    listKind: DesposibleRequestList
-    plural: desposiblerequests
-    singular: desposiblerequest
+    kind: DisposableRequest
+    listKind: DisposableRequestList
+    plural: disposablerequests
+    singular: disposablerequest
   scope: Cluster
   versions:
   - additionalPrinterColumns:
@@ -35,7 +35,7 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: A DesposibleRequest is an example API type.
+        description: A DisposableRequest is an example API type.
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -50,7 +50,7 @@ spec:
           metadata:
             type: object
           spec:
-            description: A DesposibleRequestSpec defines the desired state of a DesposibleRequest.
+            description: A DisposableRequestSpec defines the desired state of a DisposableRequest.
             properties:
               deletionPolicy:
                 default: Delete
@@ -66,8 +66,8 @@ spec:
                 - Delete
                 type: string
               forProvider:
-                description: DesposibleRequestParameters are the configurable fields
-                  of a DesposibleRequest.
+                description: DisposableRequestParameters are the configurable fields
+                  of a DisposableRequest.
                 properties:
                   body:
                     type: string
@@ -302,8 +302,8 @@ spec:
             - forProvider
             type: object
           status:
-            description: A DesposibleRequestStatus represents the observed state of
-              a DesposibleRequest.
+            description: A DisposableRequestStatus represents the observed state of
+              a DisposableRequest.
             properties:
               conditions:
                 description: Conditions of the resource.
