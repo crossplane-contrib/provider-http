@@ -19,22 +19,19 @@ spec:
           chart:
             name: wordpress
             repository: https://charts.bitnami.com/bitnami
-            version: 15.2.5
           namespace: wordpress
-        providerConfigRef:
-          name: helm-provider
     patches:
-      - fromFieldPath: spec.Namespace
-        toFieldPath: "spec.forProvider.namespace"
+      - fromFieldPath: spec.wordpressVersion
+        toFieldPath: spec.forProvider.chart.version
       - type: ToCompositeFieldPath
         fromFieldPath: status.atProvider.state
         toFieldPath: status.helm.state
         policy:
           fromFieldPath: Optional
-  - name: httprequestincompo
+  - name: httprequest
     base:
       apiVersion: http.crossplane.io/v1alpha1
-      kind: DesposibleRequest 
+      kind: DisposableRequest 
       spec:
           deletionPolicy: Orphan
           forProvider:
@@ -52,8 +49,11 @@ spec:
             name: http-conf
           rollbackLimit: 2
     patches:
-    # This ensures the request won't happen unless the helm chart is deployed.
-      - fromFieldPath: status.helm.state 
-        toFieldPath: spec.forProvider.state 
-        policy:
-          fromFieldPath: Required
+      - type: ToCompositeFieldPath
+        fromFieldPath: status.response.body
+        toFieldPath: status.http.response.body
+        transforms:
+          - type: convert
+            convert:
+              toType: object
+              format: json
