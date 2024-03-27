@@ -10,7 +10,7 @@ To install `provider-http`, you have two options:
 1. Using the Crossplane CLI in a Kubernetes cluster where Crossplane is installed:
 
     ```console
-    kubectl crossplane install provider xpkg.upbound.io/crossplane-contrib/provider-http:v0.1.0
+    kubectl crossplane install provider xpkg.upbound.io/crossplane-contrib/provider-http:v0.2.0
     ```
 
 2. Manually creating a Provider by applying the following YAML:
@@ -21,7 +21,7 @@ To install `provider-http`, you have two options:
     metadata:
       name: provider-http
     spec:
-      package: "xpkg.upbound.io/crossplane-contrib/provider-http:v0.1.0"
+      package: "xpkg.upbound.io/crossplane-contrib/provider-http:v0.2.0"
     ```
 
 
@@ -29,7 +29,7 @@ To install `provider-http`, you have two options:
 
 `provider-http` supports the following resources:
 
-- **DisposableRequest:** Initiates a one-time HTTP request. See [DisposableRequest CRD documentation](resources-docs/desposiblerequest_docs.md).
+- **DisposableRequest:** Initiates a one-time HTTP request. See [DisposableRequest CRD documentation](resources-docs/disposablerequest_docs.md).
 - **Request:** Manages a resource through HTTP requests. See [Request CRD documentation](resources-docs/request_docs.md).
 
 ## Usage
