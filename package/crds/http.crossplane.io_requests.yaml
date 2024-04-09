@@ -109,6 +109,17 @@ spec:
                         type: string
                       body:
                         type: string
+                      secretsRefs:
+                        items:
+                          properties:
+                            key:
+                              type: string
+                            name:
+                              type: string
+                            namespace:
+                              type: string
+                          type: object
+                        type: array
                     type: object
                   waitTimeout:
                     type: string

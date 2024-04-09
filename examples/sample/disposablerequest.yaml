@@ -3,6 +3,12 @@ kind: DisposableRequest
 metadata:
   name: health-check
 spec:
+  secretsRefs:
+    - name: secretname
+      namespace: crossplane-system
+      fieldPath: token
+      toFieldPaths: 
+        - forProvider.headers.authorization[0]
   deletionPolicy: Orphan
   forProvider:
     # The 'expectedResponse' field is optional. If used, also set 'rollbackRetriesLimit', which determines the number of HTTP requests to be sent until the jq query returns true.    
