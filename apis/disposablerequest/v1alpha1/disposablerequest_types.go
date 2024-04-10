@@ -55,6 +55,7 @@ type DisposableRequestSpec struct {
 	xpv1.ResourceSpec `json:",inline"`
 
 	ForProvider DisposableRequestParameters `json:"forProvider"`
+	SecretsRefs []SecretRef `json:"secretsRefs,omitempty"`
 }
 
 type Response struct {
@@ -68,6 +69,13 @@ type Mapping struct {
 	Body    string              `json:"body,omitempty"`
 	URL     string              `json:"url"`
 	Headers map[string][]string `json:"headers,omitempty"`
+}
+
+type SecretRef struct {
+	Name string `json:"name,omitempty"`
+	Namespace string `json:"namespace,omitempty"`
+	Key string `json:"key,omitempty"`
+	ToFieldPaths []string `json:"toFieldPaths,omitempty"`
 }
 
 // A DisposableRequestStatus represents the observed state of a DisposableRequest.

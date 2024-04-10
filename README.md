@@ -64,7 +64,7 @@ spec:
 For more detailed examples and configuration options, refer to the [examples directory](examples/sample/).
 
 
-### Developing locally
+## Developing locally
 
 Run controller against the cluster:
 ```
@@ -72,5 +72,5 @@ make run
 ```
 
 
-### Troubleshooting
+## Troubleshooting
 If you encounter any issues during installation or usage, refer to the [troubleshooting guide](https://docs.crossplane.io/knowledge-base/guides/troubleshoot/) for common problems and solutions.

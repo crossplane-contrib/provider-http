@@ -278,6 +278,21 @@ spec:
                 required:
                 - name
                 type: object
+              secretsRefs:
+                items:
+                  properties:
+                    key:
+                      type: string
+                    name:
+                      type: string
+                    namespace:
+                      type: string
+                    toFieldPaths:
+                      items:
+                        type: string
+                      type: array
+                  type: object
+                type: array
               writeConnectionSecretToRef:
                 description: WriteConnectionSecretToReference specifies the namespace
                   and name of a Secret to which any connection details for this managed

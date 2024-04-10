@@ -48,8 +48,14 @@ type Mapping struct {
 type Payload struct {
 	BaseUrl string `json:"baseUrl,omitempty"`
 	Body    string `json:"body,omitempty"`
+	SecretsRefs []SecretRef `json:"secretsRefs,omitempty"`
 }
 
+type SecretRef struct {
+	Name string `json:"name,omitempty"`
+	Namespace string `json:"namespace,omitempty"`
+	Key string `json:"key,omitempty"`
+}
 // A RequestSpec defines the desired state of a Request.
 type RequestSpec struct {
 	xpv1.ResourceSpec `json:",inline"`
