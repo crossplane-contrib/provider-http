@@ -4,13 +4,20 @@ metadata:
   name: health-check
 spec:
   deletionPolicy: Orphan
+  secretsRefs:
+    - name: secretname
+      namespace: crossplane-system
+      key: token
+      toFieldPaths:
+        - forProvider.headers.user-agent[0]
+        - forProviders.body.check_type
   forProvider:
-    # The 'expectedResponse' field is optional. If used, also set 'rollbackRetriesLimit', which determines the number of HTTP requests to be sent until the jq query returns true.    
+    # The 'expectedResponse' field is optional. If used, also set 'rollbackRetriesLimit', which determines the number of HTTP requests to be sent until the jq query returns true.
     # expectedResponse: '.Body.job_status == "success"'
     insecureSkipTLSVerify: true
     waitTimeout: 5m
     rollbackRetriesLimit: 5
-    url:  http://todo.default.svc.cluster.local/health-check
+    url: http://todo.default.svc.cluster.local/health-check
     method: POST
     body: |
       {
@@ -18,7 +25,7 @@ spec:
         "additional_info": "optional"
       }
     headers:
-      User-Agent: 
+      User-Agent:
         - "Crossplane Health Checker"
   providerConfigRef:
     name: http-conf

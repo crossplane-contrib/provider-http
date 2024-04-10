@@ -9,6 +9,8 @@ spec:
     headers:
       Content-Type:
         - application/json
+      Authorization:
+        - ("Bearer" + .payload.secretsRefs[0])
     payload:
       baseUrl: http://todo.default.svc.cluster.local/todos
       body: |
@@ -17,6 +19,10 @@ spec:
           "reminder": "Every 1 hour", 
           "responsible": "Dan"
         }
+      secretsRefs:
+        - name: secretname
+          namespace: crossplane-system
+          key: authorization-token
     mappings:
       - method: "POST"
         body: |
@@ -26,11 +32,8 @@ spec:
             responsible: .payload.body.responsible,
           }
         url: .payload.baseUrl
-        headers:
-          Authorization:
-            - token
       - method: "GET"
-        url: (.payload.baseUrl + "/" + (.response.body.id|tostring)) 
+        url: (.payload.baseUrl + "/" + (.response.body.id|tostring))
       - method: "PUT"
         body: |
           {
@@ -38,9 +41,8 @@ spec:
             reminder: .payload.body.reminder, 
             responsible: .payload.body.responsible
           }
-        url: (.payload.baseUrl + "/" + (.response.body.id|tostring)) 
+        url: (.payload.baseUrl + "/" + (.response.body.id|tostring))
       - method: "DELETE"
-        url: (.payload.baseUrl + "/" + (.response.body.id|tostring)) 
-  
+        url: (.payload.baseUrl + "/" + (.response.body.id|tostring))
   providerConfigRef:
     name: http-conf
