@@ -7,16 +7,9 @@ spec:
     - name: secretname
       namespace: crossplane-system
       fieldPath: token
-      toFieldPaths: 
+      toFieldPaths:
         - forProvider.headers.authorization[0]
   deletionPolicy: Orphan
-  secretsRefs:
-    - name: secretname
-      namespace: crossplane-system
-      key: token
-      toFieldPaths:
-        - forProvider.headers.user-agent[0]
-        - forProviders.body.check_type
   forProvider:
     # The 'expectedResponse' field is optional. If used, also set 'rollbackRetriesLimit', which determines the number of HTTP requests to be sent until the jq query returns true.
     # expectedResponse: '.Body.job_status == "success"'
