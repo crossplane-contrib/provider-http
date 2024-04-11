@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	corev1 "k8s.io/api/core/v1"
 
 	"github.com/crossplane-contrib/provider-http/internal/jq"
 	json_util "github.com/crossplane-contrib/provider-http/internal/json"
@@ -51,6 +52,8 @@ const (
 	errFailedToSendHttpDisposableRequest = "failed to send http request"
 	errFailedUpdateStatusConditions      = "failed updating status conditions"
 	ErrExpectedFormat                    = "JQ filter should return a boolean, but returned error: %s"
+	errPatchFromReferencedSecret = "cannot patch from referenced secret"
+	errGetReferencedSecret       = "cannot get referenced secret"
 )
 
 // Setup adds a controller that reconciles DisposableRequest managed resources.
@@ -152,7 +155,37 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	}, nil
 }
 
+func (c *external) setSecrets(ctx context.Context, cr *v1alpha1.DisposableRequest) error {
+	for _, ref := range cr.Spec.SecretsRefs {
+		res := &corev1.Secret{}
+
+		// Try to get referenced secret
+		err := c.localKube.Get(ctx, client.ObjectKey{
+			Namespace: ref.Namespace,
+			Name:      ref.Name,
+		}, res)
+
+		if err != nil {
+			return errors.Wrap(err, errGetReferencedSecret)
+		}
+
+		// Patch fields if any
+		if ref.Key != "" {
+			if err := ref.ApplyFromFieldPathPatch(res, cr); err != nil {
+				return errors.Wrap(err, errPatchFromReferencedSecret)
+			}
+		}
+	}
+
+	return nil
+}
+
 func (c *external) deployAction(ctx context.Context, cr *v1alpha1.DisposableRequest) error {
+	err := c.setSecrets(ctx, cr)
+	if err != nil {
+		return err
+	}
+
 	details, err := c.http.SendRequest(ctx, cr.Spec.ForProvider.Method,
 		cr.Spec.ForProvider.URL, cr.Spec.ForProvider.Body, cr.Spec.ForProvider.Headers, cr.Spec.ForProvider.InsecureSkipTLSVerify)
 

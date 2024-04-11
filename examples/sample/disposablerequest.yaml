@@ -6,9 +6,11 @@ spec:
   secretsRefs:
     - name: secretname
       namespace: crossplane-system
-      fieldPath: token
+      key: token
       toFieldPaths:
         - forProvider.headers.authorization[0]
+        - forProvider.body.aaa
+        
   deletionPolicy: Orphan
   forProvider:
     # The 'expectedResponse' field is optional. If used, also set 'rollbackRetriesLimit', which determines the number of HTTP requests to be sent until the jq query returns true.
@@ -16,7 +18,7 @@ spec:
     insecureSkipTLSVerify: true
     waitTimeout: 5m
     rollbackRetriesLimit: 5
-    url: http://todo.default.svc.cluster.local/health-check
+    url: https://enwgarmh79yh.x.pipedream.net/
     method: POST
     body: |
       {
