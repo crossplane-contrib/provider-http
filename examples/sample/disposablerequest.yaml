@@ -3,14 +3,28 @@ kind: DisposableRequest
 metadata:
   name: health-check
 spec:
-  secretsRefs:
-    - name: secretname
-      namespace: crossplane-system
-      key: token
+  # Secrets providing patches for request data
+  requestSecretDataPatches:
+    - name: my-secret
+      namespace: default
+      key: username
       toFieldPaths:
         - forProvider.headers.authorization[0]
         - forProvider.body.aaa
-        
+    - name: my-secret
+      namespace: default
+      key: password
+      toFieldPaths:
+        - forProvider.body.bb
+
+  # Secrets receiving patches for response data
+  responseSecretDataPatches: 
+    - name: response-secret
+      namespace: default
+      key: extracted-data
+      fromFieldPath:
+        .Body.success
+
   deletionPolicy: Orphan
   forProvider:
     # The 'expectedResponse' field is optional. If used, also set 'rollbackRetriesLimit', which determines the number of HTTP requests to be sent until the jq query returns true.
@@ -28,6 +42,8 @@ spec:
     headers:
       User-Agent:
         - "Crossplane Health Checker"
+    # 
   providerConfigRef:
     name: http-conf
 # TODO: check if it's possible to modify the deletionPolicy to be orphan by default.
+# 

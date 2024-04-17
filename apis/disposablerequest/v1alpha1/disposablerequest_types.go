@@ -18,16 +18,19 @@ package v1alpha1
 
 import (
 	"reflect"
+	"context"
 	"fmt"
 	"strings"
 	"encoding/json"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime"
     b64 "encoding/base64"
 
+	corev1 "k8s.io/api/core/v1"
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/pkg/fieldpath"
  
@@ -61,9 +64,13 @@ type DisposableRequestParameters struct {
 // A DisposableRequestSpec defines the desired state of a DisposableRequest.
 type DisposableRequestSpec struct {
 	xpv1.ResourceSpec `json:",inline"`
-
 	ForProvider DisposableRequestParameters `json:"forProvider"`
-	SecretsRefs []SecretRef `json:"secretsRefs,omitempty"`
+	
+	// RequestSecretDataPatches specifies the secrets providing patches for request data.
+	RequestSecretDataPatches []SecretRef `json:"requestSecretDataPatches,omitempty"`
+
+	// ResponseSecretDataPatches specifies the secrets receiving patches for response data.
+	ResponseSecretDataPatches []SecretRef `json:"responseSecretDataPatches,omitempty"`
 }
 
 type Response struct {
@@ -84,6 +91,7 @@ type SecretRef struct {
 	Namespace string `json:"namespace,omitempty"`
 	Key string `json:"key,omitempty"`
 	ToFieldPaths []string `json:"toFieldPaths,omitempty"`
+	FromFieldPath string `json:"fromFieldPath,omitempty"`
 }
 
 // A DisposableRequestStatus represents the observed state of a DisposableRequest.
@@ -132,6 +140,25 @@ var (
 
 func init() {
 	SchemeBuilder.Register(&DisposableRequest{}, &DisposableRequestList{})
+}
+
+// ApplyToFieldPathPatch patches the "to" secret, using a source field
+// on the "from" resource.
+func (r *SecretRef) ApplyToFieldPathPatch(data string, secret *corev1.Secret, localKube client.Client, ctx context.Context) error {
+	encodedValue := b64.StdEncoding.EncodeToString([]byte(data))
+	if secret.Data == nil {
+        secret.Data = make(map[string][]byte)
+    }
+
+    // Set the key to the encoded value
+    secret.Data[r.Key] = []byte(encodedValue)
+
+	err := localKube.Update(ctx, secret)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // ApplyFromFieldPathPatch patches the "to" resource, using a source field

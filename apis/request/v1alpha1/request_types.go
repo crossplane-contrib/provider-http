@@ -48,7 +48,7 @@ type Mapping struct {
 type Payload struct {
 	BaseUrl string `json:"baseUrl,omitempty"`
 	Body    string `json:"body,omitempty"`
-	SecretsRefs []SecretRef `json:"secretsRefs,omitempty"`
+	RequestSecretDataPatches []SecretRef `json:"secretsRefs,omitempty"`
 }
 
 type SecretRef struct {

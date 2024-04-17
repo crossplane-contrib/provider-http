@@ -28,8 +28,10 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	corev1 "k8s.io/api/core/v1"
-
 	"github.com/crossplane-contrib/provider-http/internal/jq"
+
+	errs "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	json_util "github.com/crossplane-contrib/provider-http/internal/json"
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/pkg/controller"
@@ -54,6 +56,7 @@ const (
 	ErrExpectedFormat                    = "JQ filter should return a boolean, but returned error: %s"
 	errPatchFromReferencedSecret = "cannot patch from referenced secret"
 	errGetReferencedSecret       = "cannot get referenced secret"
+	errCreateReferencedSecret = "cannot create referenced secret"
 )
 
 // Setup adds a controller that reconciles DisposableRequest managed resources.
@@ -156,7 +159,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 }
 
 func (c *external) setSecrets(ctx context.Context, cr *v1alpha1.DisposableRequest) error {
-	for _, ref := range cr.Spec.SecretsRefs {
+	for _, ref := range cr.Spec.RequestSecretDataPatches {
 		res := &corev1.Secret{}
 
 		// Try to get referenced secret
@@ -172,6 +175,80 @@ func (c *external) setSecrets(ctx context.Context, cr *v1alpha1.DisposableReques
 		// Patch fields if any
 		if ref.Key != "" {
 			if err := ref.ApplyFromFieldPathPatch(res, cr); err != nil {
+				return errors.Wrap(err, errPatchFromReferencedSecret)
+			}
+		}
+	}
+
+	return nil
+}
+
+
+func (c *external) setToSecrets(ctx context.Context, cr *v1alpha1.DisposableRequest, response httpClient.HttpResponse) error {
+	for _, ref := range cr.Spec.ResponseSecretDataPatches {
+		secret := &corev1.Secret{}
+
+		fmt.Println("in setToSecrets")
+		err := c.localKube.Get(ctx, client.ObjectKey{
+			Namespace: ref.Namespace,
+			Name:      ref.Name,
+		}, secret)
+		
+		if err != nil {
+			if errs.IsNotFound(err) {
+				fmt.Println("should create the secret")
+
+				// Create the secret if it does not exist
+				secret := &corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: ref.Namespace,
+						Name:      ref.Name,
+					},
+				}
+		
+				err = c.localKube.Create(ctx, secret)
+				if err != nil {
+					return errors.Wrap(err, errCreateReferencedSecret)
+				}
+
+				err = c.localKube.Get(ctx, client.ObjectKey{
+					Namespace: ref.Namespace,
+					Name:      ref.Name,
+				}, secret)
+
+				if err != nil {
+					return errors.Wrap(err, errGetReferencedSecret)
+				}
+			} else {
+				return errors.Wrap(err, errGetReferencedSecret)
+			}
+		}
+		
+		fmt.Println("we got the secret")
+
+		
+		responseMap, err := json_util.StructToMap(response)
+		if err != nil {
+			return errors.Wrap(err, "failed to convert response to map")
+		}
+
+		json_util.ConvertJSONStringsToMaps(&responseMap)
+
+		valueToPatch, err := jq.ParseString(ref.FromFieldPath, responseMap)
+		if err != nil {
+			boolResult, _ := jq.ParseBool(ref.FromFieldPath, responseMap)
+			valueToPatch = strconv.FormatBool(boolResult)
+		}
+
+		fmt.Println("ok2tefggg3")
+		fmt.Println(valueToPatch)
+
+
+		// Patch fields if any
+		if ref.Key != "" {
+			fmt.Println("key is here")
+
+			if err := ref.ApplyToFieldPathPatch(valueToPatch, secret, c.localKube, ctx); err != nil {
 				return errors.Wrap(err, errPatchFromReferencedSecret)
 			}
 		}
@@ -230,6 +307,7 @@ func (c *external) deployAction(ctx context.Context, cr *v1alpha1.DisposableRequ
 			resource.SetError(errors.New("Response does not match the expected format, retries limit "+fmt.Sprint(limit))), resource.SetRequestDetails())
 	}
 
+	c.setToSecrets(ctx, cr, res)
 	return utils.SetRequestResourceStatus(*resource, resource.SetStatusCode(), resource.SetHeaders(), resource.SetBody(), resource.SetSynced(), resource.SetRequestDetails())
 }
 

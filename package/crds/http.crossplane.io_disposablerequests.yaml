@@ -278,9 +278,32 @@ spec:
                 required:
                 - name
                 type: object
-              secretsRefs:
+              requestSecretDataPatches:
+                description: RequestSecretDataPatches specifies the secrets providing
+                  patches for request data.
                 items:
                   properties:
+                    fromFieldPath:
+                      type: string
+                    key:
+                      type: string
+                    name:
+                      type: string
+                    namespace:
+                      type: string
+                    toFieldPaths:
+                      items:
+                        type: string
+                      type: array
+                  type: object
+                type: array
+              responseSecretDataPatches:
+                description: ResponseSecretDataPatches specifies the secrets receiving
+                  patches for response data.
+                items:
+                  properties:
+                    fromFieldPath:
+                      type: string
                     key:
                       type: string
                     name:

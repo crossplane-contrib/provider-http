@@ -130,8 +130,15 @@ func (in *DisposableRequestSpec) DeepCopyInto(out *DisposableRequestSpec) {
 	*out = *in
 	in.ResourceSpec.DeepCopyInto(&out.ResourceSpec)
 	in.ForProvider.DeepCopyInto(&out.ForProvider)
-	if in.SecretsRefs != nil {
-		in, out := &in.SecretsRefs, &out.SecretsRefs
+	if in.RequestSecretDataPatches != nil {
+		in, out := &in.RequestSecretDataPatches, &out.RequestSecretDataPatches
+		*out = make([]SecretRef, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
+	if in.ResponseSecretDataPatches != nil {
+		in, out := &in.ResponseSecretDataPatches, &out.ResponseSecretDataPatches
 		*out = make([]SecretRef, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
