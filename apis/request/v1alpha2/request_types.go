@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha1
+package v1alpha2
 
 import (
 	"reflect"
@@ -48,8 +48,14 @@ type Mapping struct {
 type Payload struct {
 	BaseUrl string `json:"baseUrl,omitempty"`
 	Body    string `json:"body,omitempty"`
+	RequestSecretDataPatches []SecretRef `json:"secretsRefs,omitempty"`
 }
 
+type SecretRef struct {
+	Name string `json:"name,omitempty"`
+	Namespace string `json:"namespace,omitempty"`
+	Key string `json:"key,omitempty"`
+}
 // A RequestSpec defines the desired state of a Request.
 type RequestSpec struct {
 	xpv1.ResourceSpec `json:",inline"`
@@ -87,6 +93,7 @@ type Cache struct {
 // +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:scope=Cluster,categories={crossplane,managed,http}
+// +kubebuilder:storageversion
 type Request struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

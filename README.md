@@ -39,7 +39,7 @@ To install `provider-http`, you have two options:
 Create a `DisposableRequest` resource to initiate a single-use HTTP interaction:
 
 ```yaml
-apiVersion: http.crossplane.io/v1alpha1
+apiVersion: http.crossplane.io/v1alpha2
 kind: DisposableRequest
 metadata:
   name: example-disposable-request
@@ -54,7 +54,7 @@ For more detailed examples and configuration options, refer to the [examples dir
 Manage a resource through HTTP requests with a `Request` resource:
 
 ```yaml
-apiVersion: http.crossplane.io/v1alpha1
+apiVersion: http.crossplane.io/v1alpha2
 kind: Request
 metadata:
   name: example-request

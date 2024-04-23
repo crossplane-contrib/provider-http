@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/crossplane-contrib/provider-http/apis/request/v1alpha1"
+	"github.com/crossplane-contrib/provider-http/apis/request/v1alpha2"
 	httpClient "github.com/crossplane-contrib/provider-http/internal/clients/http"
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
 	"github.com/crossplane/crossplane-runtime/pkg/test"
@@ -22,7 +22,7 @@ func Test_isUpToDate(t *testing.T) {
 	type args struct {
 		http      httpClient.Client
 		localKube client.Client
-		mg        *v1alpha1.Request
+		mg        *v1alpha2.Request
 	}
 	type want struct {
 		result ObserveRequestDetails
@@ -43,7 +43,7 @@ func Test_isUpToDate(t *testing.T) {
 				localKube: &test.MockClient{
 					MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
 				},
-				mg: httpRequest(func(r *v1alpha1.Request) {
+				mg: httpRequest(func(r *v1alpha2.Request) {
 					r.Status.Response.Body = ""
 				}),
 			},
@@ -61,7 +61,7 @@ func Test_isUpToDate(t *testing.T) {
 				localKube: &test.MockClient{
 					MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
 				},
-				mg: httpRequest(func(r *v1alpha1.Request) {
+				mg: httpRequest(func(r *v1alpha2.Request) {
 					r.Status.RequestDetails.Method = http.MethodPost
 					r.Status.Response.StatusCode = 400
 				}),
@@ -80,7 +80,7 @@ func Test_isUpToDate(t *testing.T) {
 				localKube: &test.MockClient{
 					MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
 				},
-				mg: httpRequest(func(r *v1alpha1.Request) {
+				mg: httpRequest(func(r *v1alpha2.Request) {
 					r.Status.Response.StatusCode = 404
 				}),
 			},
@@ -102,7 +102,7 @@ func Test_isUpToDate(t *testing.T) {
 				localKube: &test.MockClient{
 					MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
 				},
-				mg: httpRequest(func(r *v1alpha1.Request) {
+				mg: httpRequest(func(r *v1alpha2.Request) {
 					r.Status.Response.Body = `{"username":"john_doe_new_username"}`
 				}),
 			},
@@ -125,7 +125,7 @@ func Test_isUpToDate(t *testing.T) {
 				localKube: &test.MockClient{
 					MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
 				},
-				mg: httpRequest(func(r *v1alpha1.Request) {
+				mg: httpRequest(func(r *v1alpha2.Request) {
 					r.Status.Response.Body = `{"username":"john_doe_new_username"}`
 				}),
 			},
@@ -159,7 +159,7 @@ func Test_isUpToDate(t *testing.T) {
 				localKube: &test.MockClient{
 					MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
 				},
-				mg: httpRequest(func(r *v1alpha1.Request) {
+				mg: httpRequest(func(r *v1alpha2.Request) {
 					r.Status.Response.Body = `{"username":"john_doe_new_username"}`
 					r.Status.Response.StatusCode = 200
 				}),

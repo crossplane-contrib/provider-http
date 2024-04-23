@@ -3,43 +3,43 @@ package json
 import (
 	"testing"
 
-	"github.com/crossplane-contrib/provider-http/apis/request/v1alpha1"
+	"github.com/crossplane-contrib/provider-http/apis/request/v1alpha2"
 	"github.com/google/go-cmp/cmp"
 )
 
 var (
-	testPostMapping = v1alpha1.Mapping{
+	testPostMapping = v1alpha2.Mapping{
 		Method: "POST",
 		Body:   "{ username: .payload.body.username, email: .payload.body.email }",
 		URL:    ".payload.baseUrl",
 		// Headers: testHeaders,
 	}
 
-	testPutMapping = v1alpha1.Mapping{
+	testPutMapping = v1alpha2.Mapping{
 		Method: "PUT",
 		Body:   "{ username: \"john_doe_new_username\" }",
 		URL:    "(.payload.baseUrl + \"/\" + .response.body.id)",
 		// Headers: testHeaders,
 	}
 
-	testGetMapping = v1alpha1.Mapping{
+	testGetMapping = v1alpha2.Mapping{
 		Method: "GET",
 		URL:    "(.payload.baseUrl + \"/\" + .response.body.id)",
 	}
 
-	testDeleteMapping = v1alpha1.Mapping{
+	testDeleteMapping = v1alpha2.Mapping{
 		Method: "DELETE",
 		URL:    "(.payload.baseUrl + \"/\" + .response.body.id)",
 	}
 )
 
 var (
-	testForProvider = v1alpha1.RequestParameters{
-		Payload: v1alpha1.Payload{
+	testForProvider = v1alpha2.RequestParameters{
+		Payload: v1alpha2.Payload{
 			Body:    "{\"username\": \"john_doe\", \"email\": \"john.doe@example.com\"}",
 			BaseUrl: "https://api.example.com/users",
 		},
-		Mappings: []v1alpha1.Mapping{
+		Mappings: []v1alpha2.Mapping{
 			testPostMapping,
 			testGetMapping,
 			testPutMapping,

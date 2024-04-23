@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/crossplane-contrib/provider-http/apis/request/v1alpha1"
+	"github.com/crossplane-contrib/provider-http/apis/request/v1alpha2"
 	httpClient "github.com/crossplane-contrib/provider-http/internal/clients/http"
 	"github.com/crossplane-contrib/provider-http/internal/controller/request/requestgen"
 	"github.com/crossplane-contrib/provider-http/internal/json"
@@ -43,7 +43,7 @@ func FailedObserve() ObserveRequestDetails {
 }
 
 // isUpToDate checks whether desired spec up to date with the observed state for a given request
-func (c *external) isUpToDate(ctx context.Context, cr *v1alpha1.Request) (ObserveRequestDetails, error) {
+func (c *external) isUpToDate(ctx context.Context, cr *v1alpha2.Request) (ObserveRequestDetails, error) {
 	if !c.isObjectValidForObservation(cr) {
 		return FailedObserve(), errors.New(errObjectNotFound)
 	}
@@ -66,7 +66,7 @@ func (c *external) isUpToDate(ctx context.Context, cr *v1alpha1.Request) (Observ
 	return c.compareResponseAndDesiredState(details, responseErr, desiredState)
 }
 
-func (c *external) isObjectValidForObservation(cr *v1alpha1.Request) bool {
+func (c *external) isObjectValidForObservation(cr *v1alpha2.Request) bool {
 	return cr.Status.Response.Body != "" &&
 		!(cr.Status.RequestDetails.Method == http.MethodPost && utils.IsHTTPError(cr.Status.Response.StatusCode))
 }
@@ -93,12 +93,12 @@ func (c *external) compareResponseAndDesiredState(details httpClient.HttpDetails
 	return observeRequestDetails, nil
 }
 
-func (c *external) desiredState(cr *v1alpha1.Request) (string, error) {
+func (c *external) desiredState(cr *v1alpha2.Request) (string, error) {
 	requestDetails, err := c.requestDetails(cr, http.MethodPut)
 	return requestDetails.Body, err
 }
 
-func (c *external) requestDetails(cr *v1alpha1.Request, method string) (requestgen.RequestDetails, error) {
+func (c *external) requestDetails(cr *v1alpha2.Request, method string) (requestgen.RequestDetails, error) {
 	mapping, ok := getMappingByMethod(&cr.Spec.ForProvider, method)
 	if !ok {
 		return requestgen.RequestDetails{}, errors.Errorf(errMappingNotFound, method)

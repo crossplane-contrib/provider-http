@@ -22,16 +22,14 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/crossplane-contrib/provider-http/internal/jq"
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
 	"github.com/pkg/errors"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	corev1 "k8s.io/api/core/v1"
-	"github.com/crossplane-contrib/provider-http/internal/jq"
 
-	errs "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	json_util "github.com/crossplane-contrib/provider-http/internal/json"
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/pkg/controller"
@@ -39,8 +37,10 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/ratelimiter"
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
+	errs "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/crossplane-contrib/provider-http/apis/disposablerequest/v1alpha1"
+	"github.com/crossplane-contrib/provider-http/apis/disposablerequest/v1alpha2"
 	apisv1alpha1 "github.com/crossplane-contrib/provider-http/apis/v1alpha1"
 	httpClient "github.com/crossplane-contrib/provider-http/internal/clients/http"
 	"github.com/crossplane-contrib/provider-http/internal/utils"
@@ -61,11 +61,11 @@ const (
 
 // Setup adds a controller that reconciles DisposableRequest managed resources.
 func Setup(mgr ctrl.Manager, o controller.Options, timeout time.Duration) error {
-	name := managed.ControllerName(v1alpha1.DisposableRequestGroupKind)
+	name := managed.ControllerName(v1alpha2.DisposableRequestGroupKind)
 	cps := []managed.ConnectionPublisher{managed.NewAPISecretPublisher(mgr.GetClient(), mgr.GetScheme())}
 
 	r := managed.NewReconciler(mgr,
-		resource.ManagedKind(v1alpha1.DisposableRequestGroupVersionKind),
+		resource.ManagedKind(v1alpha2.DisposableRequestGroupVersionKind),
 		managed.WithExternalConnecter(&connector{
 			logger:          o.Logger,
 			kube:            mgr.GetClient(),
@@ -82,7 +82,7 @@ func Setup(mgr ctrl.Manager, o controller.Options, timeout time.Duration) error 
 		Named(name).
 		WithOptions(o.ForControllerRuntime()).
 		WithEventFilter(resource.DesiredStateChanged()).
-		For(&v1alpha1.DisposableRequest{}).
+		For(&v1alpha2.DisposableRequest{}).
 		Complete(ratelimiter.NewReconciler(name, r, o.GlobalRateLimiter))
 }
 
@@ -94,7 +94,7 @@ type connector struct {
 }
 
 func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.ExternalClient, error) {
-	cr, ok := mg.(*v1alpha1.DisposableRequest)
+	cr, ok := mg.(*v1alpha2.DisposableRequest)
 	if !ok {
 		return nil, errors.New(errNotDisposableRequest)
 	}
@@ -130,7 +130,7 @@ type external struct {
 }
 
 func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
-	cr, ok := mg.(*v1alpha1.DisposableRequest)
+	cr, ok := mg.(*v1alpha2.DisposableRequest)
 	if !ok {
 		return managed.ExternalObservation{}, errors.New(errNotDisposableRequest)
 	}
@@ -158,7 +158,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	}, nil
 }
 
-func (c *external) setSecrets(ctx context.Context, cr *v1alpha1.DisposableRequest) error {
+func (c *external) setSecrets(ctx context.Context, cr *v1alpha2.DisposableRequest) error {
 	for _, ref := range cr.Spec.RequestSecretDataPatches {
 		res := &corev1.Secret{}
 
@@ -184,7 +184,7 @@ func (c *external) setSecrets(ctx context.Context, cr *v1alpha1.DisposableReques
 }
 
 
-func (c *external) setToSecrets(ctx context.Context, cr *v1alpha1.DisposableRequest, response httpClient.HttpResponse) error {
+func (c *external) setToSecrets(ctx context.Context, cr *v1alpha2.DisposableRequest, response httpClient.HttpResponse) error {
 	for _, ref := range cr.Spec.ResponseSecretDataPatches {
 		secret := &corev1.Secret{}
 
@@ -257,7 +257,7 @@ func (c *external) setToSecrets(ctx context.Context, cr *v1alpha1.DisposableRequ
 	return nil
 }
 
-func (c *external) deployAction(ctx context.Context, cr *v1alpha1.DisposableRequest) error {
+func (c *external) deployAction(ctx context.Context, cr *v1alpha2.DisposableRequest) error {
 	err := c.setSecrets(ctx, cr)
 	if err != nil {
 		return err
@@ -311,7 +311,7 @@ func (c *external) deployAction(ctx context.Context, cr *v1alpha1.DisposableRequ
 	return utils.SetRequestResourceStatus(*resource, resource.SetStatusCode(), resource.SetHeaders(), resource.SetBody(), resource.SetSynced(), resource.SetRequestDetails())
 }
 
-func (c *external) isResponseAsExpected(cr *v1alpha1.DisposableRequest, res httpClient.HttpResponse) (bool, error) {
+func (c *external) isResponseAsExpected(cr *v1alpha2.DisposableRequest, res httpClient.HttpResponse) (bool, error) {
 	// If no expected response is defined, consider it as expected.
 	if cr.Spec.ForProvider.ExpectedResponse == "" {
 		return true, nil
@@ -337,7 +337,7 @@ func (c *external) isResponseAsExpected(cr *v1alpha1.DisposableRequest, res http
 }
 
 func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.ExternalCreation, error) {
-	cr, ok := mg.(*v1alpha1.DisposableRequest)
+	cr, ok := mg.(*v1alpha2.DisposableRequest)
 	if !ok {
 		return managed.ExternalCreation{}, errors.New(errNotDisposableRequest)
 	}
@@ -350,7 +350,7 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 }
 
 func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.ExternalUpdate, error) {
-	cr, ok := mg.(*v1alpha1.DisposableRequest)
+	cr, ok := mg.(*v1alpha2.DisposableRequest)
 	if !ok {
 		return managed.ExternalUpdate{}, errors.New(errNotDisposableRequest)
 	}

@@ -6,7 +6,7 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/crossplane-contrib/provider-http/apis/request/v1alpha1"
+	"github.com/crossplane-contrib/provider-http/apis/request/v1alpha2"
 	"github.com/crossplane-contrib/provider-http/internal/controller/request/requestprocessing"
 	json_util "github.com/crossplane-contrib/provider-http/internal/json"
 	"github.com/crossplane-contrib/provider-http/internal/utils"
@@ -21,7 +21,7 @@ type RequestDetails struct {
 }
 
 // GenerateRequestDetails generates request details.
-func GenerateRequestDetails(methodMapping v1alpha1.Mapping, forProvider v1alpha1.RequestParameters, response v1alpha1.Response) (RequestDetails, error, bool) {
+func GenerateRequestDetails(methodMapping v1alpha2.Mapping, forProvider v1alpha2.RequestParameters, response v1alpha2.Response) (RequestDetails, error, bool) {
 	jqObject := generateRequestObject(forProvider, response)
 	url, err := generateURL(methodMapping.URL, jqObject)
 	if err != nil {
@@ -47,7 +47,7 @@ func GenerateRequestDetails(methodMapping v1alpha1.Mapping, forProvider v1alpha1
 
 // generateRequestObject creates a JSON-compatible map from the specified Request's ForProvider and Response fields.
 // It merges the two maps, converts JSON strings to nested maps, and returns the resulting map.
-func generateRequestObject(forProvider v1alpha1.RequestParameters, response v1alpha1.Response) map[string]interface{} {
+func generateRequestObject(forProvider v1alpha2.RequestParameters, response v1alpha2.Response) map[string]interface{} {
 	baseMap, _ := json_util.StructToMap(forProvider)
 	statusMap, _ := json_util.StructToMap(map[string]interface{}{
 		"response": response,

@@ -34,7 +34,7 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
 
-	"github.com/crossplane-contrib/provider-http/apis/request/v1alpha1"
+	"github.com/crossplane-contrib/provider-http/apis/request/v1alpha2"
 	apisv1alpha1 "github.com/crossplane-contrib/provider-http/apis/v1alpha1"
 	httpClient "github.com/crossplane-contrib/provider-http/internal/clients/http"
 	"github.com/crossplane-contrib/provider-http/internal/controller/request/requestgen"
@@ -56,11 +56,11 @@ const (
 
 // Setup adds a controller that reconciles Request managed resources.
 func Setup(mgr ctrl.Manager, o controller.Options, timeout time.Duration) error {
-	name := managed.ControllerName(v1alpha1.RequestGroupKind)
+	name := managed.ControllerName(v1alpha2.RequestGroupKind)
 	cps := []managed.ConnectionPublisher{managed.NewAPISecretPublisher(mgr.GetClient(), mgr.GetScheme())}
 
 	r := managed.NewReconciler(mgr,
-		resource.ManagedKind(v1alpha1.RequestGroupVersionKind),
+		resource.ManagedKind(v1alpha2.RequestGroupVersionKind),
 		managed.WithExternalConnecter(&connector{
 			logger:          o.Logger,
 			kube:            mgr.GetClient(),
@@ -77,7 +77,7 @@ func Setup(mgr ctrl.Manager, o controller.Options, timeout time.Duration) error 
 		Named(name).
 		WithOptions(o.ForControllerRuntime()).
 		WithEventFilter(resource.DesiredStateChanged()).
-		For(&v1alpha1.Request{}).
+		For(&v1alpha2.Request{}).
 		Complete(ratelimiter.NewReconciler(name, r, o.GlobalRateLimiter))
 }
 
@@ -96,7 +96,7 @@ type connector struct {
 // 3. Getting the credentials specified by the ProviderConfig.
 // 4. Using the credentials to form a client.
 func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.ExternalClient, error) {
-	cr, ok := mg.(*v1alpha1.Request)
+	cr, ok := mg.(*v1alpha2.Request)
 	if !ok {
 		return nil, errors.New(errNotRequest)
 	}
@@ -134,7 +134,7 @@ type external struct {
 }
 
 func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
-	cr, ok := mg.(*v1alpha1.Request)
+	cr, ok := mg.(*v1alpha2.Request)
 	if !ok {
 		return managed.ExternalObservation{}, errors.New(errNotRequest)
 	}
@@ -178,7 +178,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	}, nil
 }
 
-func (c *external) deployAction(ctx context.Context, cr *v1alpha1.Request, method string) error {
+func (c *external) deployAction(ctx context.Context, cr *v1alpha2.Request, method string) error {
 	mapping, ok := getMappingByMethod(&cr.Spec.ForProvider, method)
 	if !ok {
 		c.logger.Info(errMappingNotFound, method)
@@ -201,7 +201,7 @@ func (c *external) deployAction(ctx context.Context, cr *v1alpha1.Request, metho
 }
 
 func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.ExternalCreation, error) {
-	cr, ok := mg.(*v1alpha1.Request)
+	cr, ok := mg.(*v1alpha2.Request)
 	if !ok {
 		return managed.ExternalCreation{}, errors.New(errNotRequest)
 	}
@@ -210,7 +210,7 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 }
 
 func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.ExternalUpdate, error) {
-	cr, ok := mg.(*v1alpha1.Request)
+	cr, ok := mg.(*v1alpha2.Request)
 	if !ok {
 		return managed.ExternalUpdate{}, errors.New(errNotRequest)
 	}
@@ -219,7 +219,7 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 }
 
 func (c *external) Delete(ctx context.Context, mg resource.Managed) error {
-	cr, ok := mg.(*v1alpha1.Request)
+	cr, ok := mg.(*v1alpha2.Request)
 	if !ok {
 		return errors.New(errNotRequest)
 	}
@@ -232,7 +232,7 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) error {
 // details are valid, the function returns them. If not, it falls back to using the cached response in the Request's status
 // and attempts to generate request details again. The function returns the generated request details or an error if the
 // generation process fails.
-func generateValidRequestDetails(cr *v1alpha1.Request, mapping *v1alpha1.Mapping) (requestgen.RequestDetails, error) {
+func generateValidRequestDetails(cr *v1alpha2.Request, mapping *v1alpha2.Mapping) (requestgen.RequestDetails, error) {
 	requestDetails, _, ok := requestgen.GenerateRequestDetails(*mapping, cr.Spec.ForProvider, cr.Status.Response)
 	if requestgen.IsRequestValid(requestDetails) && ok {
 		return requestDetails, nil

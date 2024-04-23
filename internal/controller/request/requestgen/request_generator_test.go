@@ -3,7 +3,7 @@ package requestgen
 import (
 	"testing"
 
-	"github.com/crossplane-contrib/provider-http/apis/request/v1alpha1"
+	"github.com/crossplane-contrib/provider-http/apis/request/v1alpha2"
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
 	"github.com/crossplane/crossplane-runtime/pkg/test"
 	"github.com/google/go-cmp/cmp"
@@ -21,38 +21,38 @@ var testHeaders2 = map[string][]string{
 }
 
 var (
-	testPostMapping = v1alpha1.Mapping{
+	testPostMapping = v1alpha2.Mapping{
 		Method:  "POST",
 		Body:    "{ username: .payload.body.username, email: .payload.body.email }",
 		URL:     ".payload.baseUrl",
 		Headers: testHeaders,
 	}
 
-	testPutMapping = v1alpha1.Mapping{
+	testPutMapping = v1alpha2.Mapping{
 		Method:  "PUT",
 		Body:    "{ username: \"john_doe_new_username\" }",
 		URL:     "(.payload.baseUrl + \"/\" + .response.body.id)",
 		Headers: testHeaders,
 	}
 
-	testGetMapping = v1alpha1.Mapping{
+	testGetMapping = v1alpha2.Mapping{
 		Method: "GET",
 		URL:    "(.payload.baseUrl + \"/\" + .response.body.id)",
 	}
 
-	testDeleteMapping = v1alpha1.Mapping{
+	testDeleteMapping = v1alpha2.Mapping{
 		Method: "DELETE",
 		URL:    "(.payload.baseUrl + \"/\" + .response.body.id)",
 	}
 )
 
 var (
-	testForProvider = v1alpha1.RequestParameters{
-		Payload: v1alpha1.Payload{
+	testForProvider = v1alpha2.RequestParameters{
+		Payload: v1alpha2.Payload{
 			Body:    "{\"username\": \"john_doe\", \"email\": \"john.doe@example.com\"}",
 			BaseUrl: "https://api.example.com/users",
 		},
-		Mappings: []v1alpha1.Mapping{
+		Mappings: []v1alpha2.Mapping{
 			testPostMapping,
 			testGetMapping,
 			testPutMapping,
@@ -63,9 +63,9 @@ var (
 
 func Test_GenerateRequestDetails(t *testing.T) {
 	type args struct {
-		methodMapping v1alpha1.Mapping
-		forProvider   v1alpha1.RequestParameters
-		response      v1alpha1.Response
+		methodMapping v1alpha2.Mapping
+		forProvider   v1alpha2.RequestParameters
+		response      v1alpha2.Response
 		logger        logging.Logger
 	}
 	type want struct {
@@ -81,7 +81,7 @@ func Test_GenerateRequestDetails(t *testing.T) {
 			args: args{
 				methodMapping: testPostMapping,
 				forProvider:   testForProvider,
-				response:      v1alpha1.Response{},
+				response:      v1alpha2.Response{},
 				logger:        logging.NewNopLogger(),
 			},
 			want: want{
@@ -98,7 +98,7 @@ func Test_GenerateRequestDetails(t *testing.T) {
 			args: args{
 				methodMapping: testPutMapping,
 				forProvider:   testForProvider,
-				response: v1alpha1.Response{
+				response: v1alpha2.Response{
 					StatusCode: 200,
 					Body:       `{"id":"123","username":"john_doe"}`,
 					Headers:    testHeaders,
@@ -119,7 +119,7 @@ func Test_GenerateRequestDetails(t *testing.T) {
 			args: args{
 				methodMapping: testDeleteMapping,
 				forProvider:   testForProvider,
-				response: v1alpha1.Response{
+				response: v1alpha2.Response{
 					StatusCode: 200,
 					Body:       `{"id":"123","username":"john_doe"}`,
 					Headers:    testHeaders,
@@ -139,7 +139,7 @@ func Test_GenerateRequestDetails(t *testing.T) {
 			args: args{
 				methodMapping: testGetMapping,
 				forProvider:   testForProvider,
-				response: v1alpha1.Response{
+				response: v1alpha2.Response{
 					StatusCode: 200,
 					Body:       `{"id":"123","username":"john_doe"}`,
 					Headers:    testHeaders,
@@ -308,8 +308,8 @@ func Test_coalesceHeaders(t *testing.T) {
 
 func Test_generateRequestObject(t *testing.T) {
 	type args struct {
-		forProvider v1alpha1.RequestParameters
-		response    v1alpha1.Response
+		forProvider v1alpha2.RequestParameters
+		response    v1alpha2.Response
 	}
 	type want struct {
 		result map[string]interface{}
@@ -321,7 +321,7 @@ func Test_generateRequestObject(t *testing.T) {
 		"Success": {
 			args: args{
 				forProvider: testForProvider,
-				response: v1alpha1.Response{
+				response: v1alpha2.Response{
 					StatusCode: 200,
 					Body:       `{"id": "123"}`,
 					Headers:    nil,

@@ -22,8 +22,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/crossplane-contrib/provider-http/apis/disposablerequest/v1alpha1"
-
+	"github.com/crossplane-contrib/provider-http/apis/disposablerequest/v1alpha2"
 	httpClient "github.com/crossplane-contrib/provider-http/internal/clients/http"
 	"github.com/crossplane-contrib/provider-http/internal/utils"
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
@@ -72,21 +71,21 @@ const (
 	testBody   = "{\"key1\": \"value1\"}"
 )
 
-type httpDisposableRequestModifier func(request *v1alpha1.DisposableRequest)
+type httpDisposableRequestModifier func(request *v1alpha2.DisposableRequest)
 
-func httpDisposableRequest(rm ...httpDisposableRequestModifier) *v1alpha1.DisposableRequest {
-	r := &v1alpha1.DisposableRequest{
+func httpDisposableRequest(rm ...httpDisposableRequestModifier) *v1alpha2.DisposableRequest {
+	r := &v1alpha2.DisposableRequest{
 		ObjectMeta: v1.ObjectMeta{
 			Name:      testDisposableRequestName,
 			Namespace: testNamespace,
 		},
-		Spec: v1alpha1.DisposableRequestSpec{
+		Spec: v1alpha2.DisposableRequestSpec{
 			ResourceSpec: xpv1.ResourceSpec{
 				ProviderConfigReference: &xpv1.Reference{
 					Name: providerName,
 				},
 			},
-			ForProvider: v1alpha1.DisposableRequestParameters{
+			ForProvider: v1alpha2.DisposableRequestParameters{
 				URL:         testURL,
 				Method:      testMethod,
 				Headers:     testHeaders,
@@ -94,7 +93,7 @@ func httpDisposableRequest(rm ...httpDisposableRequestModifier) *v1alpha1.Dispos
 				WaitTimeout: testTimeout,
 			},
 		},
-		Status: v1alpha1.DisposableRequestStatus{},
+		Status: v1alpha2.DisposableRequestStatus{},
 	}
 
 	for _, m := range rm {
@@ -271,7 +270,7 @@ func Test_httpExternal_Update(t *testing.T) {
 
 func Test_deployAction(t *testing.T) {
 	type args struct {
-		cr        *v1alpha1.DisposableRequest
+		cr        *v1alpha2.DisposableRequest
 		http      httpClient.Client
 		localKube client.Client
 	}
@@ -299,16 +298,16 @@ func Test_deployAction(t *testing.T) {
 					MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
 					MockGet:          test.NewMockGetFn(nil),
 				},
-				cr: &v1alpha1.DisposableRequest{
-					Spec: v1alpha1.DisposableRequestSpec{
-						ForProvider: v1alpha1.DisposableRequestParameters{
+				cr: &v1alpha2.DisposableRequest{
+					Spec: v1alpha2.DisposableRequestSpec{
+						ForProvider: v1alpha2.DisposableRequestParameters{
 							URL:     "invalid-url",
 							Method:  testMethod,
 							Headers: testHeaders,
 							Body:    testBody,
 						},
 					},
-					Status: v1alpha1.DisposableRequestStatus{},
+					Status: v1alpha2.DisposableRequestStatus{},
 				},
 			},
 			want: want{
@@ -333,16 +332,16 @@ func Test_deployAction(t *testing.T) {
 					MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
 					MockGet:          test.NewMockGetFn(nil),
 				},
-				cr: &v1alpha1.DisposableRequest{
-					Spec: v1alpha1.DisposableRequestSpec{
-						ForProvider: v1alpha1.DisposableRequestParameters{
+				cr: &v1alpha2.DisposableRequest{
+					Spec: v1alpha2.DisposableRequestSpec{
+						ForProvider: v1alpha2.DisposableRequestParameters{
 							URL:     testURL,
 							Method:  testMethod,
 							Headers: testHeaders,
 							Body:    testBody,
 						},
 					},
-					Status: v1alpha1.DisposableRequestStatus{},
+					Status: v1alpha2.DisposableRequestStatus{},
 				},
 			},
 			want: want{
@@ -371,16 +370,16 @@ func Test_deployAction(t *testing.T) {
 					MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
 					MockGet:          test.NewMockGetFn(nil),
 				},
-				cr: &v1alpha1.DisposableRequest{
-					Spec: v1alpha1.DisposableRequestSpec{
-						ForProvider: v1alpha1.DisposableRequestParameters{
+				cr: &v1alpha2.DisposableRequest{
+					Spec: v1alpha2.DisposableRequestSpec{
+						ForProvider: v1alpha2.DisposableRequestParameters{
 							URL:     testURL,
 							Method:  testMethod,
 							Headers: testHeaders,
 							Body:    testBody,
 						},
 					},
-					Status: v1alpha1.DisposableRequestStatus{},
+					Status: v1alpha2.DisposableRequestStatus{},
 				},
 			},
 			want: want{
