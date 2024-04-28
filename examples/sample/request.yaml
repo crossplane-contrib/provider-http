@@ -1,7 +1,7 @@
 apiVersion: http.crossplane.io/v1alpha2
 kind: Request
 metadata:
-  name: laundry-ye
+  name: laundry
 spec:
   forProvider:
     insecureSkipTLSVerify: true
@@ -12,10 +12,10 @@ spec:
       Authorization:
         - ("Bearer {{ auth:default:token }}")
     payload:
-      baseUrl: http://host.docker.internal:5000/todo
+      baseUrl: http://todo.default.svc.cluster.local/todos
       body: |
         {
-          "name": "Do Laundry {{ auth:default:token }}", 
+          "name": "Do Laundry", 
           "reminder": "Every 1 hour", 
           "responsible": "Dan",
           "password": "secretdata {{ password:crossplane-system:secretKey }}"
@@ -29,6 +29,9 @@ spec:
             responsible: .payload.body.responsible,
           }
         url: .payload.baseUrl
+        headers:
+          Extra-Header-For-Post:
+            - extra-value
       - method: "GET"
         url: (.payload.baseUrl + "/" + (.response.body.id|tostring))
       - method: "PUT"

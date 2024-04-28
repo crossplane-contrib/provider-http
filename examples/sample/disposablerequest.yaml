@@ -6,13 +6,12 @@ spec:
   deletionPolicy: Orphan
   forProvider:
     # Injecting data from secrets is possible, simply use the following syntax: {{ name:namespace:key }} (supported for body and headers only)
-    url: http://host.docker.internal:5000/todo
+    url:  http://todo.default.svc.cluster.local/health-check
     method: POST
     body: |
       {
-        "todo_name": "Do Laundry", 
-        "reminder": "Every 1 hour", 
-        "responsible": "Dan",
+        "check_type": "simple",
+        "additional_info": "optional",
         "password": "secretdata {{ password:crossplane-system:secretKey }}"
       }
     headers:

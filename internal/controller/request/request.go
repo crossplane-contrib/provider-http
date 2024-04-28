@@ -53,6 +53,7 @@ const (
 	errFailedToUpdateStatusFailures = "failed to reset status failures counter"
 	errFailedUpdateStatusConditions = "failed updating status conditions"
 	errMappingNotFound              = "%s mapping doesn't exist in request, skipping operation"
+	errPatchDataToSecret = "Warning, couldn't patch data from request to secret %s:%s:%s, error: "
 )
 
 // Setup adds a controller that reconciles Request managed resources.
@@ -233,7 +234,7 @@ func (c *external) patchResponseToSecret(ctx context.Context, cr *v1alpha2.Reque
 	for _, ref := range cr.Spec.ForProvider.SecretInjectionConfigs {
 		err := datapatcher.PatchResponseToSecret(ctx, c.localKube, c.logger, response, ref.ResponsePath, ref.SecretKey, ref.SecretRef.Name, ref.SecretRef.Namespace)
 		if err != nil {
-			c.logger.Info("Warning, couldn't patch data from request to secret %s:%s:%s, error: ", ref.SecretRef.Name, ref.SecretRef.Namespace, ref.SecretKey, err.Error())
+			c.logger.Info(errPatchDataToSecret, ref.SecretRef.Name, ref.SecretRef.Namespace, ref.SecretKey, err.Error())
 		}
 	}
 }

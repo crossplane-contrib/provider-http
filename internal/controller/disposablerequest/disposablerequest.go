@@ -55,6 +55,7 @@ const (
 	errPatchFromReferencedSecret         = "cannot patch from referenced secret"
 	errGetReferencedSecret               = "cannot get referenced secret"
 	errCreateReferencedSecret            = "cannot create referenced secret"
+	errPatchDataToSecret = "Warning, couldn't patch data from request to secret %s:%s:%s, error: "
 )
 
 // Setup adds a controller that reconciles DisposableRequest managed resources.
@@ -274,11 +275,9 @@ func (c *external) Delete(_ context.Context, _ resource.Managed) error {
 
 func (c *external) patchResponseToSecret(ctx context.Context, cr *v1alpha2.DisposableRequest, response httpClient.HttpResponse) {
 	for _, ref := range cr.Spec.ForProvider.SecretInjectionConfigs {
-
-		fmt.Println("hi inside")
 		err := datapatcher.PatchResponseToSecret(ctx, c.localKube, c.logger, response, ref.ResponsePath, ref.SecretKey, ref.SecretRef.Name, ref.SecretRef.Namespace)
 		if err != nil {
-			c.logger.Info("Warning, couldn't patch data from request to secret %s:%s:%s, error: ", ref.SecretRef.Name, ref.SecretRef.Namespace, ref.SecretKey, err.Error())
+			c.logger.Info(errPatchDataToSecret, ref.SecretRef.Name, ref.SecretRef.Namespace, ref.SecretKey, err.Error())
 		}
 	}
 }

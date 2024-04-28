@@ -52,7 +52,7 @@ func (hc *client) SendRequest(ctx context.Context, method string, url string, bo
 	requestDetails := HttpRequest{
 		URL:  url,
 		Body: body.Encrypted.(string),
-		// Headers: headers.Encrypted.(map[string][]string),
+		Headers: headers.Encrypted.(map[string][]string),
 		Method: method,
 	}
 
