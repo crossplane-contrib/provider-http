@@ -22,10 +22,10 @@ import (
 	"strconv"
 	"time"
 
+	datapatcher "github.com/crossplane-contrib/provider-http/internal/data-patcher"
 	"github.com/crossplane-contrib/provider-http/internal/jq"
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
 	"github.com/pkg/errors"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -37,8 +37,6 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/ratelimiter"
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
-	errs "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/crossplane-contrib/provider-http/apis/disposablerequest/v1alpha2"
 	apisv1alpha1 "github.com/crossplane-contrib/provider-http/apis/v1alpha1"
@@ -54,9 +52,9 @@ const (
 	errFailedToSendHttpDisposableRequest = "failed to send http request"
 	errFailedUpdateStatusConditions      = "failed updating status conditions"
 	ErrExpectedFormat                    = "JQ filter should return a boolean, but returned error: %s"
-	errPatchFromReferencedSecret = "cannot patch from referenced secret"
-	errGetReferencedSecret       = "cannot get referenced secret"
-	errCreateReferencedSecret = "cannot create referenced secret"
+	errPatchFromReferencedSecret         = "cannot patch from referenced secret"
+	errGetReferencedSecret               = "cannot get referenced secret"
+	errCreateReferencedSecret            = "cannot create referenced secret"
 )
 
 // Setup adds a controller that reconciles DisposableRequest managed resources.
@@ -158,113 +156,20 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	}, nil
 }
 
-func (c *external) setSecrets(ctx context.Context, cr *v1alpha2.DisposableRequest) error {
-	for _, ref := range cr.Spec.RequestSecretDataPatches {
-		res := &corev1.Secret{}
-
-		// Try to get referenced secret
-		err := c.localKube.Get(ctx, client.ObjectKey{
-			Namespace: ref.Namespace,
-			Name:      ref.Name,
-		}, res)
-
-		if err != nil {
-			return errors.Wrap(err, errGetReferencedSecret)
-		}
-
-		// Patch fields if any
-		if ref.Key != "" {
-			if err := ref.ApplyFromFieldPathPatch(res, cr); err != nil {
-				return errors.Wrap(err, errPatchFromReferencedSecret)
-			}
-		}
-	}
-
-	return nil
-}
-
-
-func (c *external) setToSecrets(ctx context.Context, cr *v1alpha2.DisposableRequest, response httpClient.HttpResponse) error {
-	for _, ref := range cr.Spec.ResponseSecretDataPatches {
-		secret := &corev1.Secret{}
-
-		fmt.Println("in setToSecrets")
-		err := c.localKube.Get(ctx, client.ObjectKey{
-			Namespace: ref.Namespace,
-			Name:      ref.Name,
-		}, secret)
-		
-		if err != nil {
-			if errs.IsNotFound(err) {
-				fmt.Println("should create the secret")
-
-				// Create the secret if it does not exist
-				secret := &corev1.Secret{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: ref.Namespace,
-						Name:      ref.Name,
-					},
-				}
-		
-				err = c.localKube.Create(ctx, secret)
-				if err != nil {
-					return errors.Wrap(err, errCreateReferencedSecret)
-				}
-
-				err = c.localKube.Get(ctx, client.ObjectKey{
-					Namespace: ref.Namespace,
-					Name:      ref.Name,
-				}, secret)
-
-				if err != nil {
-					return errors.Wrap(err, errGetReferencedSecret)
-				}
-			} else {
-				return errors.Wrap(err, errGetReferencedSecret)
-			}
-		}
-		
-		fmt.Println("we got the secret")
-
-		
-		responseMap, err := json_util.StructToMap(response)
-		if err != nil {
-			return errors.Wrap(err, "failed to convert response to map")
-		}
-
-		json_util.ConvertJSONStringsToMaps(&responseMap)
-
-		valueToPatch, err := jq.ParseString(ref.FromFieldPath, responseMap)
-		if err != nil {
-			boolResult, _ := jq.ParseBool(ref.FromFieldPath, responseMap)
-			valueToPatch = strconv.FormatBool(boolResult)
-		}
-
-		fmt.Println("ok2tefggg3")
-		fmt.Println(valueToPatch)
-
-
-		// Patch fields if any
-		if ref.Key != "" {
-			fmt.Println("key is here")
-
-			if err := ref.ApplyToFieldPathPatch(valueToPatch, secret, c.localKube, ctx); err != nil {
-				return errors.Wrap(err, errPatchFromReferencedSecret)
-			}
-		}
-	}
-
-	return nil
-}
-
 func (c *external) deployAction(ctx context.Context, cr *v1alpha2.DisposableRequest) error {
-	err := c.setSecrets(ctx, cr)
+	sensitiveBody, err := datapatcher.PatchSecretsIntoBody(ctx, c.localKube, cr.Spec.ForProvider.Body)
 	if err != nil {
 		return err
 	}
 
-	details, err := c.http.SendRequest(ctx, cr.Spec.ForProvider.Method,
-		cr.Spec.ForProvider.URL, cr.Spec.ForProvider.Body, cr.Spec.ForProvider.Headers, cr.Spec.ForProvider.InsecureSkipTLSVerify)
+	sensitiveHeaders, err := datapatcher.PatchSecretsIntoHeaders(ctx, c.localKube, cr.Spec.ForProvider.Headers)
+	if err != nil {
+		return err
+	}
+
+	bodyData := httpClient.Data{Encrypted: cr.Spec.ForProvider.Body, Decrypted: sensitiveBody}
+	headersData := httpClient.Data{Encrypted: cr.Spec.ForProvider.Headers, Decrypted: sensitiveHeaders}
+	details, err := c.http.SendRequest(ctx, cr.Spec.ForProvider.Method, cr.Spec.ForProvider.URL, bodyData, headersData, cr.Spec.ForProvider.InsecureSkipTLSVerify)
 
 	res := details.HttpResponse
 	resource := &utils.RequestResource{
@@ -274,6 +179,8 @@ func (c *external) deployAction(ctx context.Context, cr *v1alpha2.DisposableRequ
 		LocalClient:    c.localKube,
 		HttpRequest:    details.HttpRequest,
 	}
+
+	c.patchResponseToSecret(ctx, cr, res)
 
 	// Get the latest version of the resource before updating
 	if err := c.localKube.Get(ctx, types.NamespacedName{Name: cr.Name, Namespace: cr.Namespace}, cr); err != nil {
@@ -307,7 +214,6 @@ func (c *external) deployAction(ctx context.Context, cr *v1alpha2.DisposableRequ
 			resource.SetError(errors.New("Response does not match the expected format, retries limit "+fmt.Sprint(limit))), resource.SetRequestDetails())
 	}
 
-	c.setToSecrets(ctx, cr, res)
 	return utils.SetRequestResourceStatus(*resource, resource.SetStatusCode(), resource.SetHeaders(), resource.SetBody(), resource.SetSynced(), resource.SetRequestDetails())
 }
 
@@ -364,4 +270,15 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 
 func (c *external) Delete(_ context.Context, _ resource.Managed) error {
 	return nil
+}
+
+func (c *external) patchResponseToSecret(ctx context.Context, cr *v1alpha2.DisposableRequest, response httpClient.HttpResponse) {
+	for _, ref := range cr.Spec.ForProvider.SecretInjectionConfigs {
+
+		fmt.Println("hi inside")
+		err := datapatcher.PatchResponseToSecret(ctx, c.localKube, c.logger, response, ref.ResponsePath, ref.SecretKey, ref.SecretRef.Name, ref.SecretRef.Namespace)
+		if err != nil {
+			c.logger.Info("Warning, couldn't patch data from request to secret %s:%s:%s, error: ", ref.SecretRef.Name, ref.SecretRef.Namespace, ref.SecretKey, err.Error())
+		}
+	}
 }

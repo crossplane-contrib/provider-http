@@ -1,10 +1,14 @@
 package requestgen
 
 import (
+	"context"
 	"testing"
 
 	"github.com/crossplane-contrib/provider-http/apis/request/v1alpha2"
+	httpClient "github.com/crossplane-contrib/provider-http/internal/clients/http"
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
 	"github.com/crossplane/crossplane-runtime/pkg/test"
 	"github.com/google/go-cmp/cmp"
 )
@@ -67,6 +71,7 @@ func Test_GenerateRequestDetails(t *testing.T) {
 		forProvider   v1alpha2.RequestParameters
 		response      v1alpha2.Response
 		logger        logging.Logger
+		localKube     client.Client
 	}
 	type want struct {
 		requestDetails RequestDetails
@@ -86,9 +91,15 @@ func Test_GenerateRequestDetails(t *testing.T) {
 			},
 			want: want{
 				requestDetails: RequestDetails{
-					Url:     "https://api.example.com/users",
-					Body:    `{"email":"john.doe@example.com","username":"john_doe"}`,
-					Headers: testHeaders,
+					Url: "https://api.example.com/users",
+					Body: httpClient.Data{
+						Encrypted: `{"email":"john.doe@example.com","username":"john_doe"}`,
+						Decrypted: `{"email":"john.doe@example.com","username":"john_doe"}`,
+					},
+					Headers: httpClient.Data{
+						Decrypted: testHeaders,
+						Encrypted: testHeaders,
+					},
 				},
 				err: nil,
 				ok:  true,
@@ -107,9 +118,15 @@ func Test_GenerateRequestDetails(t *testing.T) {
 			},
 			want: want{
 				requestDetails: RequestDetails{
-					Url:     "https://api.example.com/users/123",
-					Body:    `{"username":"john_doe_new_username"}`,
-					Headers: testHeaders,
+					Url: "https://api.example.com/users/123",
+					Body: httpClient.Data{
+						Encrypted: `{"username":"john_doe_new_username"}`,
+						Decrypted: `{"username":"john_doe_new_username"}`,
+					},
+					Headers: httpClient.Data{
+						Decrypted: testHeaders,
+						Encrypted: testHeaders,
+					},
 				},
 				err: nil,
 				ok:  true,
@@ -128,8 +145,15 @@ func Test_GenerateRequestDetails(t *testing.T) {
 			},
 			want: want{
 				requestDetails: RequestDetails{
-					Url:     "https://api.example.com/users/123",
-					Headers: map[string][]string{},
+					Url: "https://api.example.com/users/123",
+					Headers: httpClient.Data{
+						Decrypted: map[string][]string{},
+						Encrypted: map[string][]string{},
+					},
+					Body: httpClient.Data{
+						Decrypted: "",
+						Encrypted: "",
+					},
 				},
 				err: nil,
 				ok:  true,
@@ -148,8 +172,15 @@ func Test_GenerateRequestDetails(t *testing.T) {
 			},
 			want: want{
 				requestDetails: RequestDetails{
-					Url:     "https://api.example.com/users/123",
-					Headers: map[string][]string{},
+					Url: "https://api.example.com/users/123",
+					Headers: httpClient.Data{
+						Decrypted: map[string][]string{},
+						Encrypted: map[string][]string{},
+					},
+					Body: httpClient.Data{
+						Decrypted: "",
+						Encrypted: "",
+					},
 				},
 				err: nil,
 				ok:  true,
@@ -158,7 +189,7 @@ func Test_GenerateRequestDetails(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			got, gotErr, ok := GenerateRequestDetails(tc.args.methodMapping, tc.args.forProvider, tc.args.response)
+			got, gotErr, ok := GenerateRequestDetails(context.Background(), tc.args.localKube, tc.args.methodMapping, tc.args.forProvider, tc.args.response)
 			if diff := cmp.Diff(tc.want.err, gotErr, test.EquateErrors()); diff != "" {
 				t.Fatalf("GenerateRequestDetails(...): -want error, +got error: %s", diff)
 			}
@@ -189,9 +220,15 @@ func Test_IsRequestValid(t *testing.T) {
 		"ValidRequestDetails": {
 			args: args{
 				requestDetails: RequestDetails{
-					Body:    `{"id": "123", "username": "john_doe"}`,
-					Url:     "https://example",
-					Headers: nil,
+					Body: httpClient.Data{
+						Encrypted: `{"id": "123", "username": "john_doe"}`,
+						Decrypted: `{"id": "123", "username": "john_doe"}`,
+					},
+					Headers: httpClient.Data{
+						Decrypted: nil,
+						Encrypted: nil,
+					},
+					Url: "https://example",
 				},
 			},
 			want: want{
@@ -201,9 +238,15 @@ func Test_IsRequestValid(t *testing.T) {
 		"NonValidRequestDetails": {
 			args: args{
 				requestDetails: RequestDetails{
-					Body:    "",
-					Url:     "",
-					Headers: nil,
+					Body: httpClient.Data{
+						Encrypted: "",
+						Decrypted: "",
+					},
+					Headers: httpClient.Data{
+						Decrypted: nil,
+						Encrypted: nil,
+					},
+					Url: "",
 				},
 			},
 			want: want{
@@ -213,9 +256,15 @@ func Test_IsRequestValid(t *testing.T) {
 		"NonValidUrl": {
 			args: args{
 				requestDetails: RequestDetails{
-					Body:    `{"id": "123", "username": "john_doe"}`,
-					Url:     "",
-					Headers: nil,
+					Body: httpClient.Data{
+						Encrypted: `{"id": "123", "username": "john_doe"}`,
+						Decrypted: `{"id": "123", "username": "john_doe"}`,
+					},
+					Headers: httpClient.Data{
+						Decrypted: nil,
+						Encrypted: nil,
+					},
+					Url: "",
 				},
 			},
 			want: want{
@@ -225,9 +274,15 @@ func Test_IsRequestValid(t *testing.T) {
 		"NonValidBody": {
 			args: args{
 				requestDetails: RequestDetails{
-					Body:    `{"id": "null", "username": "john_doe"}`,
-					Url:     "https://example",
-					Headers: nil,
+					Body: httpClient.Data{
+						Encrypted: `{"id": "null", "username": "john_doe"}`,
+						Decrypted: `{"id": "null", "username": "john_doe"}`,
+					},
+					Headers: httpClient.Data{
+						Decrypted: nil,
+						Encrypted: nil,
+					},
+					Url: "https://example",
 				},
 			},
 			want: want{

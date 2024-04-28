@@ -39,6 +39,7 @@ import (
 	httpClient "github.com/crossplane-contrib/provider-http/internal/clients/http"
 	"github.com/crossplane-contrib/provider-http/internal/controller/request/requestgen"
 	"github.com/crossplane-contrib/provider-http/internal/controller/request/statushandler"
+	datapatcher "github.com/crossplane-contrib/provider-http/internal/data-patcher"
 	"github.com/crossplane-contrib/provider-http/internal/utils"
 )
 
@@ -185,12 +186,13 @@ func (c *external) deployAction(ctx context.Context, cr *v1alpha2.Request, metho
 		return nil
 	}
 
-	requestDetails, err := generateValidRequestDetails(cr, mapping)
+	requestDetails, err := generateValidRequestDetails(ctx, c.localKube, cr, mapping)
 	if err != nil {
 		return err
 	}
 
 	details, err := c.http.SendRequest(ctx, mapping.Method, requestDetails.Url, requestDetails.Body, requestDetails.Headers, cr.Spec.ForProvider.InsecureSkipTLSVerify)
+	c.patchResponseToSecret(ctx, cr, details.HttpResponse)
 
 	statusHandler, err := statushandler.NewStatusHandler(ctx, cr, details, err, c.localKube, c.logger)
 	if err != nil {
@@ -227,18 +229,27 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) error {
 	return errors.Wrap(c.deployAction(ctx, cr, http.MethodDelete), errFailedToSendHttpRequest)
 }
 
+func (c *external) patchResponseToSecret(ctx context.Context, cr *v1alpha2.Request, response httpClient.HttpResponse) {
+	for _, ref := range cr.Spec.ForProvider.SecretInjectionConfigs {
+		err := datapatcher.PatchResponseToSecret(ctx, c.localKube, c.logger, response, ref.ResponsePath, ref.SecretKey, ref.SecretRef.Name, ref.SecretRef.Namespace)
+		if err != nil {
+			c.logger.Info("Warning, couldn't patch data from request to secret %s:%s:%s, error: ", ref.SecretRef.Name, ref.SecretRef.Namespace, ref.SecretKey, err.Error())
+		}
+	}
+}
+
 // generateValidRequestDetails generates valid request details based on the given Request resource and Mapping configuration.
 // It first attempts to generate request details using the HTTP response stored in the Request's status. If the generated
 // details are valid, the function returns them. If not, it falls back to using the cached response in the Request's status
 // and attempts to generate request details again. The function returns the generated request details or an error if the
 // generation process fails.
-func generateValidRequestDetails(cr *v1alpha2.Request, mapping *v1alpha2.Mapping) (requestgen.RequestDetails, error) {
-	requestDetails, _, ok := requestgen.GenerateRequestDetails(*mapping, cr.Spec.ForProvider, cr.Status.Response)
+func generateValidRequestDetails(ctx context.Context, localKube client.Client, cr *v1alpha2.Request, mapping *v1alpha2.Mapping) (requestgen.RequestDetails, error) {
+	requestDetails, _, ok := requestgen.GenerateRequestDetails(ctx, localKube, *mapping, cr.Spec.ForProvider, cr.Status.Response)
 	if requestgen.IsRequestValid(requestDetails) && ok {
 		return requestDetails, nil
 	}
 
-	requestDetails, err, _ := requestgen.GenerateRequestDetails(*mapping, cr.Spec.ForProvider, cr.Status.Cache.Response)
+	requestDetails, err, _ := requestgen.GenerateRequestDetails(ctx, localKube, *mapping, cr.Spec.ForProvider, cr.Status.Cache.Response)
 	if err != nil {
 		return requestgen.RequestDetails{}, err
 	}

@@ -55,6 +55,15 @@ func StructToMap(obj interface{}) (newMap map[string]interface{}, err error) {
 	return
 }
 
+func ConvertMapToJson(m map[string]interface{}) ([]byte, bool) {
+	jsonData, err := json.Marshal(m)
+	if err != nil {
+		return nil, false
+	}
+
+	return jsonData, true
+}
+
 func deepEqual(a, b interface{}) bool {
 	aBytes, err := json.Marshal(a)
 	if err != nil {

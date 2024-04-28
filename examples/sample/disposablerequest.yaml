@@ -3,47 +3,38 @@ kind: DisposableRequest
 metadata:
   name: health-check
 spec:
-  # Secrets providing patches for request data
-  requestSecretDataPatches:
-    - name: my-secret
-      namespace: default
-      key: username
-      toFieldPaths:
-        - forProvider.headers.authorization[0]
-        - forProvider.body.aaa
-    - name: my-secret
-      namespace: default
-      key: password
-      toFieldPaths:
-        - forProvider.body.bb
-
-  # Secrets receiving patches for response data
-  responseSecretDataPatches: 
-    - name: response-secret
-      namespace: default
-      key: extracted-data
-      fromFieldPath:
-        .Body.success
-
   deletionPolicy: Orphan
   forProvider:
-    # The 'expectedResponse' field is optional. If used, also set 'rollbackRetriesLimit', which determines the number of HTTP requests to be sent until the jq query returns true.
-    # expectedResponse: '.Body.job_status == "success"'
-    insecureSkipTLSVerify: true
-    waitTimeout: 5m
-    rollbackRetriesLimit: 5
-    url: https://enwgarmh79yh.x.pipedream.net/
+    # Injecting data from secrets is possible, simply use the following syntax: {{ name:namespace:key }} (supported for body and headers only)
+    url: http://host.docker.internal:5000/todo
     method: POST
     body: |
       {
-        "check_type": "simple",
-        "additional_info": "optional"
+        "todo_name": "Do Laundry", 
+        "reminder": "Every 1 hour", 
+        "responsible": "Dan",
+        "password": "secretdata {{ password:crossplane-system:secretKey }}"
       }
     headers:
       User-Agent:
         - "Crossplane Health Checker"
-    # 
+      Authorization:
+        - "Bearer {{ auth:default:token }}"
+    insecureSkipTLSVerify: true
+
+    # The 'expectedResponse' field is optional. If used, also set 'rollbackRetriesLimit', which determines the number of HTTP requests to be sent until the jq query returns true.
+    # expectedResponse: '.Body.job_status == "success"'
+    rollbackRetriesLimit: 5
+    waitTimeout: 5m
+
+    # Secrets receiving patches from response data
+    secretInjectionConfigs: 
+      - secretRef:
+          name: response-secret
+          namespace: default
+        secretKey: extracted-data
+        responsePath: .body.reminder
+
   providerConfigRef:
     name: http-conf
 # TODO: check if it's possible to modify the deletionPolicy to be orphan by default.
-# 

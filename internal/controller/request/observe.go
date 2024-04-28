@@ -48,7 +48,7 @@ func (c *external) isUpToDate(ctx context.Context, cr *v1alpha2.Request) (Observ
 		return FailedObserve(), errors.New(errObjectNotFound)
 	}
 
-	requestDetails, err := c.requestDetails(cr, http.MethodGet)
+	requestDetails, err := c.requestDetails(ctx, cr, http.MethodGet)
 	if err != nil {
 		return FailedObserve(), err
 	}
@@ -58,7 +58,8 @@ func (c *external) isUpToDate(ctx context.Context, cr *v1alpha2.Request) (Observ
 		return FailedObserve(), errors.New(errObjectNotFound)
 	}
 
-	desiredState, err := c.desiredState(cr)
+	c.patchResponseToSecret(ctx, cr, details.HttpResponse)
+	desiredState, err := c.desiredState(ctx, cr)
 	if err != nil {
 		return FailedObserve(), err
 	}
@@ -93,16 +94,16 @@ func (c *external) compareResponseAndDesiredState(details httpClient.HttpDetails
 	return observeRequestDetails, nil
 }
 
-func (c *external) desiredState(cr *v1alpha2.Request) (string, error) {
-	requestDetails, err := c.requestDetails(cr, http.MethodPut)
-	return requestDetails.Body, err
+func (c *external) desiredState(ctx context.Context, cr *v1alpha2.Request) (string, error) {
+	requestDetails, err := c.requestDetails(ctx, cr, http.MethodPut)
+	return requestDetails.Body.Encrypted.(string), err
 }
 
-func (c *external) requestDetails(cr *v1alpha2.Request, method string) (requestgen.RequestDetails, error) {
+func (c *external) requestDetails(ctx context.Context, cr *v1alpha2.Request, method string) (requestgen.RequestDetails, error) {
 	mapping, ok := getMappingByMethod(&cr.Spec.ForProvider, method)
 	if !ok {
 		return requestgen.RequestDetails{}, errors.Errorf(errMappingNotFound, method)
 	}
 
-	return generateValidRequestDetails(cr, mapping)
+	return generateValidRequestDetails(ctx, c.localKube, cr, mapping)
 }

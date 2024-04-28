@@ -27,14 +27,23 @@ import (
 
 // RequestParameters are the configurable fields of a Request.
 type RequestParameters struct {
-	Mappings []Mapping           `json:"mappings"`
-	Payload  Payload             `json:"payload"`
-	Headers  map[string][]string `json:"headers,omitempty"`
+	// Mappings defines the HTTP mappings for different methods.
+	Mappings []Mapping `json:"mappings"`
 
+	// Payload defines the payload for the request.
+	Payload Payload `json:"payload"`
+
+	// Headers defines default headers for each request.
+	Headers map[string][]string `json:"headers,omitempty"`
+
+	// WaitTimeout specifies the maximum time duration for waiting.
 	WaitTimeout *metav1.Duration `json:"waitTimeout,omitempty"`
 
 	// InsecureSkipTLSVerify, when set to true, skips TLS certificate checks for the HTTP request
 	InsecureSkipTLSVerify bool `json:"insecureSkipTLSVerify,omitempty"`
+
+	// SecretInjectionConfig specifies the secrets receiving patches for response data.
+	SecretInjectionConfigs []SecretInjectionConfig `json:"secretInjectionConfigs,omitempty"`
 }
 
 type Mapping struct {
@@ -48,18 +57,33 @@ type Mapping struct {
 type Payload struct {
 	BaseUrl string `json:"baseUrl,omitempty"`
 	Body    string `json:"body,omitempty"`
-	RequestSecretDataPatches []SecretRef `json:"secretsRefs,omitempty"`
 }
 
-type SecretRef struct {
-	Name string `json:"name,omitempty"`
-	Namespace string `json:"namespace,omitempty"`
-	Key string `json:"key,omitempty"`
-}
 // A RequestSpec defines the desired state of a Request.
 type RequestSpec struct {
 	xpv1.ResourceSpec `json:",inline"`
 	ForProvider       RequestParameters `json:"forProvider"`
+}
+
+// SecretInjectionConfig represents the configuration for injecting secret data into a Kubernetes secret.
+type SecretInjectionConfig struct {
+	// SecretRef contains the name and namespace of the Kubernetes secret where the data will be injected.
+	SecretRef SecretRef `json:"secretRef"`
+
+	// SecretKey is the key within the Kubernetes secret where the data will be injected.
+	SecretKey string `json:"secretKey"`
+
+	// ResponsePath is is a jq filter expression represents the path in the response where the secret value will be extracted from.
+	ResponsePath string `json:"responsePath"`
+}
+
+// SecretRef contains the name and namespace of a Kubernetes secret.
+type SecretRef struct {
+	// Name is the name of the Kubernetes secret.
+	Name string `json:"name"`
+
+	// Namespace is the namespace of the Kubernetes secret.
+	Namespace string `json:"namespace"`
 }
 
 // RequestObservation are the observable fields of a Request.

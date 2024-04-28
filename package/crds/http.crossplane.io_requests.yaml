@@ -462,12 +462,15 @@ spec:
                       items:
                         type: string
                       type: array
+                    description: Headers defines default headers for each request.
                     type: object
                   insecureSkipTLSVerify:
                     description: InsecureSkipTLSVerify, when set to true, skips TLS
                       certificate checks for the HTTP request
                     type: boolean
                   mappings:
+                    description: Mappings defines the HTTP mappings for different
+                      methods.
                     items:
                       properties:
                         body:
@@ -493,24 +496,53 @@ spec:
                       type: object
                     type: array
                   payload:
+                    description: Payload defines the payload for the request.
                     properties:
                       baseUrl:
                         type: string
                       body:
                         type: string
-                      secretsRefs:
-                        items:
+                    type: object
+                  secretInjectionConfigs:
+                    description: SecretInjectionConfig specifies the secrets receiving
+                      patches for response data.
+                    items:
+                      description: SecretInjectionConfig represents the configuration
+                        for injecting secret data into a Kubernetes secret.
+                      properties:
+                        responsePath:
+                          description: ResponsePath is is a jq filter expression represents
+                            the path in the response where the secret value will be
+                            extracted from.
+                          type: string
+                        secretKey:
+                          description: SecretKey is the key within the Kubernetes
+                            secret where the data will be injected.
+                          type: string
+                        secretRef:
+                          description: SecretRef contains the name and namespace of
+                            the Kubernetes secret where the data will be injected.
                           properties:
-                            key:
-                              type: string
                             name:
+                              description: Name is the name of the Kubernetes secret.
                               type: string
                             namespace:
+                              description: Namespace is the namespace of the Kubernetes
+                                secret.
                               type: string
+                          required:
+                          - name
+                          - namespace
                           type: object
-                        type: array
-                    type: object
+                      required:
+                      - responsePath
+                      - secretKey
+                      - secretRef
+                      type: object
+                    type: array
                   waitTimeout:
+                    description: WaitTimeout specifies the maximum time duration for
+                      waiting.
                     type: string
                 required:
                 - mappings

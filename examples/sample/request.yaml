@@ -1,7 +1,7 @@
 apiVersion: http.crossplane.io/v1alpha2
 kind: Request
 metadata:
-  name: laundry
+  name: laundry-ye
 spec:
   forProvider:
     insecureSkipTLSVerify: true
@@ -10,19 +10,16 @@ spec:
       Content-Type:
         - application/json
       Authorization:
-        - ("Bearer" + .payload.secretsRefs[0])
+        - ("Bearer {{ auth:default:token }}{{auth-new:default:token}}")
     payload:
-      baseUrl: http://todo.default.svc.cluster.local/todos
+      baseUrl: http://host.docker.internal:5000/todo
       body: |
         {
-          "name": "Do Laundry", 
+          "name": "Do Laundry {{ auth:default:token }}", 
           "reminder": "Every 1 hour", 
-          "responsible": "Dan"
+          "responsible": "Dan",
+          "password": "secretdata {{ password:crossplane-system:secretKey }}"
         }
-      secretsRefs:
-        - name: secretname
-          namespace: crossplane-system
-          key: authorization-token
     mappings:
       - method: "POST"
         body: |
@@ -44,5 +41,18 @@ spec:
         url: (.payload.baseUrl + "/" + (.response.body.id|tostring))
       - method: "DELETE"
         url: (.payload.baseUrl + "/" + (.response.body.id|tostring))
+    
+    # Secrets receiving patches from response data
+    secretInjectionConfigs: 
+      - secretRef:
+          name: response-secret
+          namespace: default
+        secretKey: extracted-data
+        responsePath: .body.reminder
+      - secretRef:
+          name: new-secret
+          namespace: default
+        secretKey: extracted-data
+        responsePath: .body.reminder
   providerConfigRef:
     name: http-conf
