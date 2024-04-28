@@ -10,7 +10,7 @@ spec:
       Content-Type:
         - application/json
       Authorization:
-        - ("Bearer {{ auth:default:token }}{{auth-new:default:token}}")
+        - ("Bearer {{ auth:default:token }}")
     payload:
       baseUrl: http://host.docker.internal:5000/todo
       body: |
