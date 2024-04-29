@@ -55,7 +55,7 @@ const (
 	errPatchFromReferencedSecret         = "cannot patch from referenced secret"
 	errGetReferencedSecret               = "cannot get referenced secret"
 	errCreateReferencedSecret            = "cannot create referenced secret"
-	errPatchDataToSecret = "Warning, couldn't patch data from request to secret %s:%s:%s, error: "
+	errPatchDataToSecret                 = "Warning, couldn't patch data from request to secret %s:%s:%s, error: "
 )
 
 // Setup adds a controller that reconciles DisposableRequest managed resources.

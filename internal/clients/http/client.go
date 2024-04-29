@@ -50,10 +50,10 @@ func (hc *client) SendRequest(ctx context.Context, method string, url string, bo
 	requestBody := []byte(body.Decrypted.(string))
 	request, err := http.NewRequestWithContext(ctx, method, url, bytes.NewBuffer(requestBody))
 	requestDetails := HttpRequest{
-		URL:  url,
-		Body: body.Encrypted.(string),
+		URL:     url,
+		Body:    body.Encrypted.(string),
 		Headers: headers.Encrypted.(map[string][]string),
-		Method: method,
+		Method:  method,
 	}
 
 	if err != nil {

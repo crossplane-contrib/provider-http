@@ -53,7 +53,7 @@ const (
 	errFailedToUpdateStatusFailures = "failed to reset status failures counter"
 	errFailedUpdateStatusConditions = "failed updating status conditions"
 	errMappingNotFound              = "%s mapping doesn't exist in request, skipping operation"
-	errPatchDataToSecret = "Warning, couldn't patch data from request to secret %s:%s:%s, error: "
+	errPatchDataToSecret            = "Warning, couldn't patch data from request to secret %s:%s:%s, error: "
 )
 
 // Setup adds a controller that reconciles Request managed resources.
