@@ -30,7 +30,7 @@ spec:
           fromFieldPath: Optional
   - name: httprequest
     base:
-      apiVersion: http.crossplane.io/v1alpha1
+      apiVersion: http.crossplane.io/v1alpha2
       kind: DisposableRequest 
       spec:
           deletionPolicy: Orphan

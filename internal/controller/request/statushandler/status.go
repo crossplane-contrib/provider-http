@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/crossplane-contrib/provider-http/apis/request/v1alpha1"
+	"github.com/crossplane-contrib/provider-http/apis/request/v1alpha2"
 	httpClient "github.com/crossplane-contrib/provider-http/internal/clients/http"
 	"github.com/crossplane-contrib/provider-http/internal/controller/request/requestgen"
 	"github.com/crossplane-contrib/provider-http/internal/controller/request/responseconverter"
@@ -16,7 +16,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// RequestStatusHandler is the interface to interact with status setting for v1alpha1.Request
+// RequestStatusHandler is the interface to interact with status setting for v1alpha2.Request
 type RequestStatusHandler interface {
 	SetRequestStatus() error
 	ResetFailures()
@@ -29,7 +29,7 @@ type requestStatusHandler struct {
 	extraSetters  *[]utils.SetRequestStatusFunc
 	resource      *utils.RequestResource
 	responseError error
-	forProvider   v1alpha1.RequestParameters
+	forProvider   v1alpha2.RequestParameters
 }
 
 // SetRequestStatus updates the current Request's status to reflect the details of the last HTTP request that occurred.
@@ -83,7 +83,7 @@ func (r *requestStatusHandler) incrementFailuresAndReturn(combinedSetters []util
 	return errors.Errorf(utils.ErrStatusCode, r.resource.HttpRequest.Method, strconv.Itoa(r.resource.HttpResponse.StatusCode))
 }
 
-func (r *requestStatusHandler) appendExtraSetters(forProvider v1alpha1.RequestParameters, combinedSetters *[]utils.SetRequestStatusFunc) {
+func (r *requestStatusHandler) appendExtraSetters(forProvider v1alpha2.RequestParameters, combinedSetters *[]utils.SetRequestStatusFunc) {
 	if r.resource.HttpRequest.Method != http.MethodGet {
 		*combinedSetters = append(*combinedSetters, r.resource.ResetFailures())
 	}
@@ -96,10 +96,10 @@ func (r *requestStatusHandler) appendExtraSetters(forProvider v1alpha1.RequestPa
 // shouldSetCache determines whether the cache should be updated based on the provided mapping, HTTP response,
 // and RequestParameters. It generates request details according to the given mapping and response. If the request
 // details are not valid, it means that instead of using the response, the cache should be used.
-func (r *requestStatusHandler) shouldSetCache(forProvider v1alpha1.RequestParameters) bool {
+func (r *requestStatusHandler) shouldSetCache(forProvider v1alpha2.RequestParameters) bool {
 	for _, mapping := range forProvider.Mappings {
 		response := responseconverter.HttpResponseToV1alpha1Response(r.resource.HttpResponse)
-		requestDetails, _, ok := requestgen.GenerateRequestDetails(mapping, forProvider, response)
+		requestDetails, _, ok := requestgen.GenerateRequestDetails(r.resource.RequestContext, r.resource.LocalClient, mapping, forProvider, response)
 		if !(requestgen.IsRequestValid(requestDetails) && ok) {
 			return false
 		}
@@ -117,7 +117,7 @@ func (r *requestStatusHandler) ResetFailures() {
 }
 
 // NewClient returns a new Request statusHandler
-func NewStatusHandler(ctx context.Context, cr *v1alpha1.Request, requestDetails httpClient.HttpDetails, err error, localKube client.Client, logger logging.Logger) (RequestStatusHandler, error) {
+func NewStatusHandler(ctx context.Context, cr *v1alpha2.Request, requestDetails httpClient.HttpDetails, err error, localKube client.Client, logger logging.Logger) (RequestStatusHandler, error) {
 	// Get the latest version of the resource before updating
 	if err := localKube.Get(ctx, types.NamespacedName{Name: cr.Name, Namespace: cr.Namespace}, cr); err != nil {
 		return nil, errors.Wrap(err, "failed to get the latest version of the resource")

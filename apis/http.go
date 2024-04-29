@@ -20,8 +20,8 @@ package apis
 import (
 	"k8s.io/apimachinery/pkg/runtime"
 
-	disposablerequestv1alpha1 "github.com/crossplane-contrib/provider-http/apis/disposablerequest/v1alpha1"
-	requestv1alpha1 "github.com/crossplane-contrib/provider-http/apis/request/v1alpha1"
+	disposablerequestv1alpha1 "github.com/crossplane-contrib/provider-http/apis/disposablerequest/v1alpha2"
+	requestv1alpha1 "github.com/crossplane-contrib/provider-http/apis/request/v1alpha2"
 	httpv1alpha1 "github.com/crossplane-contrib/provider-http/apis/v1alpha1"
 )
 

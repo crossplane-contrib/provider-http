@@ -1,10 +1,14 @@
 package requestgen
 
 import (
+	"context"
 	"testing"
 
-	"github.com/crossplane-contrib/provider-http/apis/request/v1alpha1"
+	"github.com/crossplane-contrib/provider-http/apis/request/v1alpha2"
+	httpClient "github.com/crossplane-contrib/provider-http/internal/clients/http"
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
 	"github.com/crossplane/crossplane-runtime/pkg/test"
 	"github.com/google/go-cmp/cmp"
 )
@@ -21,38 +25,38 @@ var testHeaders2 = map[string][]string{
 }
 
 var (
-	testPostMapping = v1alpha1.Mapping{
+	testPostMapping = v1alpha2.Mapping{
 		Method:  "POST",
 		Body:    "{ username: .payload.body.username, email: .payload.body.email }",
 		URL:     ".payload.baseUrl",
 		Headers: testHeaders,
 	}
 
-	testPutMapping = v1alpha1.Mapping{
+	testPutMapping = v1alpha2.Mapping{
 		Method:  "PUT",
 		Body:    "{ username: \"john_doe_new_username\" }",
 		URL:     "(.payload.baseUrl + \"/\" + .response.body.id)",
 		Headers: testHeaders,
 	}
 
-	testGetMapping = v1alpha1.Mapping{
+	testGetMapping = v1alpha2.Mapping{
 		Method: "GET",
 		URL:    "(.payload.baseUrl + \"/\" + .response.body.id)",
 	}
 
-	testDeleteMapping = v1alpha1.Mapping{
+	testDeleteMapping = v1alpha2.Mapping{
 		Method: "DELETE",
 		URL:    "(.payload.baseUrl + \"/\" + .response.body.id)",
 	}
 )
 
 var (
-	testForProvider = v1alpha1.RequestParameters{
-		Payload: v1alpha1.Payload{
+	testForProvider = v1alpha2.RequestParameters{
+		Payload: v1alpha2.Payload{
 			Body:    "{\"username\": \"john_doe\", \"email\": \"john.doe@example.com\"}",
 			BaseUrl: "https://api.example.com/users",
 		},
-		Mappings: []v1alpha1.Mapping{
+		Mappings: []v1alpha2.Mapping{
 			testPostMapping,
 			testGetMapping,
 			testPutMapping,
@@ -63,10 +67,11 @@ var (
 
 func Test_GenerateRequestDetails(t *testing.T) {
 	type args struct {
-		methodMapping v1alpha1.Mapping
-		forProvider   v1alpha1.RequestParameters
-		response      v1alpha1.Response
+		methodMapping v1alpha2.Mapping
+		forProvider   v1alpha2.RequestParameters
+		response      v1alpha2.Response
 		logger        logging.Logger
+		localKube     client.Client
 	}
 	type want struct {
 		requestDetails RequestDetails
@@ -81,14 +86,20 @@ func Test_GenerateRequestDetails(t *testing.T) {
 			args: args{
 				methodMapping: testPostMapping,
 				forProvider:   testForProvider,
-				response:      v1alpha1.Response{},
+				response:      v1alpha2.Response{},
 				logger:        logging.NewNopLogger(),
 			},
 			want: want{
 				requestDetails: RequestDetails{
-					Url:     "https://api.example.com/users",
-					Body:    `{"email":"john.doe@example.com","username":"john_doe"}`,
-					Headers: testHeaders,
+					Url: "https://api.example.com/users",
+					Body: httpClient.Data{
+						Encrypted: `{"email":"john.doe@example.com","username":"john_doe"}`,
+						Decrypted: `{"email":"john.doe@example.com","username":"john_doe"}`,
+					},
+					Headers: httpClient.Data{
+						Decrypted: testHeaders,
+						Encrypted: testHeaders,
+					},
 				},
 				err: nil,
 				ok:  true,
@@ -98,7 +109,7 @@ func Test_GenerateRequestDetails(t *testing.T) {
 			args: args{
 				methodMapping: testPutMapping,
 				forProvider:   testForProvider,
-				response: v1alpha1.Response{
+				response: v1alpha2.Response{
 					StatusCode: 200,
 					Body:       `{"id":"123","username":"john_doe"}`,
 					Headers:    testHeaders,
@@ -107,9 +118,15 @@ func Test_GenerateRequestDetails(t *testing.T) {
 			},
 			want: want{
 				requestDetails: RequestDetails{
-					Url:     "https://api.example.com/users/123",
-					Body:    `{"username":"john_doe_new_username"}`,
-					Headers: testHeaders,
+					Url: "https://api.example.com/users/123",
+					Body: httpClient.Data{
+						Encrypted: `{"username":"john_doe_new_username"}`,
+						Decrypted: `{"username":"john_doe_new_username"}`,
+					},
+					Headers: httpClient.Data{
+						Decrypted: testHeaders,
+						Encrypted: testHeaders,
+					},
 				},
 				err: nil,
 				ok:  true,
@@ -119,7 +136,7 @@ func Test_GenerateRequestDetails(t *testing.T) {
 			args: args{
 				methodMapping: testDeleteMapping,
 				forProvider:   testForProvider,
-				response: v1alpha1.Response{
+				response: v1alpha2.Response{
 					StatusCode: 200,
 					Body:       `{"id":"123","username":"john_doe"}`,
 					Headers:    testHeaders,
@@ -128,8 +145,15 @@ func Test_GenerateRequestDetails(t *testing.T) {
 			},
 			want: want{
 				requestDetails: RequestDetails{
-					Url:     "https://api.example.com/users/123",
-					Headers: map[string][]string{},
+					Url: "https://api.example.com/users/123",
+					Headers: httpClient.Data{
+						Decrypted: map[string][]string{},
+						Encrypted: map[string][]string{},
+					},
+					Body: httpClient.Data{
+						Decrypted: "",
+						Encrypted: "",
+					},
 				},
 				err: nil,
 				ok:  true,
@@ -139,7 +163,7 @@ func Test_GenerateRequestDetails(t *testing.T) {
 			args: args{
 				methodMapping: testGetMapping,
 				forProvider:   testForProvider,
-				response: v1alpha1.Response{
+				response: v1alpha2.Response{
 					StatusCode: 200,
 					Body:       `{"id":"123","username":"john_doe"}`,
 					Headers:    testHeaders,
@@ -148,8 +172,15 @@ func Test_GenerateRequestDetails(t *testing.T) {
 			},
 			want: want{
 				requestDetails: RequestDetails{
-					Url:     "https://api.example.com/users/123",
-					Headers: map[string][]string{},
+					Url: "https://api.example.com/users/123",
+					Headers: httpClient.Data{
+						Decrypted: map[string][]string{},
+						Encrypted: map[string][]string{},
+					},
+					Body: httpClient.Data{
+						Decrypted: "",
+						Encrypted: "",
+					},
 				},
 				err: nil,
 				ok:  true,
@@ -158,7 +189,7 @@ func Test_GenerateRequestDetails(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			got, gotErr, ok := GenerateRequestDetails(tc.args.methodMapping, tc.args.forProvider, tc.args.response)
+			got, gotErr, ok := GenerateRequestDetails(context.Background(), tc.args.localKube, tc.args.methodMapping, tc.args.forProvider, tc.args.response)
 			if diff := cmp.Diff(tc.want.err, gotErr, test.EquateErrors()); diff != "" {
 				t.Fatalf("GenerateRequestDetails(...): -want error, +got error: %s", diff)
 			}
@@ -189,9 +220,15 @@ func Test_IsRequestValid(t *testing.T) {
 		"ValidRequestDetails": {
 			args: args{
 				requestDetails: RequestDetails{
-					Body:    `{"id": "123", "username": "john_doe"}`,
-					Url:     "https://example",
-					Headers: nil,
+					Body: httpClient.Data{
+						Encrypted: `{"id": "123", "username": "john_doe"}`,
+						Decrypted: `{"id": "123", "username": "john_doe"}`,
+					},
+					Headers: httpClient.Data{
+						Decrypted: nil,
+						Encrypted: nil,
+					},
+					Url: "https://example",
 				},
 			},
 			want: want{
@@ -201,9 +238,15 @@ func Test_IsRequestValid(t *testing.T) {
 		"NonValidRequestDetails": {
 			args: args{
 				requestDetails: RequestDetails{
-					Body:    "",
-					Url:     "",
-					Headers: nil,
+					Body: httpClient.Data{
+						Encrypted: "",
+						Decrypted: "",
+					},
+					Headers: httpClient.Data{
+						Decrypted: nil,
+						Encrypted: nil,
+					},
+					Url: "",
 				},
 			},
 			want: want{
@@ -213,9 +256,15 @@ func Test_IsRequestValid(t *testing.T) {
 		"NonValidUrl": {
 			args: args{
 				requestDetails: RequestDetails{
-					Body:    `{"id": "123", "username": "john_doe"}`,
-					Url:     "",
-					Headers: nil,
+					Body: httpClient.Data{
+						Encrypted: `{"id": "123", "username": "john_doe"}`,
+						Decrypted: `{"id": "123", "username": "john_doe"}`,
+					},
+					Headers: httpClient.Data{
+						Decrypted: nil,
+						Encrypted: nil,
+					},
+					Url: "",
 				},
 			},
 			want: want{
@@ -225,9 +274,15 @@ func Test_IsRequestValid(t *testing.T) {
 		"NonValidBody": {
 			args: args{
 				requestDetails: RequestDetails{
-					Body:    `{"id": "null", "username": "john_doe"}`,
-					Url:     "https://example",
-					Headers: nil,
+					Body: httpClient.Data{
+						Encrypted: `{"id": "null", "username": "john_doe"}`,
+						Decrypted: `{"id": "null", "username": "john_doe"}`,
+					},
+					Headers: httpClient.Data{
+						Decrypted: nil,
+						Encrypted: nil,
+					},
+					Url: "https://example",
 				},
 			},
 			want: want{
@@ -308,8 +363,8 @@ func Test_coalesceHeaders(t *testing.T) {
 
 func Test_generateRequestObject(t *testing.T) {
 	type args struct {
-		forProvider v1alpha1.RequestParameters
-		response    v1alpha1.Response
+		forProvider v1alpha2.RequestParameters
+		response    v1alpha2.Response
 	}
 	type want struct {
 		result map[string]interface{}
@@ -321,7 +376,7 @@ func Test_generateRequestObject(t *testing.T) {
 		"Success": {
 			args: args{
 				forProvider: testForProvider,
-				response: v1alpha1.Response{
+				response: v1alpha2.Response{
 					StatusCode: 200,
 					Body:       `{"id": "123"}`,
 					Headers:    nil,
