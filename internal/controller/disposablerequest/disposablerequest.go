@@ -175,7 +175,7 @@ func (c *external) deployAction(ctx context.Context, cr *v1alpha2.DisposableRequ
 	headersData := httpClient.Data{Encrypted: cr.Spec.ForProvider.Headers, Decrypted: sensitiveHeaders}
 	details, err := c.http.SendRequest(ctx, cr.Spec.ForProvider.Method, cr.Spec.ForProvider.URL, bodyData, headersData, cr.Spec.ForProvider.InsecureSkipTLSVerify)
 
-	res := details.HttpResponse
+	sensitiveResponse := details.HttpResponse
 	resource := &utils.RequestResource{
 		Resource:       cr,
 		RequestContext: ctx,
@@ -184,7 +184,7 @@ func (c *external) deployAction(ctx context.Context, cr *v1alpha2.DisposableRequ
 		HttpRequest:    details.HttpRequest,
 	}
 
-	c.patchResponseToSecret(ctx, cr, res)
+	c.patchResponseToSecret(ctx, cr, &resource.HttpResponse)
 
 	// Get the latest version of the resource before updating
 	if err := c.localKube.Get(ctx, types.NamespacedName{Name: cr.Name, Namespace: cr.Namespace}, cr); err != nil {
@@ -199,15 +199,15 @@ func (c *external) deployAction(ctx context.Context, cr *v1alpha2.DisposableRequ
 		return err
 	}
 
-	if utils.IsHTTPError(res.StatusCode) {
+	if utils.IsHTTPError(resource.HttpResponse.StatusCode) {
 		if settingError := utils.SetRequestResourceStatus(*resource, resource.SetStatusCode(), resource.SetHeaders(), resource.SetBody(), resource.SetRequestDetails(), resource.SetError(nil)); settingError != nil {
 			return errors.Wrap(settingError, utils.ErrFailedToSetStatus)
 		}
 
-		return errors.Errorf(utils.ErrStatusCode, cr.Spec.ForProvider.Method, strconv.Itoa(res.StatusCode))
+		return errors.Errorf(utils.ErrStatusCode, cr.Spec.ForProvider.Method, strconv.Itoa(resource.HttpResponse.StatusCode))
 	}
 
-	isExpectedResponse, err := c.isResponseAsExpected(cr, res)
+	isExpectedResponse, err := c.isResponseAsExpected(cr, sensitiveResponse)
 	if err != nil {
 		return err
 	}
@@ -276,7 +276,7 @@ func (c *external) Delete(_ context.Context, _ resource.Managed) error {
 	return nil
 }
 
-func (c *external) patchResponseToSecret(ctx context.Context, cr *v1alpha2.DisposableRequest, response httpClient.HttpResponse) {
+func (c *external) patchResponseToSecret(ctx context.Context, cr *v1alpha2.DisposableRequest, response *httpClient.HttpResponse) {
 	for _, ref := range cr.Spec.ForProvider.SecretInjectionConfigs {
 		err := datapatcher.PatchResponseToSecret(ctx, c.localKube, c.logger, response, ref.ResponsePath, ref.SecretKey, ref.SecretRef.Name, ref.SecretRef.Namespace)
 		if err != nil {

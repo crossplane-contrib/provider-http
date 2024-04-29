@@ -3,6 +3,7 @@ package datapatcher
 import (
 	"context"
 
+	httpClient "github.com/crossplane-contrib/provider-http/internal/clients/http"
 	kubehandler "github.com/crossplane-contrib/provider-http/internal/kube-handler"
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
 	"github.com/pkg/errors"
@@ -50,7 +51,7 @@ func copyHeaders(headers map[string][]string) map[string][]string {
 }
 
 // PatchResponseToSecret patches response data into a Kubernetes secret.
-func PatchResponseToSecret(ctx context.Context, localKube client.Client, logger logging.Logger, data interface{}, path, secretKey, secretName, secretNamespace string) error {
+func PatchResponseToSecret(ctx context.Context, localKube client.Client, logger logging.Logger, data *httpClient.HttpResponse, path, secretKey, secretName, secretNamespace string) error {
 	secret, err := kubehandler.GetOrCreateSecret(ctx, localKube, secretName, secretNamespace)
 	if err != nil {
 		return err

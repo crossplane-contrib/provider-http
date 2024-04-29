@@ -195,7 +195,7 @@ func (c *external) deployAction(ctx context.Context, cr *v1alpha2.Request, metho
 	}
 
 	details, err := c.http.SendRequest(ctx, mapping.Method, requestDetails.Url, requestDetails.Body, requestDetails.Headers, cr.Spec.ForProvider.InsecureSkipTLSVerify)
-	c.patchResponseToSecret(ctx, cr, details.HttpResponse)
+	c.patchResponseToSecret(ctx, cr, &details.HttpResponse)
 
 	statusHandler, err := statushandler.NewStatusHandler(ctx, cr, details, err, c.localKube, c.logger)
 	if err != nil {
@@ -232,7 +232,7 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) error {
 	return errors.Wrap(c.deployAction(ctx, cr, http.MethodDelete), errFailedToSendHttpRequest)
 }
 
-func (c *external) patchResponseToSecret(ctx context.Context, cr *v1alpha2.Request, response httpClient.HttpResponse) {
+func (c *external) patchResponseToSecret(ctx context.Context, cr *v1alpha2.Request, response *httpClient.HttpResponse) {
 	for _, ref := range cr.Spec.ForProvider.SecretInjectionConfigs {
 		err := datapatcher.PatchResponseToSecret(ctx, c.localKube, c.logger, response, ref.ResponsePath, ref.SecretKey, ref.SecretRef.Name, ref.SecretRef.Namespace)
 		if err != nil {

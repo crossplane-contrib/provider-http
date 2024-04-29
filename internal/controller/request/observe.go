@@ -58,7 +58,7 @@ func (c *external) isUpToDate(ctx context.Context, cr *v1alpha2.Request) (Observ
 		return FailedObserve(), errors.New(errObjectNotFound)
 	}
 
-	c.patchResponseToSecret(ctx, cr, details.HttpResponse)
+	c.patchResponseToSecret(ctx, cr, &details.HttpResponse)
 	desiredState, err := c.desiredState(ctx, cr)
 	if err != nil {
 		return FailedObserve(), err

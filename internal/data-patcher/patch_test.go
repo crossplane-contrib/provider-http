@@ -4,7 +4,6 @@ import (
 	"context"
 	"testing"
 
-	"github.com/crossplane/crossplane-runtime/pkg/logging"
 	"github.com/crossplane/crossplane-runtime/pkg/test"
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
@@ -191,41 +190,6 @@ func TestPatchSecretsIntoHeaders(t *testing.T) {
 			}
 			if diff := cmp.Diff(tc.want.result, got); diff != "" {
 				t.Errorf("isUpToDate(...): -want result, +got result: %s", diff)
-			}
-		})
-	}
-}
-
-func TestPatchResponseToSecret(t *testing.T) {
-	type args struct {
-		ctx             context.Context
-		localKube       client.Client
-		logger          logging.Logger
-		data            interface{}
-		path            string
-		secretKey       string
-		secretName      string
-		secretNamespace string
-	}
-
-	type want struct {
-		err error
-	}
-
-	cases := map[string]struct {
-		args args
-		want want
-	}{
-		// Add test cases
-	}
-
-	for name, tc := range cases {
-		tc := tc // Create local copies of loop variables
-
-		t.Run(name, func(t *testing.T) {
-			gotErr := PatchResponseToSecret(tc.args.ctx, tc.args.localKube, tc.args.logger, tc.args.data, tc.args.path, tc.args.secretKey, tc.args.secretName, tc.args.secretNamespace)
-			if diff := cmp.Diff(tc.want.err, gotErr, test.EquateErrors()); diff != "" {
-				t.Fatalf("isUpToDate(...): -want error, +got error: %s", diff)
 			}
 		})
 	}
