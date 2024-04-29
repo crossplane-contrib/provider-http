@@ -118,6 +118,12 @@ func patchValueToSecret(ctx context.Context, kubeClient client.Client, logger lo
 	// patch the {{name:namespace:key}} of secret instead of the sensitive value
 	placeholder := fmt.Sprintf("{{%s:%s:%s}}", secret.Name, secret.Namespace, secretKey)
 	data.Body = strings.ReplaceAll(data.Body, valueToPatch, placeholder)
+	for _, headersList := range data.Headers {
+		for i, header := range headersList {
+			newHeader := strings.ReplaceAll(header, valueToPatch, placeholder)
+			headersList[i] = newHeader
+		}
+	}
 
 	return kubehandler.UpdateSecret(ctx, kubeClient, secret)
 }

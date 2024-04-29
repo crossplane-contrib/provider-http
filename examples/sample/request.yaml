@@ -57,9 +57,9 @@ spec:
         secretKey: extracted-data
         responsePath: .body.reminder
       - secretRef:
-          name: new-secret
+          name: response-secret
           namespace: default
-        secretKey: extracted-data
-        responsePath: .body.reminder
+        secretKey: extracted-data-headers
+        responsePath: .headers.Try[0]
   providerConfigRef:
     name: http-conf

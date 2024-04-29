@@ -33,7 +33,11 @@ spec:
           namespace: default
         secretKey: extracted-data
         responsePath: .body.reminder
-
+      - secretRef:
+          name: response-secret
+          namespace: default
+        secretKey: extracted-data-headers
+        responsePath: .headers.Try[0]
   providerConfigRef:
     name: http-conf
 # TODO: check if it's possible to modify the deletionPolicy to be orphan by default.
