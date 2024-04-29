@@ -9,7 +9,7 @@ The `Request` resource is designed for managing a resource through HTTP requests
 Here is an example `Request` resource definition:
 
   ```yaml
-  apiVersion: http.crossplane.io/v1alpha1
+  apiVersion: http.crossplane.io/v1alpha2
   kind: Request
   metadata:
     name: user-dan
@@ -55,7 +55,7 @@ The PUT mapping represents your desired state. The body in this mapping should b
 Example PUT mapping:
 
   ```yaml
-  apiVersion: http.crossplane.io/v1alpha1
+  apiVersion: http.crossplane.io/v1alpha2
     ...
       mappings:
         ...
@@ -106,7 +106,7 @@ Example `Request` status:
 Here's an example of using variables from the response:
 
   ```yaml
-  apiVersion: http.crossplane.io/v1alpha1
+  apiVersion: http.crossplane.io/v1alpha2
   kind: Request
   metadata:
     name: user-dan

@@ -9,7 +9,7 @@ The `DisposableRequest` resource is designed for initiating one-time HTTP reques
 
 Here is an example `DisposableRequest` resource definition:
 ```yaml
-    apiVersion: http.crossplane.io/v1alpha1
+    apiVersion: http.crossplane.io/v1alpha2
     kind: DisposableRequest
     metadata:
       name: example-disposable-request

@@ -1,13 +1,17 @@
 package requestgen
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
 	"github.com/pkg/errors"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/crossplane-contrib/provider-http/apis/request/v1alpha1"
+	"github.com/crossplane-contrib/provider-http/apis/request/v1alpha2"
+	httpClient "github.com/crossplane-contrib/provider-http/internal/clients/http"
 	"github.com/crossplane-contrib/provider-http/internal/controller/request/requestprocessing"
+	datapatcher "github.com/crossplane-contrib/provider-http/internal/data-patcher"
 	json_util "github.com/crossplane-contrib/provider-http/internal/json"
 	"github.com/crossplane-contrib/provider-http/internal/utils"
 
@@ -16,12 +20,12 @@ import (
 
 type RequestDetails struct {
 	Url     string
-	Body    string
-	Headers map[string][]string
+	Body    httpClient.Data
+	Headers httpClient.Data
 }
 
 // GenerateRequestDetails generates request details.
-func GenerateRequestDetails(methodMapping v1alpha1.Mapping, forProvider v1alpha1.RequestParameters, response v1alpha1.Response) (RequestDetails, error, bool) {
+func GenerateRequestDetails(ctx context.Context, localKube client.Client, methodMapping v1alpha2.Mapping, forProvider v1alpha2.RequestParameters, response v1alpha2.Response) (RequestDetails, error, bool) {
 	jqObject := generateRequestObject(forProvider, response)
 	url, err := generateURL(methodMapping.URL, jqObject)
 	if err != nil {
@@ -32,22 +36,22 @@ func GenerateRequestDetails(methodMapping v1alpha1.Mapping, forProvider v1alpha1
 		return RequestDetails{}, errors.Errorf(utils.ErrInvalidURL, url), false
 	}
 
-	body, err := generateBody(methodMapping.Body, jqObject)
+	bodyData, err := generateBody(ctx, localKube, methodMapping.Body, jqObject)
 	if err != nil {
 		return RequestDetails{}, err, false
 	}
 
-	headers, err := generateHeaders(coalesceHeaders(methodMapping.Headers, forProvider.Headers), jqObject)
+	headersData, err := generateHeaders(ctx, localKube, coalesceHeaders(methodMapping.Headers, forProvider.Headers), jqObject)
 	if err != nil {
 		return RequestDetails{}, err, false
 	}
 
-	return RequestDetails{Body: body, Url: url, Headers: headers}, nil, true
+	return RequestDetails{Body: bodyData, Url: url, Headers: headersData}, nil, true
 }
 
 // generateRequestObject creates a JSON-compatible map from the specified Request's ForProvider and Response fields.
 // It merges the two maps, converts JSON strings to nested maps, and returns the resulting map.
-func generateRequestObject(forProvider v1alpha1.RequestParameters, response v1alpha1.Response) map[string]interface{} {
+func generateRequestObject(forProvider v1alpha2.RequestParameters, response v1alpha2.Response) map[string]interface{} {
 	baseMap, _ := json_util.StructToMap(forProvider)
 	statusMap, _ := json_util.StructToMap(map[string]interface{}{
 		"response": response,
@@ -82,26 +86,45 @@ func generateURL(urlJQFilter string, jqObject map[string]interface{}) (string, e
 }
 
 // generateBody applies a mapping body to generate the request body.
-func generateBody(mappingBody string, jqObject map[string]interface{}) (string, error) {
+func generateBody(ctx context.Context, localKube client.Client, mappingBody string, jqObject map[string]interface{}) (httpClient.Data, error) {
 	if mappingBody == "" {
-		return "", nil
+		return httpClient.Data{
+			Encrypted: "",
+			Decrypted: "",
+		}, nil
 	}
 
 	jqQuery := requestprocessing.ConvertStringToJQQuery(mappingBody)
 	body, err := requestprocessing.ApplyJQOnStr(jqQuery, jqObject)
 	if err != nil {
-		return "", err
+		return httpClient.Data{}, err
 	}
 
-	return body, nil
+	sensitiveBody, err := datapatcher.PatchSecretsIntoBody(ctx, localKube, body)
+	if err != nil {
+		return httpClient.Data{}, err
+	}
+
+	return httpClient.Data{
+		Encrypted: body,
+		Decrypted: sensitiveBody,
+	}, nil
 }
 
 // generateHeaders applies JQ queries to generate headers.
-func generateHeaders(headers map[string][]string, jqObject map[string]interface{}) (map[string][]string, error) {
+func generateHeaders(ctx context.Context, localKube client.Client, headers map[string][]string, jqObject map[string]interface{}) (httpClient.Data, error) {
 	generatedHeaders, err := requestprocessing.ApplyJQOnMapStrings(headers, jqObject)
 	if err != nil {
-		return nil, err
+		return httpClient.Data{}, err
 	}
 
-	return generatedHeaders, nil
+	sensitiveHeaders, err := datapatcher.PatchSecretsIntoHeaders(ctx, localKube, generatedHeaders)
+	if err != nil {
+		return httpClient.Data{}, err
+	}
+
+	return httpClient.Data{
+		Encrypted: generatedHeaders,
+		Decrypted: sensitiveHeaders,
+	}, nil
 }

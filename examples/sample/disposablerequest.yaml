@@ -1,25 +1,43 @@
-apiVersion: http.crossplane.io/v1alpha1
+apiVersion: http.crossplane.io/v1alpha2
 kind: DisposableRequest
 metadata:
   name: health-check
 spec:
   deletionPolicy: Orphan
   forProvider:
-    # The 'expectedResponse' field is optional. If used, also set 'rollbackRetriesLimit', which determines the number of HTTP requests to be sent until the jq query returns true.    
-    # expectedResponse: '.Body.job_status == "success"'
-    insecureSkipTLSVerify: true
-    waitTimeout: 5m
-    rollbackRetriesLimit: 5
+    # Injecting data from secrets is possible, simply use the following syntax: {{ name:namespace:key }} (supported for body and headers only)
     url:  http://todo.default.svc.cluster.local/health-check
     method: POST
     body: |
       {
         "check_type": "simple",
-        "additional_info": "optional"
+        "additional_info": "optional",
+        "password": "secretdata {{ password:crossplane-system:secretKey }}"
       }
     headers:
-      User-Agent: 
+      User-Agent:
         - "Crossplane Health Checker"
+      Authorization:
+        - "Bearer {{ auth:default:token }}"
+    insecureSkipTLSVerify: true
+
+    # The 'expectedResponse' field is optional. If used, also set 'rollbackRetriesLimit', which determines the number of HTTP requests to be sent until the jq query returns true.
+    # expectedResponse: '.body.job_status == "success"'
+    rollbackRetriesLimit: 5
+    waitTimeout: 5m
+
+    # Secrets receiving patches from response data
+    secretInjectionConfigs: 
+      - secretRef:
+          name: response-secret
+          namespace: default
+        secretKey: extracted-data
+        responsePath: .body.reminder
+      - secretRef:
+          name: response-secret
+          namespace: default
+        secretKey: extracted-data-headers
+        responsePath: .headers.Try[0]
   providerConfigRef:
     name: http-conf
 # TODO: check if it's possible to modify the deletionPolicy to be orphan by default.

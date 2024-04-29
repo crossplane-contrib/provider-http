@@ -7,7 +7,7 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/crossplane-contrib/provider-http/apis/request/v1alpha1"
+	"github.com/crossplane-contrib/provider-http/apis/request/v1alpha2"
 	httpClient "github.com/crossplane-contrib/provider-http/internal/clients/http"
 	"github.com/crossplane-contrib/provider-http/internal/utils"
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
@@ -32,36 +32,36 @@ const (
 )
 
 var (
-	testPostMapping = v1alpha1.Mapping{
+	testPostMapping = v1alpha2.Mapping{
 		Method: "POST",
 		Body:   "{ username: .payload.body.username, email: .payload.body.email }",
 		URL:    ".payload.baseUrl",
 	}
 
-	testPutMapping = v1alpha1.Mapping{
+	testPutMapping = v1alpha2.Mapping{
 		Method: "PUT",
 		Body:   "{ username: \"john_doe_new_username\" }",
 		URL:    "(.payload.baseUrl + \"/\" + .response.body.id)",
 	}
 
-	testGetMapping = v1alpha1.Mapping{
+	testGetMapping = v1alpha2.Mapping{
 		Method: "GET",
 		URL:    "(.payload.baseUrl + \"/\" + .response.body.id)",
 	}
 
-	testDeleteMapping = v1alpha1.Mapping{
+	testDeleteMapping = v1alpha2.Mapping{
 		Method: "DELETE",
 		URL:    "(.payload.baseUrl + \"/\" + .response.body.id)",
 	}
 )
 
 var (
-	testForProvider = v1alpha1.RequestParameters{
-		Payload: v1alpha1.Payload{
+	testForProvider = v1alpha2.RequestParameters{
+		Payload: v1alpha2.Payload{
 			Body:    "{\"username\": \"john_doe\", \"email\": \"john.doe@example.com\"}",
 			BaseUrl: "https://api.example.com/users",
 		},
-		Mappings: []v1alpha1.Mapping{
+		Mappings: []v1alpha2.Mapping{
 			testPostMapping,
 			testGetMapping,
 			testPutMapping,
@@ -70,8 +70,8 @@ var (
 	}
 )
 
-var testCr = &v1alpha1.Request{
-	Spec: v1alpha1.RequestSpec{
+var testCr = &v1alpha2.Request{
+	Spec: v1alpha2.RequestSpec{
 		ForProvider: testForProvider,
 	},
 }
@@ -85,7 +85,7 @@ var testRequest = httpClient.HttpRequest{
 func Test_SetRequestStatus(t *testing.T) {
 	type args struct {
 		localKube      client.Client
-		cr             *v1alpha1.Request
+		cr             *v1alpha2.Request
 		requestDetails httpClient.HttpDetails
 		err            error
 		isSynced       bool

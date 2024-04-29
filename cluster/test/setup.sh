@@ -24,7 +24,7 @@ metadata:
   labels:
     app: todo
 spec:
-  replicas: 1 # Number of replicas you want
+  replicas: 1 
   selector:
     matchLabels:
       app: todo
@@ -55,4 +55,24 @@ spec:
     app: todo
 EOF
 
+cat <<EOF | kubectl apply -f -
+kind: Secret
+apiVersion: v1
+metadata:
+  name: auth
+  namespace: default
+type: Opaque
+data:
+  token: bXktc2VjcmV0LXZhbHVl
+EOF
 
+cat <<EOF | kubectl apply -f -
+kind: Secret
+apiVersion: v1
+metadata:
+  name: password
+  namespace: crossplane-system
+type: Opaque
+data:
+  secretKey: bXktc2VjcmV0LXZhbHVl
+EOF
