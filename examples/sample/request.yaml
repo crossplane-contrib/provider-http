@@ -30,6 +30,10 @@ spec:
           }
         url: .payload.baseUrl
         headers:
+          Content-Type:
+            - application/json
+          Authorization:
+            - ("Bearer {{ auth:default:token }}")
           Extra-Header-For-Post:
             - extra-value
       - method: "GET"
