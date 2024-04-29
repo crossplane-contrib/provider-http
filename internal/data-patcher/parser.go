@@ -100,8 +100,12 @@ func patchValueToSecret(ctx context.Context, kubeClient client.Client, logger lo
 
 	valueToPatch, err := jq.ParseString(requestFieldPath, dataMap)
 	if err != nil {
-		boolResult, _ := jq.ParseBool(requestFieldPath, dataMap)
-		valueToPatch = strconv.FormatBool(boolResult)
+		boolResult, err := jq.ParseBool(requestFieldPath, dataMap)
+		if err != nil {
+			valueToPatch = ""
+		} else {
+			valueToPatch = strconv.FormatBool(boolResult)
+		}
 	}
 
 	if valueToPatch == "" {
