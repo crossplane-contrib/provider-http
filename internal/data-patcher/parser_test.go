@@ -1,11 +1,29 @@
 package datapatcher
 
 import (
+	"context"
+	"errors"
 	"testing"
 
+	"github.com/crossplane/crossplane-runtime/pkg/test"
 	"github.com/google/go-cmp/cmp"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
+
+func createSpecificSecret(name, namespace, key, value string) *corev1.Secret {
+	return &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		Data: map[string][]byte{
+			key:         []byte(value),
+			"other-key": []byte("otherSecretValue"),
+		},
+	}
+}
 
 func Test_findPlaceholders(t *testing.T) {
 	type args struct {
@@ -192,6 +210,96 @@ func Test_replacePlaceholderWithSecretValue(t *testing.T) {
 			got := replacePlaceholderWithSecretValue(tc.args.originalString, tc.args.old, tc.args.secret, tc.args.key)
 			if diff := cmp.Diff(tc.want.result, got); diff != "" {
 				t.Errorf("replacePlaceholderWithSecretValue(...): -want result, +got result: %s", diff)
+			}
+		})
+	}
+}
+
+func Test_patchSecretsToValue(t *testing.T) {
+	placeholderData := "{{name:namespace:key}}"
+
+	type args struct {
+		valueToHandle string
+		localKube     client.Client
+	}
+
+	type want struct {
+		result string
+	}
+
+	cases := map[string]struct {
+		args args
+		want want
+	}{
+		"ShouldPatchSingleSecret": {
+			args: args{
+				valueToHandle: "data -> " + placeholderData,
+				localKube: &test.MockClient{
+					MockGet: func(ctx context.Context, key client.ObjectKey, obj client.Object) error {
+						secret, ok := obj.(*corev1.Secret)
+						if !ok {
+							return errors.New("object is not a Secret")
+						}
+
+						*secret = *createSpecificSecret("name", "namespace", "key", "value")
+						return nil
+					},
+				},
+			},
+			want: want{
+				result: "data -> value",
+			},
+		},
+		"ShouldPatchMultipleSecrets": {
+			args: args{
+				valueToHandle: "data -> " + placeholderData + " " + placeholderData,
+				localKube: &test.MockClient{
+					MockGet: func(ctx context.Context, key client.ObjectKey, obj client.Object) error {
+						secret, ok := obj.(*corev1.Secret)
+						if !ok {
+							return errors.New("object is not a Secret")
+						}
+
+						*secret = *createSpecificSecret("name", "namespace", "key", "value")
+						return nil
+					},
+				},
+			},
+			want: want{
+				result: "data -> value value",
+			},
+		},
+		"ShouldNotPatchInvalidPlaceholder": {
+			args: args{
+				valueToHandle: "data -> {{invalid-placeholder}}",
+				localKube: &test.MockClient{
+					MockGet: func(ctx context.Context, key client.ObjectKey, obj client.Object) error {
+						secret, ok := obj.(*corev1.Secret)
+						if !ok {
+							return errors.New("object is not a Secret")
+						}
+
+						*secret = *createSpecificSecret("name", "namespace", "key", "value")
+						return nil
+					},
+				},
+			},
+			want: want{
+				result: "data -> {{invalid-placeholder}}",
+			},
+		},
+	}
+
+	for name, tc := range cases {
+		tc := tc // Create local copies of loop variables
+
+		t.Run(name, func(t *testing.T) {
+			got, err := patchSecretsToValue(context.Background(), tc.args.localKube, tc.args.valueToHandle)
+			if err != nil {
+				t.Fatalf("patchSecretsToValue(...): unexpected error: %v", err)
+			}
+			if got != tc.want.result {
+				t.Errorf("patchSecretsToValue(...): want result %q, got %q", tc.want.result, got)
 			}
 		})
 	}

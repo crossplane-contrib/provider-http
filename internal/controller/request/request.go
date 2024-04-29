@@ -18,6 +18,7 @@ package request
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -53,7 +54,8 @@ const (
 	errFailedToUpdateStatusFailures = "failed to reset status failures counter"
 	errFailedUpdateStatusConditions = "failed updating status conditions"
 	errMappingNotFound              = "%s mapping doesn't exist in request, skipping operation"
-	errPatchDataToSecret            = "Warning, couldn't patch data from request to secret %s:%s:%s, error: "
+	errPatchDataToSecret            = "Warning, couldn't patch data from request to secret %s:%s:%s, error: %s"
+	errGetLatestVersion             = "failed to get the latest version of the resource"
 )
 
 // Setup adds a controller that reconciles Request managed resources.
@@ -154,7 +156,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 
 	// Get the latest version of the resource before updating
 	if err := c.localKube.Get(ctx, types.NamespacedName{Name: cr.Name, Namespace: cr.Namespace}, cr); err != nil {
-		return managed.ExternalObservation{}, errors.Wrap(err, "failed to get the latest version of the resource")
+		return managed.ExternalObservation{}, errors.Wrap(err, errGetLatestVersion)
 	}
 
 	statusHandler, err := statushandler.NewStatusHandler(ctx, cr, observeRequestDetails.Details, observeRequestDetails.ResponseError, c.localKube, c.logger)
@@ -183,7 +185,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 func (c *external) deployAction(ctx context.Context, cr *v1alpha2.Request, method string) error {
 	mapping, ok := getMappingByMethod(&cr.Spec.ForProvider, method)
 	if !ok {
-		c.logger.Info(errMappingNotFound, method)
+		c.logger.Info(fmt.Sprintf(errMappingNotFound, method))
 		return nil
 	}
 
@@ -234,7 +236,7 @@ func (c *external) patchResponseToSecret(ctx context.Context, cr *v1alpha2.Reque
 	for _, ref := range cr.Spec.ForProvider.SecretInjectionConfigs {
 		err := datapatcher.PatchResponseToSecret(ctx, c.localKube, c.logger, response, ref.ResponsePath, ref.SecretKey, ref.SecretRef.Name, ref.SecretRef.Namespace)
 		if err != nil {
-			c.logger.Info(errPatchDataToSecret, ref.SecretRef.Name, ref.SecretRef.Namespace, ref.SecretKey, err.Error())
+			c.logger.Info(fmt.Sprintf(errPatchDataToSecret, ref.SecretRef.Name, ref.SecretRef.Namespace, ref.SecretKey, err.Error()))
 		}
 	}
 }

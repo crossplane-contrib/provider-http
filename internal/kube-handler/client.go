@@ -3,11 +3,18 @@ package kubehandler
 import (
 	"context"
 
+	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	errs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
+)
+
+const (
+	errCreateSecret = "create secret failed"
+	errGetSecret    = "get secret failed"
+	errUpdateFailed = "update secret failed"
 )
 
 // GetSecret retrieves a Kubernetes Secret from the cluster.
@@ -19,7 +26,7 @@ func GetSecret(ctx context.Context, kubeClient client.Client, name string, names
 	}, secret)
 
 	if err != nil {
-		return &corev1.Secret{}, err
+		return &corev1.Secret{}, errors.Wrap(err, errGetSecret)
 	}
 
 	return secret, nil
@@ -30,11 +37,10 @@ func GetOrCreateSecret(ctx context.Context, kubeClient client.Client, name strin
 	secret, err := GetSecret(ctx, kubeClient, name, namespace)
 	if err != nil {
 		if errs.IsNotFound(err) {
-			secret, err = createSecret(ctx, kubeClient, name, namespace)
-			if err != nil {
-				return &corev1.Secret{}, err
-			}
+			return createSecret(ctx, kubeClient, name, namespace)
 		}
+
+		return &corev1.Secret{}, err
 	}
 
 	return secret, nil
@@ -44,7 +50,7 @@ func GetOrCreateSecret(ctx context.Context, kubeClient client.Client, name strin
 func UpdateSecret(ctx context.Context, kubeClient client.Client, secret *corev1.Secret) error {
 	err := kubeClient.Update(ctx, secret)
 	if err != nil {
-		return err
+		return errors.Wrap(err, errUpdateFailed)
 	}
 
 	return nil
@@ -60,7 +66,7 @@ func createSecret(ctx context.Context, kubeClient client.Client, name string, na
 
 	err := kubeClient.Create(ctx, secret)
 	if err != nil {
-		return &corev1.Secret{}, err
+		return &corev1.Secret{}, errors.Wrap(err, errCreateSecret)
 	}
 
 	return secret, nil

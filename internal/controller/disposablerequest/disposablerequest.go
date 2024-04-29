@@ -55,7 +55,10 @@ const (
 	errPatchFromReferencedSecret         = "cannot patch from referenced secret"
 	errGetReferencedSecret               = "cannot get referenced secret"
 	errCreateReferencedSecret            = "cannot create referenced secret"
-	errPatchDataToSecret                 = "Warning, couldn't patch data from request to secret %s:%s:%s, error: "
+	errPatchDataToSecret                 = "Warning, couldn't patch data from request to secret %s:%s:%s, error: %s"
+	errConvertResToMap                   = "failed to convert response to map"
+	errGetLatestVersion                  = "failed to get the latest version of the resource"
+	errResponseFormat                    = "Response does not match the expected format, retries limit "
 )
 
 // Setup adds a controller that reconciles DisposableRequest managed resources.
@@ -142,7 +145,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 
 	// Get the latest version of the resource before updating
 	if err := c.localKube.Get(ctx, types.NamespacedName{Name: cr.Name, Namespace: cr.Namespace}, cr); err != nil {
-		return managed.ExternalObservation{}, errors.Wrap(err, "failed to get the latest version of the resource")
+		return managed.ExternalObservation{}, errors.Wrap(err, errGetLatestVersion)
 	}
 
 	cr.Status.SetConditions(xpv1.Available())
@@ -185,7 +188,7 @@ func (c *external) deployAction(ctx context.Context, cr *v1alpha2.DisposableRequ
 
 	// Get the latest version of the resource before updating
 	if err := c.localKube.Get(ctx, types.NamespacedName{Name: cr.Name, Namespace: cr.Namespace}, cr); err != nil {
-		return errors.Wrap(err, "failed to get the latest version of the resource")
+		return errors.Wrap(err, errGetLatestVersion)
 	}
 
 	if err != nil {
@@ -212,7 +215,7 @@ func (c *external) deployAction(ctx context.Context, cr *v1alpha2.DisposableRequ
 	if !isExpectedResponse {
 		limit := utils.GetRollbackRetriesLimit(cr.Spec.ForProvider.RollbackRetriesLimit)
 		return utils.SetRequestResourceStatus(*resource, resource.SetStatusCode(), resource.SetHeaders(), resource.SetBody(),
-			resource.SetError(errors.New("Response does not match the expected format, retries limit "+fmt.Sprint(limit))), resource.SetRequestDetails())
+			resource.SetError(errors.New(errResponseFormat+fmt.Sprint(limit))), resource.SetRequestDetails())
 	}
 
 	return utils.SetRequestResourceStatus(*resource, resource.SetStatusCode(), resource.SetHeaders(), resource.SetBody(), resource.SetSynced(), resource.SetRequestDetails())
@@ -230,7 +233,7 @@ func (c *external) isResponseAsExpected(cr *v1alpha2.DisposableRequest, res http
 
 	responseMap, err := json_util.StructToMap(res)
 	if err != nil {
-		return false, errors.Wrap(err, "failed to convert response to map")
+		return false, errors.Wrap(err, errConvertResToMap)
 	}
 
 	json_util.ConvertJSONStringsToMaps(&responseMap)
@@ -277,7 +280,7 @@ func (c *external) patchResponseToSecret(ctx context.Context, cr *v1alpha2.Dispo
 	for _, ref := range cr.Spec.ForProvider.SecretInjectionConfigs {
 		err := datapatcher.PatchResponseToSecret(ctx, c.localKube, c.logger, response, ref.ResponsePath, ref.SecretKey, ref.SecretRef.Name, ref.SecretRef.Namespace)
 		if err != nil {
-			c.logger.Info(errPatchDataToSecret, ref.SecretRef.Name, ref.SecretRef.Namespace, ref.SecretKey, err.Error())
+			c.logger.Info(fmt.Sprintf(errPatchDataToSecret, ref.SecretRef.Name, ref.SecretRef.Namespace, ref.SecretKey, err.Error()))
 		}
 	}
 }

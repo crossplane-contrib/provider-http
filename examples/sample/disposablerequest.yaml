@@ -22,7 +22,7 @@ spec:
     insecureSkipTLSVerify: true
 
     # The 'expectedResponse' field is optional. If used, also set 'rollbackRetriesLimit', which determines the number of HTTP requests to be sent until the jq query returns true.
-    # expectedResponse: '.Body.job_status == "success"'
+    # expectedResponse: '.body.job_status == "success"'
     rollbackRetriesLimit: 5
     waitTimeout: 5m
 

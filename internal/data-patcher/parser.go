@@ -1,6 +1,7 @@
 package datapatcher
 
 import (
+	"fmt"
 	"regexp"
 	"strings"
 
@@ -16,6 +17,11 @@ import (
 	kubehandler "github.com/crossplane-contrib/provider-http/internal/kube-handler"
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
 	"github.com/pkg/errors"
+)
+
+const (
+	errEmptyKey    = "Warning, value at field %s is empty, skipping secret update for: %s"
+	errConvertData = "failed to convert data to map"
 )
 
 const (
@@ -86,7 +92,7 @@ func patchSecretsToValue(ctx context.Context, localKube client.Client, valueToHa
 func patchValueToSecret(ctx context.Context, kubeClient client.Client, logger logging.Logger, data interface{}, secret *corev1.Secret, secretKey string, requestFieldPath string) error {
 	dataMap, err := json_util.StructToMap(data)
 	if err != nil {
-		return errors.Wrap(err, "failed to convert data to map")
+		return errors.Wrap(err, errConvertData)
 	}
 
 	json_util.ConvertJSONStringsToMaps(&dataMap)
@@ -98,7 +104,7 @@ func patchValueToSecret(ctx context.Context, kubeClient client.Client, logger lo
 	}
 
 	if valueToPatch == "" {
-		logger.Info("Warning, value at field %s is empty, skipping secret update for: %s", requestFieldPath, data)
+		logger.Info(fmt.Sprintf(errEmptyKey, requestFieldPath, data))
 		return nil
 	}
 
