@@ -144,6 +144,46 @@ func Test_isUpToDate(t *testing.T) {
 				},
 			},
 		},
+		"SuccessNoPUTMapping": {
+			args: args{
+				http: &MockHttpClient{
+					MockSendRequest: func(ctx context.Context, method string, url string, body, headers httpClient.Data, skipTLSVerify bool) (resp httpClient.HttpDetails, err error) {
+						return httpClient.HttpDetails{
+							HttpResponse: httpClient.HttpResponse{
+								Body:       `{"username":"old_name"}`,
+								StatusCode: 200,
+							},
+						}, nil
+					},
+				},
+				localKube: &test.MockClient{
+					MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
+				},
+				mg: httpRequest(func(r *v1alpha2.Request) {
+					r.Status.Response.Body = `{"username":"john_doe_new_username"}`
+					r.Status.Response.StatusCode = 200
+					r.Spec.ForProvider.Mappings = []v1alpha2.Mapping{
+						testPostMapping,
+						testGetMapping,
+						testDeleteMapping,
+					}
+				}),
+			},
+			want: want{
+				err: nil,
+				result: ObserveRequestDetails{
+					Details: httpClient.HttpDetails{
+						HttpResponse: httpClient.HttpResponse{
+							Body:       `{"username":"old_name"}`,
+							Headers:    nil,
+							StatusCode: 200,
+						},
+					},
+					ResponseError: nil,
+					Synced:        true,
+				},
+			},
+		},
 		"SuccessJSONBody": {
 			args: args{
 				http: &MockHttpClient{
