@@ -4,12 +4,12 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Release version (e.g. v0.2.0)'
+        description: "Release version (e.g. v1.0.1)"
         required: true
       channel:
-        description: 'Release channel'
+        description: "Release channel"
         required: true
-        default: 'alpha'
+        default: "alpha"
 
 env:
   CONTRIB_DOCKER_USR: ${{ secrets.CONTRIB_DOCKER_USR }}

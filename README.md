@@ -2,28 +2,26 @@
 
 `provider-http` is a Crossplane Provider designed to facilitate sending HTTP requests as resources.
 
-
 ## Installation
 
 To install `provider-http`, you have two options:
 
 1. Using the Crossplane CLI in a Kubernetes cluster where Crossplane is installed:
 
-    ```console
-    kubectl crossplane install provider xpkg.upbound.io/crossplane-contrib/provider-http:v1.0.0
-    ```
+   ```console
+   crossplane xpkg install provider xpkg.upbound.io/crossplane-contrib/provider-http:v1.0.1
+   ```
 
 2. Manually creating a Provider by applying the following YAML:
 
-    ```yaml
-    apiVersion: pkg.crossplane.io/v1
-    kind: Provider
-    metadata:
-      name: provider-http
-    spec:
-      package: "xpkg.upbound.io/crossplane-contrib/provider-http:v0.2.0"
-    ```
-
+   ```yaml
+   apiVersion: pkg.crossplane.io/v1
+   kind: Provider
+   metadata:
+     name: provider-http
+   spec:
+     package: "xpkg.upbound.io/crossplane-contrib/provider-http:v1.0.1"
+   ```
 
 ## Supported Resources
 
@@ -46,8 +44,8 @@ metadata:
 spec:
   # Add your DisposableRequest specification here
 ```
-For more detailed examples and configuration options, refer to the [examples directory](examples/sample/).
 
+For more detailed examples and configuration options, refer to the [examples directory](examples/sample/).
 
 ### Request
 
@@ -61,16 +59,17 @@ metadata:
 spec:
   # Add your Request specification here
 ```
-For more detailed examples and configuration options, refer to the [examples directory](examples/sample/).
 
+For more detailed examples and configuration options, refer to the [examples directory](examples/sample/).
 
 ## Developing locally
 
 Run controller against the cluster:
+
 ```
 make run
 ```
 
-
 ## Troubleshooting
+
 If you encounter any issues during installation or usage, refer to the [troubleshooting guide](https://docs.crossplane.io/knowledge-base/guides/troubleshoot/) for common problems and solutions.
