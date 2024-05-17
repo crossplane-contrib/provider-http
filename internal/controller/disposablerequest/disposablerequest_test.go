@@ -22,8 +22,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/crossplane-contrib/provider-http/apis/disposablerequest/v1alpha1"
-
+	"github.com/crossplane-contrib/provider-http/apis/disposablerequest/v1alpha2"
 	httpClient "github.com/crossplane-contrib/provider-http/internal/clients/http"
 	"github.com/crossplane-contrib/provider-http/internal/utils"
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
@@ -72,21 +71,21 @@ const (
 	testBody   = "{\"key1\": \"value1\"}"
 )
 
-type httpDisposableRequestModifier func(request *v1alpha1.DisposableRequest)
+type httpDisposableRequestModifier func(request *v1alpha2.DisposableRequest)
 
-func httpDisposableRequest(rm ...httpDisposableRequestModifier) *v1alpha1.DisposableRequest {
-	r := &v1alpha1.DisposableRequest{
+func httpDisposableRequest(rm ...httpDisposableRequestModifier) *v1alpha2.DisposableRequest {
+	r := &v1alpha2.DisposableRequest{
 		ObjectMeta: v1.ObjectMeta{
 			Name:      testDisposableRequestName,
 			Namespace: testNamespace,
 		},
-		Spec: v1alpha1.DisposableRequestSpec{
+		Spec: v1alpha2.DisposableRequestSpec{
 			ResourceSpec: xpv1.ResourceSpec{
 				ProviderConfigReference: &xpv1.Reference{
 					Name: providerName,
 				},
 			},
-			ForProvider: v1alpha1.DisposableRequestParameters{
+			ForProvider: v1alpha2.DisposableRequestParameters{
 				URL:         testURL,
 				Method:      testMethod,
 				Headers:     testHeaders,
@@ -94,7 +93,7 @@ func httpDisposableRequest(rm ...httpDisposableRequestModifier) *v1alpha1.Dispos
 				WaitTimeout: testTimeout,
 			},
 		},
-		Status: v1alpha1.DisposableRequestStatus{},
+		Status: v1alpha2.DisposableRequestStatus{},
 	}
 
 	for _, m := range rm {
@@ -104,13 +103,13 @@ func httpDisposableRequest(rm ...httpDisposableRequestModifier) *v1alpha1.Dispos
 	return r
 }
 
-type MockSendRequestFn func(ctx context.Context, method string, url string, body string, headers map[string][]string, skipTLSVerify bool) (resp httpClient.HttpDetails, err error)
+type MockSendRequestFn func(ctx context.Context, method string, url string, body httpClient.Data, headers httpClient.Data, skipTLSVerify bool) (resp httpClient.HttpDetails, err error)
 
 type MockHttpClient struct {
 	MockSendRequest MockSendRequestFn
 }
 
-func (c *MockHttpClient) SendRequest(ctx context.Context, method string, url string, body string, headers map[string][]string, skipTLSVerify bool) (resp httpClient.HttpDetails, err error) {
+func (c *MockHttpClient) SendRequest(ctx context.Context, method string, url string, body httpClient.Data, headers httpClient.Data, skipTLSVerify bool) (resp httpClient.HttpDetails, err error) {
 	return c.MockSendRequest(ctx, method, url, body, headers, skipTLSVerify)
 }
 
@@ -144,7 +143,7 @@ func Test_httpExternal_Create(t *testing.T) {
 		"DisposableRequestFailed": {
 			args: args{
 				http: &MockHttpClient{
-					MockSendRequest: func(ctx context.Context, method string, url string, body string, headers map[string][]string, skipTLSVerify bool) (resp httpClient.HttpDetails, err error) {
+					MockSendRequest: func(ctx context.Context, method string, url string, body httpClient.Data, headers httpClient.Data, skipTLSVerify bool) (resp httpClient.HttpDetails, err error) {
 						return httpClient.HttpDetails{}, errBoom
 					},
 				},
@@ -162,7 +161,7 @@ func Test_httpExternal_Create(t *testing.T) {
 		"Success": {
 			args: args{
 				http: &MockHttpClient{
-					MockSendRequest: func(ctx context.Context, method string, url string, body string, headers map[string][]string, skipTLSVerify bool) (resp httpClient.HttpDetails, err error) {
+					MockSendRequest: func(ctx context.Context, method string, url string, body httpClient.Data, headers httpClient.Data, skipTLSVerify bool) (resp httpClient.HttpDetails, err error) {
 						return httpClient.HttpDetails{}, nil
 					},
 				},
@@ -220,7 +219,7 @@ func Test_httpExternal_Update(t *testing.T) {
 		"DisposableRequestFailed": {
 			args: args{
 				http: &MockHttpClient{
-					MockSendRequest: func(ctx context.Context, method string, url string, body string, headers map[string][]string, skipTLSVerify bool) (resp httpClient.HttpDetails, err error) {
+					MockSendRequest: func(ctx context.Context, method string, url string, body, headers httpClient.Data, skipTLSVerify bool) (resp httpClient.HttpDetails, err error) {
 						return httpClient.HttpDetails{}, errBoom
 					},
 				},
@@ -237,7 +236,7 @@ func Test_httpExternal_Update(t *testing.T) {
 		"Success": {
 			args: args{
 				http: &MockHttpClient{
-					MockSendRequest: func(ctx context.Context, method string, url string, body string, headers map[string][]string, skipTLSVerify bool) (resp httpClient.HttpDetails, err error) {
+					MockSendRequest: func(ctx context.Context, method string, url string, body, headers httpClient.Data, skipTLSVerify bool) (resp httpClient.HttpDetails, err error) {
 						return httpClient.HttpDetails{}, nil
 					},
 				},
@@ -271,7 +270,7 @@ func Test_httpExternal_Update(t *testing.T) {
 
 func Test_deployAction(t *testing.T) {
 	type args struct {
-		cr        *v1alpha1.DisposableRequest
+		cr        *v1alpha2.DisposableRequest
 		http      httpClient.Client
 		localKube client.Client
 	}
@@ -291,7 +290,7 @@ func Test_deployAction(t *testing.T) {
 		"SuccessUpdateStatusRequestFailure": {
 			args: args{
 				http: &MockHttpClient{
-					MockSendRequest: func(ctx context.Context, method string, url string, body string, headers map[string][]string, skipTLSVerify bool) (resp httpClient.HttpDetails, err error) {
+					MockSendRequest: func(ctx context.Context, method string, url string, body, headers httpClient.Data, skipTLSVerify bool) (resp httpClient.HttpDetails, err error) {
 						return httpClient.HttpDetails{}, errors.Errorf(utils.ErrInvalidURL, "invalid-url")
 					},
 				},
@@ -299,16 +298,16 @@ func Test_deployAction(t *testing.T) {
 					MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
 					MockGet:          test.NewMockGetFn(nil),
 				},
-				cr: &v1alpha1.DisposableRequest{
-					Spec: v1alpha1.DisposableRequestSpec{
-						ForProvider: v1alpha1.DisposableRequestParameters{
+				cr: &v1alpha2.DisposableRequest{
+					Spec: v1alpha2.DisposableRequestSpec{
+						ForProvider: v1alpha2.DisposableRequestParameters{
 							URL:     "invalid-url",
 							Method:  testMethod,
 							Headers: testHeaders,
 							Body:    testBody,
 						},
 					},
-					Status: v1alpha1.DisposableRequestStatus{},
+					Status: v1alpha2.DisposableRequestStatus{},
 				},
 			},
 			want: want{
@@ -319,7 +318,7 @@ func Test_deployAction(t *testing.T) {
 		"SuccessUpdateStatusCodeError": {
 			args: args{
 				http: &MockHttpClient{
-					MockSendRequest: func(ctx context.Context, method string, url string, body string, headers map[string][]string, skipTLSVerify bool) (resp httpClient.HttpDetails, err error) {
+					MockSendRequest: func(ctx context.Context, method string, url string, body, headers httpClient.Data, skipTLSVerify bool) (resp httpClient.HttpDetails, err error) {
 						return httpClient.HttpDetails{
 							HttpResponse: httpClient.HttpResponse{
 								StatusCode: 400,
@@ -333,16 +332,16 @@ func Test_deployAction(t *testing.T) {
 					MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
 					MockGet:          test.NewMockGetFn(nil),
 				},
-				cr: &v1alpha1.DisposableRequest{
-					Spec: v1alpha1.DisposableRequestSpec{
-						ForProvider: v1alpha1.DisposableRequestParameters{
+				cr: &v1alpha2.DisposableRequest{
+					Spec: v1alpha2.DisposableRequestSpec{
+						ForProvider: v1alpha2.DisposableRequestParameters{
 							URL:     testURL,
 							Method:  testMethod,
 							Headers: testHeaders,
 							Body:    testBody,
 						},
 					},
-					Status: v1alpha1.DisposableRequestStatus{},
+					Status: v1alpha2.DisposableRequestStatus{},
 				},
 			},
 			want: want{
@@ -357,7 +356,7 @@ func Test_deployAction(t *testing.T) {
 		"SuccessUpdateStatusSuccessfulRequest": {
 			args: args{
 				http: &MockHttpClient{
-					MockSendRequest: func(ctx context.Context, method string, url string, body string, headers map[string][]string, skipTLSVerify bool) (resp httpClient.HttpDetails, err error) {
+					MockSendRequest: func(ctx context.Context, method string, url string, body, headers httpClient.Data, skipTLSVerify bool) (resp httpClient.HttpDetails, err error) {
 						return httpClient.HttpDetails{
 							HttpResponse: httpClient.HttpResponse{
 								StatusCode: 200,
@@ -371,16 +370,16 @@ func Test_deployAction(t *testing.T) {
 					MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
 					MockGet:          test.NewMockGetFn(nil),
 				},
-				cr: &v1alpha1.DisposableRequest{
-					Spec: v1alpha1.DisposableRequestSpec{
-						ForProvider: v1alpha1.DisposableRequestParameters{
+				cr: &v1alpha2.DisposableRequest{
+					Spec: v1alpha2.DisposableRequestSpec{
+						ForProvider: v1alpha2.DisposableRequestParameters{
 							URL:     testURL,
 							Method:  testMethod,
 							Headers: testHeaders,
 							Body:    testBody,
 						},
 					},
-					Status: v1alpha1.DisposableRequestStatus{},
+					Status: v1alpha2.DisposableRequestStatus{},
 				},
 			},
 			want: want{

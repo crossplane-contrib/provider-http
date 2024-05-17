@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/crossplane-contrib/provider-http/apis/request/v1alpha1"
+	"github.com/crossplane-contrib/provider-http/apis/request/v1alpha2"
 	httpClient "github.com/crossplane-contrib/provider-http/internal/clients/http"
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
 	"github.com/crossplane/crossplane-runtime/pkg/test"
@@ -22,7 +22,7 @@ func Test_isUpToDate(t *testing.T) {
 	type args struct {
 		http      httpClient.Client
 		localKube client.Client
-		mg        *v1alpha1.Request
+		mg        *v1alpha2.Request
 	}
 	type want struct {
 		result ObserveRequestDetails
@@ -36,14 +36,14 @@ func Test_isUpToDate(t *testing.T) {
 		"ObjectNotFoundEmptyBody": {
 			args: args{
 				http: &MockHttpClient{
-					MockSendRequest: func(ctx context.Context, method string, url string, body string, headers map[string][]string, skipTLSVerify bool) (resp httpClient.HttpDetails, err error) {
+					MockSendRequest: func(ctx context.Context, method string, url string, body, headers httpClient.Data, skipTLSVerify bool) (resp httpClient.HttpDetails, err error) {
 						return httpClient.HttpDetails{}, nil
 					},
 				},
 				localKube: &test.MockClient{
 					MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
 				},
-				mg: httpRequest(func(r *v1alpha1.Request) {
+				mg: httpRequest(func(r *v1alpha2.Request) {
 					r.Status.Response.Body = ""
 				}),
 			},
@@ -54,14 +54,14 @@ func Test_isUpToDate(t *testing.T) {
 		"ObjectNotFoundPostFailed": {
 			args: args{
 				http: &MockHttpClient{
-					MockSendRequest: func(ctx context.Context, method string, url string, body string, headers map[string][]string, skipTLSVerify bool) (resp httpClient.HttpDetails, err error) {
+					MockSendRequest: func(ctx context.Context, method string, url string, body, headers httpClient.Data, skipTLSVerify bool) (resp httpClient.HttpDetails, err error) {
 						return httpClient.HttpDetails{}, nil
 					},
 				},
 				localKube: &test.MockClient{
 					MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
 				},
-				mg: httpRequest(func(r *v1alpha1.Request) {
+				mg: httpRequest(func(r *v1alpha2.Request) {
 					r.Status.RequestDetails.Method = http.MethodPost
 					r.Status.Response.StatusCode = 400
 				}),
@@ -73,14 +73,14 @@ func Test_isUpToDate(t *testing.T) {
 		"ObjectNotFound404StatusCode": {
 			args: args{
 				http: &MockHttpClient{
-					MockSendRequest: func(ctx context.Context, method string, url string, body string, headers map[string][]string, skipTLSVerify bool) (resp httpClient.HttpDetails, err error) {
+					MockSendRequest: func(ctx context.Context, method string, url string, body, headers httpClient.Data, skipTLSVerify bool) (resp httpClient.HttpDetails, err error) {
 						return httpClient.HttpDetails{}, nil
 					},
 				},
 				localKube: &test.MockClient{
 					MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
 				},
-				mg: httpRequest(func(r *v1alpha1.Request) {
+				mg: httpRequest(func(r *v1alpha2.Request) {
 					r.Status.Response.StatusCode = 404
 				}),
 			},
@@ -91,7 +91,7 @@ func Test_isUpToDate(t *testing.T) {
 		"FailBodyNotJSON": {
 			args: args{
 				http: &MockHttpClient{
-					MockSendRequest: func(ctx context.Context, method string, url string, body string, headers map[string][]string, skipTLSVerify bool) (resp httpClient.HttpDetails, err error) {
+					MockSendRequest: func(ctx context.Context, method string, url string, body, headers httpClient.Data, skipTLSVerify bool) (resp httpClient.HttpDetails, err error) {
 						return httpClient.HttpDetails{
 							HttpResponse: httpClient.HttpResponse{
 								Body: "not a JSON",
@@ -102,7 +102,7 @@ func Test_isUpToDate(t *testing.T) {
 				localKube: &test.MockClient{
 					MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
 				},
-				mg: httpRequest(func(r *v1alpha1.Request) {
+				mg: httpRequest(func(r *v1alpha2.Request) {
 					r.Status.Response.Body = `{"username":"john_doe_new_username"}`
 				}),
 			},
@@ -113,7 +113,7 @@ func Test_isUpToDate(t *testing.T) {
 		"SuccessNotSynced": {
 			args: args{
 				http: &MockHttpClient{
-					MockSendRequest: func(ctx context.Context, method string, url string, body string, headers map[string][]string, skipTLSVerify bool) (resp httpClient.HttpDetails, err error) {
+					MockSendRequest: func(ctx context.Context, method string, url string, body, headers httpClient.Data, skipTLSVerify bool) (resp httpClient.HttpDetails, err error) {
 						return httpClient.HttpDetails{
 							HttpResponse: httpClient.HttpResponse{
 								Body:       `{"username":"old_name"}`,
@@ -125,7 +125,7 @@ func Test_isUpToDate(t *testing.T) {
 				localKube: &test.MockClient{
 					MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
 				},
-				mg: httpRequest(func(r *v1alpha1.Request) {
+				mg: httpRequest(func(r *v1alpha2.Request) {
 					r.Status.Response.Body = `{"username":"john_doe_new_username"}`
 				}),
 			},
@@ -144,10 +144,50 @@ func Test_isUpToDate(t *testing.T) {
 				},
 			},
 		},
+		"SuccessNoPUTMapping": {
+			args: args{
+				http: &MockHttpClient{
+					MockSendRequest: func(ctx context.Context, method string, url string, body, headers httpClient.Data, skipTLSVerify bool) (resp httpClient.HttpDetails, err error) {
+						return httpClient.HttpDetails{
+							HttpResponse: httpClient.HttpResponse{
+								Body:       `{"username":"old_name"}`,
+								StatusCode: 200,
+							},
+						}, nil
+					},
+				},
+				localKube: &test.MockClient{
+					MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
+				},
+				mg: httpRequest(func(r *v1alpha2.Request) {
+					r.Status.Response.Body = `{"username":"john_doe_new_username"}`
+					r.Status.Response.StatusCode = 200
+					r.Spec.ForProvider.Mappings = []v1alpha2.Mapping{
+						testPostMapping,
+						testGetMapping,
+						testDeleteMapping,
+					}
+				}),
+			},
+			want: want{
+				err: nil,
+				result: ObserveRequestDetails{
+					Details: httpClient.HttpDetails{
+						HttpResponse: httpClient.HttpResponse{
+							Body:       `{"username":"old_name"}`,
+							Headers:    nil,
+							StatusCode: 200,
+						},
+					},
+					ResponseError: nil,
+					Synced:        true,
+				},
+			},
+		},
 		"SuccessJSONBody": {
 			args: args{
 				http: &MockHttpClient{
-					MockSendRequest: func(ctx context.Context, method string, url string, body string, headers map[string][]string, skipTLSVerify bool) (resp httpClient.HttpDetails, err error) {
+					MockSendRequest: func(ctx context.Context, method string, url string, body, headers httpClient.Data, skipTLSVerify bool) (resp httpClient.HttpDetails, err error) {
 						return httpClient.HttpDetails{
 							HttpResponse: httpClient.HttpResponse{
 								Body:       `{"username":"john_doe_new_username"}`,
@@ -159,7 +199,7 @@ func Test_isUpToDate(t *testing.T) {
 				localKube: &test.MockClient{
 					MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
 				},
-				mg: httpRequest(func(r *v1alpha1.Request) {
+				mg: httpRequest(func(r *v1alpha2.Request) {
 					r.Status.Response.Body = `{"username":"john_doe_new_username"}`
 					r.Status.Response.StatusCode = 200
 				}),

@@ -15,7 +15,7 @@ import (
 
 // Client is the interface to interact with Http
 type Client interface {
-	SendRequest(ctx context.Context, method string, url string, body string, headers map[string][]string, skipTLSVerify bool) (resp HttpDetails, err error)
+	SendRequest(ctx context.Context, method string, url string, body Data, headers Data, skipTLSVerify bool) (resp HttpDetails, err error)
 }
 
 type client struct {
@@ -24,9 +24,14 @@ type client struct {
 }
 
 type HttpResponse struct {
-	Body       string
-	Headers    map[string][]string
-	StatusCode int
+	Body       string              `json:"body"`
+	Headers    map[string][]string `json:"headers"`
+	StatusCode int                 `json:"statusCode"`
+}
+
+type Data struct {
+	Encrypted interface{} // Data containing encrypted data -> to be shown at the status
+	Decrypted interface{} // Data containing sensitive data -> to be sent
 }
 
 type HttpRequest struct {
@@ -41,14 +46,13 @@ type HttpDetails struct {
 	HttpRequest  HttpRequest
 }
 
-func (hc *client) SendRequest(ctx context.Context, method string, url string, body string, headers map[string][]string, skipTLSVerify bool) (details HttpDetails, err error) {
-	requestBody := []byte(body)
+func (hc *client) SendRequest(ctx context.Context, method string, url string, body Data, headers Data, skipTLSVerify bool) (details HttpDetails, err error) {
+	requestBody := []byte(body.Decrypted.(string))
 	request, err := http.NewRequestWithContext(ctx, method, url, bytes.NewBuffer(requestBody))
-
 	requestDetails := HttpRequest{
 		URL:     url,
-		Body:    body,
-		Headers: headers,
+		Body:    body.Encrypted.(string),
+		Headers: headers.Encrypted.(map[string][]string),
 		Method:  method,
 	}
 
@@ -58,7 +62,7 @@ func (hc *client) SendRequest(ctx context.Context, method string, url string, bo
 		}, err
 	}
 
-	for key, values := range headers {
+	for key, values := range headers.Decrypted.(map[string][]string) {
 		for _, value := range values {
 			request.Header.Add(key, value)
 		}

@@ -2,10 +2,11 @@ package request
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"strings"
 
-	"github.com/crossplane-contrib/provider-http/apis/request/v1alpha1"
+	"github.com/crossplane-contrib/provider-http/apis/request/v1alpha2"
 	httpClient "github.com/crossplane-contrib/provider-http/internal/clients/http"
 	"github.com/crossplane-contrib/provider-http/internal/controller/request/requestgen"
 	"github.com/crossplane-contrib/provider-http/internal/json"
@@ -43,12 +44,12 @@ func FailedObserve() ObserveRequestDetails {
 }
 
 // isUpToDate checks whether desired spec up to date with the observed state for a given request
-func (c *external) isUpToDate(ctx context.Context, cr *v1alpha1.Request) (ObserveRequestDetails, error) {
+func (c *external) isUpToDate(ctx context.Context, cr *v1alpha2.Request) (ObserveRequestDetails, error) {
 	if !c.isObjectValidForObservation(cr) {
 		return FailedObserve(), errors.New(errObjectNotFound)
 	}
 
-	requestDetails, err := c.requestDetails(cr, http.MethodGet)
+	requestDetails, err := c.requestDetails(ctx, cr, http.MethodGet)
 	if err != nil {
 		return FailedObserve(), err
 	}
@@ -58,15 +59,22 @@ func (c *external) isUpToDate(ctx context.Context, cr *v1alpha1.Request) (Observ
 		return FailedObserve(), errors.New(errObjectNotFound)
 	}
 
-	desiredState, err := c.desiredState(cr)
+	c.patchResponseToSecret(ctx, cr, &details.HttpResponse)
+	desiredState, err := c.desiredState(ctx, cr)
 	if err != nil {
+		if isErrorMappingNotFound(err) {
+			// Since there is no PUT mapping, we skip the check for its presence in the GET response.
+			return NewObserve(details, responseErr, true), nil
+		}
+
+		// For any other error, we return a failed observation.
 		return FailedObserve(), err
 	}
 
 	return c.compareResponseAndDesiredState(details, responseErr, desiredState)
 }
 
-func (c *external) isObjectValidForObservation(cr *v1alpha1.Request) bool {
+func (c *external) isObjectValidForObservation(cr *v1alpha2.Request) bool {
 	return cr.Status.Response.Body != "" &&
 		!(cr.Status.RequestDetails.Method == http.MethodPost && utils.IsHTTPError(cr.Status.Response.StatusCode))
 }
@@ -93,16 +101,26 @@ func (c *external) compareResponseAndDesiredState(details httpClient.HttpDetails
 	return observeRequestDetails, nil
 }
 
-func (c *external) desiredState(cr *v1alpha1.Request) (string, error) {
-	requestDetails, err := c.requestDetails(cr, http.MethodPut)
-	return requestDetails.Body, err
+func (c *external) desiredState(ctx context.Context, cr *v1alpha2.Request) (string, error) {
+	requestDetails, err := c.requestDetails(ctx, cr, http.MethodPut)
+	if err != nil {
+		return "", err
+	}
+
+	return requestDetails.Body.Encrypted.(string), nil
 }
 
-func (c *external) requestDetails(cr *v1alpha1.Request, method string) (requestgen.RequestDetails, error) {
+func (c *external) requestDetails(ctx context.Context, cr *v1alpha2.Request, method string) (requestgen.RequestDetails, error) {
 	mapping, ok := getMappingByMethod(&cr.Spec.ForProvider, method)
 	if !ok {
 		return requestgen.RequestDetails{}, errors.Errorf(errMappingNotFound, method)
 	}
 
-	return generateValidRequestDetails(cr, mapping)
+	return generateValidRequestDetails(ctx, c.localKube, cr, mapping)
+}
+
+// isErrorMappingNotFound checks if the provided error indicates that the
+// mapping for an HTTP PUT request is not found.
+func isErrorMappingNotFound(err error) bool {
+	return errors.Cause(err).Error() == fmt.Sprintf(errMappingNotFound, http.MethodPut)
 }

@@ -22,13 +22,14 @@ import (
 	"strconv"
 	"time"
 
+	datapatcher "github.com/crossplane-contrib/provider-http/internal/data-patcher"
+	"github.com/crossplane-contrib/provider-http/internal/jq"
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/crossplane-contrib/provider-http/internal/jq"
 	json_util "github.com/crossplane-contrib/provider-http/internal/json"
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/pkg/controller"
@@ -37,7 +38,7 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
 
-	"github.com/crossplane-contrib/provider-http/apis/disposablerequest/v1alpha1"
+	"github.com/crossplane-contrib/provider-http/apis/disposablerequest/v1alpha2"
 	apisv1alpha1 "github.com/crossplane-contrib/provider-http/apis/v1alpha1"
 	httpClient "github.com/crossplane-contrib/provider-http/internal/clients/http"
 	"github.com/crossplane-contrib/provider-http/internal/utils"
@@ -51,15 +52,22 @@ const (
 	errFailedToSendHttpDisposableRequest = "failed to send http request"
 	errFailedUpdateStatusConditions      = "failed updating status conditions"
 	ErrExpectedFormat                    = "JQ filter should return a boolean, but returned error: %s"
+	errPatchFromReferencedSecret         = "cannot patch from referenced secret"
+	errGetReferencedSecret               = "cannot get referenced secret"
+	errCreateReferencedSecret            = "cannot create referenced secret"
+	errPatchDataToSecret                 = "Warning, couldn't patch data from request to secret %s:%s:%s, error: %s"
+	errConvertResToMap                   = "failed to convert response to map"
+	errGetLatestVersion                  = "failed to get the latest version of the resource"
+	errResponseFormat                    = "Response does not match the expected format, retries limit "
 )
 
 // Setup adds a controller that reconciles DisposableRequest managed resources.
 func Setup(mgr ctrl.Manager, o controller.Options, timeout time.Duration) error {
-	name := managed.ControllerName(v1alpha1.DisposableRequestGroupKind)
+	name := managed.ControllerName(v1alpha2.DisposableRequestGroupKind)
 	cps := []managed.ConnectionPublisher{managed.NewAPISecretPublisher(mgr.GetClient(), mgr.GetScheme())}
 
 	r := managed.NewReconciler(mgr,
-		resource.ManagedKind(v1alpha1.DisposableRequestGroupVersionKind),
+		resource.ManagedKind(v1alpha2.DisposableRequestGroupVersionKind),
 		managed.WithExternalConnecter(&connector{
 			logger:          o.Logger,
 			kube:            mgr.GetClient(),
@@ -76,7 +84,7 @@ func Setup(mgr ctrl.Manager, o controller.Options, timeout time.Duration) error 
 		Named(name).
 		WithOptions(o.ForControllerRuntime()).
 		WithEventFilter(resource.DesiredStateChanged()).
-		For(&v1alpha1.DisposableRequest{}).
+		For(&v1alpha2.DisposableRequest{}).
 		Complete(ratelimiter.NewReconciler(name, r, o.GlobalRateLimiter))
 }
 
@@ -88,7 +96,7 @@ type connector struct {
 }
 
 func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.ExternalClient, error) {
-	cr, ok := mg.(*v1alpha1.DisposableRequest)
+	cr, ok := mg.(*v1alpha2.DisposableRequest)
 	if !ok {
 		return nil, errors.New(errNotDisposableRequest)
 	}
@@ -124,7 +132,7 @@ type external struct {
 }
 
 func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
-	cr, ok := mg.(*v1alpha1.DisposableRequest)
+	cr, ok := mg.(*v1alpha2.DisposableRequest)
 	if !ok {
 		return managed.ExternalObservation{}, errors.New(errNotDisposableRequest)
 	}
@@ -137,7 +145,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 
 	// Get the latest version of the resource before updating
 	if err := c.localKube.Get(ctx, types.NamespacedName{Name: cr.Name, Namespace: cr.Namespace}, cr); err != nil {
-		return managed.ExternalObservation{}, errors.Wrap(err, "failed to get the latest version of the resource")
+		return managed.ExternalObservation{}, errors.Wrap(err, errGetLatestVersion)
 	}
 
 	cr.Status.SetConditions(xpv1.Available())
@@ -152,11 +160,22 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	}, nil
 }
 
-func (c *external) deployAction(ctx context.Context, cr *v1alpha1.DisposableRequest) error {
-	details, err := c.http.SendRequest(ctx, cr.Spec.ForProvider.Method,
-		cr.Spec.ForProvider.URL, cr.Spec.ForProvider.Body, cr.Spec.ForProvider.Headers, cr.Spec.ForProvider.InsecureSkipTLSVerify)
+func (c *external) deployAction(ctx context.Context, cr *v1alpha2.DisposableRequest) error {
+	sensitiveBody, err := datapatcher.PatchSecretsIntoBody(ctx, c.localKube, cr.Spec.ForProvider.Body)
+	if err != nil {
+		return err
+	}
 
-	res := details.HttpResponse
+	sensitiveHeaders, err := datapatcher.PatchSecretsIntoHeaders(ctx, c.localKube, cr.Spec.ForProvider.Headers)
+	if err != nil {
+		return err
+	}
+
+	bodyData := httpClient.Data{Encrypted: cr.Spec.ForProvider.Body, Decrypted: sensitiveBody}
+	headersData := httpClient.Data{Encrypted: cr.Spec.ForProvider.Headers, Decrypted: sensitiveHeaders}
+	details, err := c.http.SendRequest(ctx, cr.Spec.ForProvider.Method, cr.Spec.ForProvider.URL, bodyData, headersData, cr.Spec.ForProvider.InsecureSkipTLSVerify)
+
+	sensitiveResponse := details.HttpResponse
 	resource := &utils.RequestResource{
 		Resource:       cr,
 		RequestContext: ctx,
@@ -165,9 +184,11 @@ func (c *external) deployAction(ctx context.Context, cr *v1alpha1.DisposableRequ
 		HttpRequest:    details.HttpRequest,
 	}
 
+	c.patchResponseToSecret(ctx, cr, &resource.HttpResponse)
+
 	// Get the latest version of the resource before updating
 	if err := c.localKube.Get(ctx, types.NamespacedName{Name: cr.Name, Namespace: cr.Namespace}, cr); err != nil {
-		return errors.Wrap(err, "failed to get the latest version of the resource")
+		return errors.Wrap(err, errGetLatestVersion)
 	}
 
 	if err != nil {
@@ -178,15 +199,15 @@ func (c *external) deployAction(ctx context.Context, cr *v1alpha1.DisposableRequ
 		return err
 	}
 
-	if utils.IsHTTPError(res.StatusCode) {
+	if utils.IsHTTPError(resource.HttpResponse.StatusCode) {
 		if settingError := utils.SetRequestResourceStatus(*resource, resource.SetStatusCode(), resource.SetHeaders(), resource.SetBody(), resource.SetRequestDetails(), resource.SetError(nil)); settingError != nil {
 			return errors.Wrap(settingError, utils.ErrFailedToSetStatus)
 		}
 
-		return errors.Errorf(utils.ErrStatusCode, cr.Spec.ForProvider.Method, strconv.Itoa(res.StatusCode))
+		return errors.Errorf(utils.ErrStatusCode, cr.Spec.ForProvider.Method, strconv.Itoa(resource.HttpResponse.StatusCode))
 	}
 
-	isExpectedResponse, err := c.isResponseAsExpected(cr, res)
+	isExpectedResponse, err := c.isResponseAsExpected(cr, sensitiveResponse)
 	if err != nil {
 		return err
 	}
@@ -194,13 +215,13 @@ func (c *external) deployAction(ctx context.Context, cr *v1alpha1.DisposableRequ
 	if !isExpectedResponse {
 		limit := utils.GetRollbackRetriesLimit(cr.Spec.ForProvider.RollbackRetriesLimit)
 		return utils.SetRequestResourceStatus(*resource, resource.SetStatusCode(), resource.SetHeaders(), resource.SetBody(),
-			resource.SetError(errors.New("Response does not match the expected format, retries limit "+fmt.Sprint(limit))), resource.SetRequestDetails())
+			resource.SetError(errors.New(errResponseFormat+fmt.Sprint(limit))), resource.SetRequestDetails())
 	}
 
 	return utils.SetRequestResourceStatus(*resource, resource.SetStatusCode(), resource.SetHeaders(), resource.SetBody(), resource.SetSynced(), resource.SetRequestDetails())
 }
 
-func (c *external) isResponseAsExpected(cr *v1alpha1.DisposableRequest, res httpClient.HttpResponse) (bool, error) {
+func (c *external) isResponseAsExpected(cr *v1alpha2.DisposableRequest, res httpClient.HttpResponse) (bool, error) {
 	// If no expected response is defined, consider it as expected.
 	if cr.Spec.ForProvider.ExpectedResponse == "" {
 		return true, nil
@@ -212,7 +233,7 @@ func (c *external) isResponseAsExpected(cr *v1alpha1.DisposableRequest, res http
 
 	responseMap, err := json_util.StructToMap(res)
 	if err != nil {
-		return false, errors.Wrap(err, "failed to convert response to map")
+		return false, errors.Wrap(err, errConvertResToMap)
 	}
 
 	json_util.ConvertJSONStringsToMaps(&responseMap)
@@ -226,7 +247,7 @@ func (c *external) isResponseAsExpected(cr *v1alpha1.DisposableRequest, res http
 }
 
 func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.ExternalCreation, error) {
-	cr, ok := mg.(*v1alpha1.DisposableRequest)
+	cr, ok := mg.(*v1alpha2.DisposableRequest)
 	if !ok {
 		return managed.ExternalCreation{}, errors.New(errNotDisposableRequest)
 	}
@@ -239,7 +260,7 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 }
 
 func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.ExternalUpdate, error) {
-	cr, ok := mg.(*v1alpha1.DisposableRequest)
+	cr, ok := mg.(*v1alpha2.DisposableRequest)
 	if !ok {
 		return managed.ExternalUpdate{}, errors.New(errNotDisposableRequest)
 	}
@@ -253,4 +274,13 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 
 func (c *external) Delete(_ context.Context, _ resource.Managed) error {
 	return nil
+}
+
+func (c *external) patchResponseToSecret(ctx context.Context, cr *v1alpha2.DisposableRequest, response *httpClient.HttpResponse) {
+	for _, ref := range cr.Spec.ForProvider.SecretInjectionConfigs {
+		err := datapatcher.PatchResponseToSecret(ctx, c.localKube, c.logger, response, ref.ResponsePath, ref.SecretKey, ref.SecretRef.Name, ref.SecretRef.Namespace)
+		if err != nil {
+			c.logger.Info(fmt.Sprintf(errPatchDataToSecret, ref.SecretRef.Name, ref.SecretRef.Namespace, ref.SecretKey, err.Error()))
+		}
+	}
 }

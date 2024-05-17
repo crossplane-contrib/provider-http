@@ -1,4 +1,4 @@
-apiVersion: http.crossplane.io/v1alpha1
+apiVersion: http.crossplane.io/v1alpha2
 kind: Request
 metadata:
   name: laundry
@@ -9,13 +9,16 @@ spec:
     headers:
       Content-Type:
         - application/json
+      Authorization:
+        - ("Bearer {{ auth:default:token }}")
     payload:
       baseUrl: http://todo.default.svc.cluster.local/todos
       body: |
         {
           "name": "Do Laundry", 
           "reminder": "Every 1 hour", 
-          "responsible": "Dan"
+          "responsible": "Dan",
+          "password": "secretdata {{ password:crossplane-system:secretKey }}"
         }
     mappings:
       - method: "POST"
@@ -27,10 +30,14 @@ spec:
           }
         url: .payload.baseUrl
         headers:
+          Content-Type:
+            - application/json
           Authorization:
-            - token
+            - ("Bearer {{ auth:default:token }}")
+          Extra-Header-For-Post:
+            - extra-value
       - method: "GET"
-        url: (.payload.baseUrl + "/" + (.response.body.id|tostring)) 
+        url: (.payload.baseUrl + "/" + (.response.body.id|tostring))
       - method: "PUT"
         body: |
           {
@@ -38,9 +45,21 @@ spec:
             reminder: .payload.body.reminder, 
             responsible: .payload.body.responsible
           }
-        url: (.payload.baseUrl + "/" + (.response.body.id|tostring)) 
+        url: (.payload.baseUrl + "/" + (.response.body.id|tostring))
       - method: "DELETE"
-        url: (.payload.baseUrl + "/" + (.response.body.id|tostring)) 
-  
+        url: (.payload.baseUrl + "/" + (.response.body.id|tostring))
+    
+    # Secrets receiving patches from response data
+    secretInjectionConfigs: 
+      - secretRef:
+          name: response-secret
+          namespace: default
+        secretKey: extracted-data
+        responsePath: .body.reminder
+      - secretRef:
+          name: response-secret
+          namespace: default
+        secretKey: extracted-data-headers
+        responsePath: .headers.Try[0]
   providerConfigRef:
     name: http-conf

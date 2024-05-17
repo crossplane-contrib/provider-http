@@ -3,7 +3,7 @@ package responseconverter
 import (
 	"testing"
 
-	"github.com/crossplane-contrib/provider-http/apis/request/v1alpha1"
+	"github.com/crossplane-contrib/provider-http/apis/request/v1alpha2"
 	httpClient "github.com/crossplane-contrib/provider-http/internal/clients/http"
 	"github.com/google/go-cmp/cmp"
 )
@@ -20,7 +20,7 @@ func Test_HttpResponseToV1alpha1Response(t *testing.T) {
 		httpResponse httpClient.HttpResponse
 	}
 	type want struct {
-		result v1alpha1.Response
+		result v1alpha2.Response
 	}
 	cases := map[string]struct {
 		args args
@@ -35,7 +35,7 @@ func Test_HttpResponseToV1alpha1Response(t *testing.T) {
 				},
 			},
 			want: want{
-				result: v1alpha1.Response{
+				result: v1alpha2.Response{
 					Body:       `{"email":"john.doe@example.com","name":"john_doe"}`,
 					Headers:    testHeaders,
 					StatusCode: 200,
