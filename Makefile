@@ -38,7 +38,7 @@ GOLANGCILINT_VERSION = 1.51.2
 # ====================================================================================
 # Setup Kubernetes tools
 KIND_VERSION = v0.18.0
-UP_VERSION = v0.17.0
+UP_VERSION = v0.28.0
 UPTEST_VERSION = v0.5.0
 UP_CHANNEL = stable
 USE_HELM3 = true
@@ -127,3 +127,6 @@ manifests:
 	@$(INFO) Deprecated. Run make generate instead.
 
 .PHONY: cobertura submodules fallthrough test-integration run manifests
+
+vendor: modules.download
+vendor.check: modules.check
