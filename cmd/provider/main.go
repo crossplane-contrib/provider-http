@@ -19,8 +19,9 @@ package main
 import (
 	"os"
 	"path/filepath"
-	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"time"
+
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 
 	"gopkg.in/alecthomas/kingpin.v2"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"

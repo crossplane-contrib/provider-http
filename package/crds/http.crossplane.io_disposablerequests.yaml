@@ -454,7 +454,7 @@ spec:
                     description: |-
                       ExpectedResponse is a jq filter expression used to evaluate the HTTP response and determine if it matches the expected criteria.
                       The expression should return a boolean; if true, the response is considered expected.
-                      Example: '.Body.job_status == "success"'
+                      Example: '.body.job_status == "success"'
                     type: string
                   headers:
                     additionalProperties:
@@ -474,6 +474,10 @@ spec:
                     x-kubernetes-validations:
                     - message: Field 'forProvider.method' is immutable
                       rule: self == oldSelf
+                  nextReconcile:
+                    description: NextReconcile specifies the duration after which
+                      the next reconcile should occur.
+                    type: string
                   rollbackRetriesLimit:
                     description: RollbackRetriesLimit is max number of attempts to
                       retry HTTP request by sending again the request.
@@ -481,7 +485,7 @@ spec:
                     type: integer
                   secretInjectionConfigs:
                     description: SecretInjectionConfig specifies the secrets receiving
-                      patches for response data.
+                      patches from response data.
                     items:
                       description: SecretInjectionConfig represents the configuration
                         for injecting secret data into a Kubernetes secret.
@@ -516,6 +520,10 @@ spec:
                       - secretRef
                       type: object
                     type: array
+                  shouldLoopInfinitely:
+                    description: ShouldLoopInfinitely specifies whether the reconciliation
+                      should loop indefinitely.
+                    type: boolean
                   url:
                     type: string
                     x-kubernetes-validations:
@@ -751,6 +759,11 @@ spec:
               failed:
                 format: int32
                 type: integer
+              lastReconcileTime:
+                description: LastReconcileTime records the last time the resource
+                  was reconciled.
+                format: date-time
+                type: string
               observedGeneration:
                 description: |-
                   ObservedGeneration is the latest metadata.generation

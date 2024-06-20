@@ -1,5 +1,11 @@
 package v1alpha2
 
+import (
+	"time"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
 func (d *DisposableRequest) SetStatusCode(statusCode int) {
 	d.Status.Response.StatusCode = statusCode
 }
@@ -16,6 +22,10 @@ func (d *DisposableRequest) SetSynced(synced bool) {
 	d.Status.Synced = synced
 	d.Status.Failed = 0
 	d.Status.Error = ""
+}
+
+func (d *DisposableRequest) SetLastReconcileTime() {
+	d.Status.LastReconcileTime = metav1.NewTime(time.Now())
 }
 
 func (d *DisposableRequest) SetError(err error) {

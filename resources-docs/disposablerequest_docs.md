@@ -24,6 +24,21 @@ Here is an example `DisposableRequest` resource definition:
             - application/json
           Authorization:
             - Bearer myToken
+        rollbackRetriesLimit: 3
+        shouldLoopInfinitely: true
+        nextReconcile: 3m
+        expectedResponse: '.body.job_status == "success"'
+        secretInjectionConfigs: 
+          - secretRef:
+              name: response-secret
+              namespace: default
+            secretKey: extracted-data
+            responsePath: .body.reminder
+          - secretRef:
+              name: response-secret
+              namespace: default
+            secretKey: extracted-data-headers
+            responsePath: .headers.Try[0]
 ```
 
 -  deletionPolicy: specifies what will happen to the underlying external when this managed resource is   deleted. in this case it should be set to "Orphan" the external resource.
@@ -33,7 +48,13 @@ Here is an example `DisposableRequest` resource definition:
 -  headers: Optional list of headers to include in the request.
 -  waitTimeout: Optional timeout for the HTTP request.
 -  rollbackLimit: Optional limit for retries.
+-  rollbackRetriesLimit: Optional Limits the number of retries when rolling back changes.
+-  shouldLoopInfinitely: Optional (defaults to false) Indicates whether the reconciliation should loop indefinitely.
+-  nextReconcile: Optional Specifies the duration after which the next reconcile should occur.
+-  secretInjectionConfigs: Optional Configurations for secrets receiving patches from response data.
 
+### Secrets Injection
+The DisposableRequest resource supports injecting data from secrets into the request's body and headers using the following syntax: {{ name:namespace:key }} (supported for body and headers only).
 
 ### Status
 The status field of the `DisposableRequest` resource will provide information about the execution status and results of the HTTP request.
