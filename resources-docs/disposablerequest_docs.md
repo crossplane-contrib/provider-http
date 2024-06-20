@@ -47,8 +47,7 @@ Here is an example `DisposableRequest` resource definition:
 -  body: Optional body of http request.
 -  headers: Optional list of headers to include in the request.
 -  waitTimeout: Optional timeout for the HTTP request.
--  rollbackLimit: Optional limit for retries.
--  rollbackRetriesLimit: Optional Limits the number of retries when rolling back changes.
+-  rollbackRetriesLimit: Optional Limits the number of retries.
 -  shouldLoopInfinitely: Optional (defaults to false) Indicates whether the reconciliation should loop indefinitely.
 -  nextReconcile: Optional Specifies the duration after which the next reconcile should occur.
 -  secretInjectionConfigs: Optional Configurations for secrets receiving patches from response data.

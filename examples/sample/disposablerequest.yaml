@@ -21,15 +21,15 @@ spec:
         - "Bearer {{ auth:default:token }}"
     insecureSkipTLSVerify: true
 
-    # Explanation: The 'expectedResponse' field is optional. If used, also set 'rollbackRetriesLimit', which determines the number of HTTP requests to be sent until the jq query returns true.
+    # The 'expectedResponse' field is optional. If used, also set 'rollbackRetriesLimit', which determines the number of HTTP requests to be sent until the jq query returns true.
     # expectedResponse: '.body.job_status == "success"'
     rollbackRetriesLimit: 5
     waitTimeout: 5m
 
-    # Explanation: Indicates whether the reconciliation should loop indefinitely. If `rollbackRetriesLimit` is set and the request returns an error, it will stop reconciliation once the limit is reached.
+    # Indicates whether the reconciliation should loop indefinitely. If `rollbackRetriesLimit` is set and the request returns an error, it will stop reconciliation once the limit is reached.
     # shouldLoopInfinitely: true
 
-    # Explanation: Specifies the duration after which the next reconcile should occur.
+    # Specifies the duration after which the next reconcile should occur.
     # nextReconcile: 3m 
 
     # Secrets receiving patches from response data
