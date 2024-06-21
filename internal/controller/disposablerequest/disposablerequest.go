@@ -76,6 +76,7 @@ func Setup(mgr ctrl.Manager, o controller.Options, timeout time.Duration) error 
 		}),
 		managed.WithLogger(o.Logger.WithValues("controller", name)),
 		managed.WithPollInterval(o.PollInterval),
+		WithCustomPollIntervalHook(),
 		managed.WithTimeout(timeout),
 		managed.WithRecorder(event.NewAPIRecorder(mgr.GetEventRecorderFor(name))),
 		managed.WithConnectionPublishers(cps...))
@@ -153,9 +154,18 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.New(errFailedUpdateStatusConditions)
 	}
 
+	isUpToDate := !(utils.ShouldRetry(cr.Spec.ForProvider.RollbackRetriesLimit, cr.Status.Failed) && !utils.RetriesLimitReached(cr.Status.Failed, cr.Spec.ForProvider.RollbackRetriesLimit))
+
+	// If shouldLoopInfinitely is true, the resource should never be considered up-to-date
+	if cr.Spec.ForProvider.ShouldLoopInfinitely {
+		if cr.Spec.ForProvider.RollbackRetriesLimit == nil {
+			isUpToDate = false
+		}
+	}
+
 	return managed.ExternalObservation{
 		ResourceExists:    true,
-		ResourceUpToDate:  !(utils.ShouldRetry(cr.Spec.ForProvider.RollbackRetriesLimit, cr.Status.Failed) && !utils.RetriesLimitReached(cr.Status.Failed, cr.Spec.ForProvider.RollbackRetriesLimit)),
+		ResourceUpToDate:  isUpToDate,
 		ConnectionDetails: nil,
 	}, nil
 }
@@ -193,14 +203,14 @@ func (c *external) deployAction(ctx context.Context, cr *v1alpha2.DisposableRequ
 
 	if err != nil {
 		setErr := resource.SetError(err)
-		if settingError := utils.SetRequestResourceStatus(*resource, setErr, resource.SetRequestDetails()); settingError != nil {
+		if settingError := utils.SetRequestResourceStatus(*resource, setErr, resource.SetLastReconcileTime(), resource.SetRequestDetails()); settingError != nil {
 			return errors.Wrap(settingError, utils.ErrFailedToSetStatus)
 		}
 		return err
 	}
 
 	if utils.IsHTTPError(resource.HttpResponse.StatusCode) {
-		if settingError := utils.SetRequestResourceStatus(*resource, resource.SetStatusCode(), resource.SetHeaders(), resource.SetBody(), resource.SetRequestDetails(), resource.SetError(nil)); settingError != nil {
+		if settingError := utils.SetRequestResourceStatus(*resource, resource.SetStatusCode(), resource.SetLastReconcileTime(), resource.SetHeaders(), resource.SetBody(), resource.SetRequestDetails(), resource.SetError(nil)); settingError != nil {
 			return errors.Wrap(settingError, utils.ErrFailedToSetStatus)
 		}
 
@@ -214,11 +224,11 @@ func (c *external) deployAction(ctx context.Context, cr *v1alpha2.DisposableRequ
 
 	if !isExpectedResponse {
 		limit := utils.GetRollbackRetriesLimit(cr.Spec.ForProvider.RollbackRetriesLimit)
-		return utils.SetRequestResourceStatus(*resource, resource.SetStatusCode(), resource.SetHeaders(), resource.SetBody(),
+		return utils.SetRequestResourceStatus(*resource, resource.SetStatusCode(), resource.SetLastReconcileTime(), resource.SetHeaders(), resource.SetBody(),
 			resource.SetError(errors.New(errResponseFormat+fmt.Sprint(limit))), resource.SetRequestDetails())
 	}
 
-	return utils.SetRequestResourceStatus(*resource, resource.SetStatusCode(), resource.SetHeaders(), resource.SetBody(), resource.SetSynced(), resource.SetRequestDetails())
+	return utils.SetRequestResourceStatus(*resource, resource.SetStatusCode(), resource.SetLastReconcileTime(), resource.SetHeaders(), resource.SetBody(), resource.SetSynced(), resource.SetRequestDetails())
 }
 
 func (c *external) isResponseAsExpected(cr *v1alpha2.DisposableRequest, res httpClient.HttpResponse) (bool, error) {
@@ -283,4 +293,35 @@ func (c *external) patchResponseToSecret(ctx context.Context, cr *v1alpha2.Dispo
 			c.logger.Info(fmt.Sprintf(errPatchDataToSecret, ref.SecretRef.Name, ref.SecretRef.Namespace, ref.SecretKey, err.Error()))
 		}
 	}
+}
+
+// WithCustomPollIntervalHook returns a managed.ReconcilerOption that sets a custom poll interval based on the DisposableRequest spec.
+func WithCustomPollIntervalHook() managed.ReconcilerOption {
+	return managed.WithPollIntervalHook(func(mg resource.Managed, pollInterval time.Duration) time.Duration {
+		defaultPollInterval := 30 * time.Second
+
+		cr, ok := mg.(*v1alpha2.DisposableRequest)
+		if !ok {
+			return defaultPollInterval
+		}
+
+		if cr.Spec.ForProvider.NextReconcile == nil {
+			return defaultPollInterval
+		}
+
+		// Calculate next reconcile time based on NextReconcile duration
+		nextReconcileDuration := cr.Spec.ForProvider.NextReconcile.Duration
+		lastReconcileTime := cr.Status.LastReconcileTime.Time
+		nextReconcileTime := lastReconcileTime.Add(nextReconcileDuration)
+
+		// Determine if the current time is past the next reconcile time
+		now := time.Now()
+		if now.Before(nextReconcileTime) {
+			// If not yet time to reconcile, calculate remaining time
+			return nextReconcileTime.Sub(now)
+		}
+
+		// Default poll interval if the next reconcile time is in the past
+		return defaultPollInterval
+	})
 }
