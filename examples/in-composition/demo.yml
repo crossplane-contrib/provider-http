@@ -2,6 +2,6 @@ apiVersion: releases.example.io/v1alpha1
 kind: Demo
 metadata:
   namespace: default
-  name: my-helm-and-http
+  name: my-demo
 spec:
-  wordpressVersion: 15.2.5
+  demoVersion: 15.2.5

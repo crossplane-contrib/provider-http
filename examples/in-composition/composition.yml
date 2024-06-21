@@ -10,50 +10,73 @@ spec:
     apiVersion: releases.example.io/v1alpha1
     kind: XDemo
   resources:
-  - name: demo
-    base:
-      apiVersion: helm.crossplane.io/v1beta1
-      kind: Release
-      spec:
-        forProvider:
-          chart:
-            name: wordpress
-            repository: https://charts.bitnami.com/bitnami
-          namespace: wordpress
-    patches:
-      - fromFieldPath: spec.wordpressVersion
-        toFieldPath: spec.forProvider.chart.version
-      - type: ToCompositeFieldPath
-        fromFieldPath: status.atProvider.state
-        toFieldPath: status.helm.state
-        policy:
-          fromFieldPath: Optional
-  - name: httprequest
+  - name: obtain-jwt-token
     base:
       apiVersion: http.crossplane.io/v1alpha2
-      kind: DisposableRequest 
+      kind: DisposableRequest
+      metadata:
+        name: obtain-jwt-token
       spec:
-          deletionPolicy: Orphan
-          forProvider:
-            url: https://enwgarmh79yh.x.pipedream.net/
-            method: POST
-            body: '{"key1": "value1"}'
-            headers:
-              Authorization:
-                - Just a Token
-              Custom-Header:
-                - Nice Header
-                - Value2
-                - Value3
-          providerConfigRef:
-            name: http-conf
-          rollbackLimit: 2
-    patches:
-      - type: ToCompositeFieldPath
-        fromFieldPath: status.response.body
-        toFieldPath: status.http.response.body
-        transforms:
-          - type: convert
-            convert:
-              toType: object
-              format: json
+        deletionPolicy: Orphan
+        forProvider:
+          url: http://localhost:8000/v1/login/
+          method: POST
+          headers:
+            Authorization:
+              - "Basic {{ basic-auth:crossplane-system:token }}"
+
+          shouldLoopInfinitely: true
+          nextReconcile: 72h # 3 days
+
+          secretInjectionConfigs:
+            - secretRef:
+                name: obtained-token
+                namespace: crossplane-system
+              secretKey: token
+              responsePath: .body.token
+        providerConfigRef:
+          name: http-conf
+  - name: manage-namespace
+    base:
+      apiVersion: http.crossplane.io/v1alpha2
+      kind: Request
+      metadata:
+        name: my-namespace
+      spec:
+        forProvider:
+          waitTimeout: 5m
+          headers:
+            Content-Type:
+              - application/json
+            Authorization:
+              - ("Bearer {{ obtained-token:crossplane-system:token }}")
+          payload:
+            baseUrl: http://localhost:8000/v1/namespaces
+            body: |
+              {
+                "name": "my-namespace"
+              }
+          mappings:
+            - method: "POST"
+              body: |
+                {
+                  name: .payload.body.name
+                }
+              url: .payload.baseUrl
+              headers:
+                Content-Type:
+                  - application/json
+                Authorization:
+                - ("Bearer {{ obtained-token:crossplane-system:token }}")
+            - method: "GET"
+              url: (.payload.baseUrl + "/" + (.response.body.name))
+            - method: "PUT"
+              body: |
+                {
+                  name: .payload.body.name
+                }
+              url: (.payload.baseUrl + "/" + (.response.body.name))
+            - method: "DELETE"
+              url: (.payload.baseUrl + "/" + (.response.body.name))
+        providerConfigRef:
+          name: http-conf

@@ -10,8 +10,8 @@ on:
 
 env:
   # Common versions
-  GO_VERSION: '1.20.2'
-  GOLANGCI_VERSION: 'v1.51.2'
+  GO_VERSION: '1.22.3'
+  GOLANGCI_VERSION: 'v1.55.2'
   DOCKER_BUILDX_VERSION: 'v0.8.2'
 
   XPKG_ACCESS_ID: ${{ secrets.XPKG_ACCESS_ID }}

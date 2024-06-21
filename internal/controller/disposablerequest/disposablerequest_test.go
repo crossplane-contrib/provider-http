@@ -424,6 +424,10 @@ func Test_deployAction(t *testing.T) {
 				if diff := cmp.Diff(tc.args.cr.Spec.ForProvider.Headers, tc.args.cr.Status.Response.Headers); diff != "" {
 					t.Fatalf("deployAction(...): -want Status.Response.Headers, +got Status.Response.Headers: %s", diff)
 				}
+
+				if tc.args.cr.Status.LastReconcileTime.IsZero() {
+					t.Fatalf("deployAction(...): -want Status.LastReconcileTime to not be nil, +got nil")
+				}
 			}
 		})
 	}
