@@ -37,11 +37,13 @@ GOLANGCILINT_VERSION = 1.51.2
 
 # ====================================================================================
 # Setup Kubernetes tools
-KIND_VERSION = v0.18.0
-UP_VERSION = v0.17.0
-UPTEST_VERSION = v0.5.0
+KIND_VERSION = v0.23.0
+UP_VERSION = v0.28.0
+UPTEST_VERSION = v0.11.1
 UP_CHANNEL = stable
 USE_HELM3 = true
+CROSSPLANE_VERSION = 1.14.6
+
 -include build/makelib/k8s_tools.mk
 
 # ====================================================================================
@@ -94,7 +96,7 @@ UPTEST_EXAMPLE_LIST := $(shell find ./examples/sample -path '*.yaml' | paste -s 
 
 uptest: $(UPTEST) $(KUBECTL) $(KUTTL)
 	@$(INFO) running automated tests
-	@KUBECTL=$(KUBECTL) KUTTL=$(KUTTL) $(UPTEST) e2e "$(UPTEST_EXAMPLE_LIST)" --setup-script=cluster/test/setup.sh || $(FAIL)
+	@KUBECTL=$(KUBECTL) KUTTL=$(KUTTL) CROSSPLANE_NAMESPACE=$(CROSSPLANE_NAMESPACE) $(UPTEST) e2e "$(UPTEST_EXAMPLE_LIST)" --setup-script=cluster/test/setup.sh || $(FAIL)
 	@$(OK) running automated tests
 
 local-dev: controlplane.up
@@ -127,3 +129,6 @@ manifests:
 	@$(INFO) Deprecated. Run make generate instead.
 
 .PHONY: cobertura submodules fallthrough test-integration run manifests
+
+vendor: modules.download
+vendor.check: modules.check

@@ -47,10 +47,16 @@ type DisposableRequestParameters struct {
 
 	// ExpectedResponse is a jq filter expression used to evaluate the HTTP response and determine if it matches the expected criteria.
 	// The expression should return a boolean; if true, the response is considered expected.
-	// Example: '.Body.job_status == "success"'
+	// Example: '.body.job_status == "success"'
 	ExpectedResponse string `json:"expectedResponse,omitempty"`
 
-	// SecretInjectionConfig specifies the secrets receiving patches for response data.
+	// NextReconcile specifies the duration after which the next reconcile should occur.
+	NextReconcile *metav1.Duration `json:"nextReconcile,omitempty"`
+
+	// ShouldLoopInfinitely specifies whether the reconciliation should loop indefinitely.
+	ShouldLoopInfinitely bool `json:"shouldLoopInfinitely,omitempty"`
+
+	// SecretInjectionConfig specifies the secrets receiving patches from response data.
 	SecretInjectionConfigs []SecretInjectionConfig `json:"secretInjectionConfigs,omitempty"`
 }
 
@@ -102,6 +108,9 @@ type DisposableRequestStatus struct {
 	Error               string   `json:"error,omitempty"`
 	Synced              bool     `json:"synced,omitempty"`
 	RequestDetails      Mapping  `json:"requestDetails,omitempty"`
+
+	// LastReconcileTime records the last time the resource was reconciled.
+	LastReconcileTime metav1.Time `json:"lastReconcileTime,omitempty"`
 }
 
 // +kubebuilder:object:root=true

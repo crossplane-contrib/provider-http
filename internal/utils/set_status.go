@@ -69,6 +69,14 @@ func (rr *RequestResource) SetSynced() SetRequestStatusFunc {
 	}
 }
 
+func (rr *RequestResource) SetLastReconcileTime() SetRequestStatusFunc {
+	return func() {
+		if lastReconcileTimeSetter, ok := rr.Resource.(LastReconcileTimeSetter); ok {
+			lastReconcileTimeSetter.SetLastReconcileTime()
+		}
+	}
+}
+
 func (rr *RequestResource) SetCache() SetRequestStatusFunc {
 	return func() {
 		if cached, ok := rr.Resource.(CacheSetter); ok {
@@ -113,6 +121,10 @@ type ErrorSetter interface {
 
 type ResetFailures interface {
 	ResetFailures()
+}
+
+type LastReconcileTimeSetter interface {
+	SetLastReconcileTime()
 }
 
 type RequestDetailsSetter interface {
