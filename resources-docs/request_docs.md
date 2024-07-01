@@ -47,7 +47,10 @@ Here is an example `Request` resource definition:
 - headers: Default HTTP request headers.
 - payload: Customizable values for HTTP requests, with jq query support [jq Documentation](https://jqlang.github.io/jq/manual/#object-identifier-index).
 - mappings: List of mappings, each specifying the HTTP method, URL, and optional request body.
+-  secretInjectionConfigs: Optional Configurations for secrets receiving patches from response data.
 
+### Secrets Injection
+The DisposableRequest resource supports injecting data from secrets into the request's body and headers using the following syntax: {{ name:namespace:key }} (supported for body and headers only).
 
 ## PUT Mapping - Desired State
 The PUT mapping represents your desired state. The body in this mapping should be contained in the GET response. If it's not, a PUT request will be sent with the according body.

@@ -62,7 +62,7 @@ func Test_Contains(t *testing.T) {
 	}{
 		"Success": {
 			args: args{
-				container: map[string]any{"email": "john.doe@example.com", "username": "john_doe"},
+				container: map[string]any{"email": "john.doe@example.com", "username": "john_doe", "details": map[string]any{"a": "a", "b": "b"}},
 				containee: map[string]any{"username": "john_doe"},
 			},
 			want: want{
@@ -71,8 +71,17 @@ func Test_Contains(t *testing.T) {
 		},
 		"SuccessMatchesJsons": {
 			args: args{
-				container: map[string]any{"email": "john.doe@example.com", "username": "john_doe"},
-				containee: map[string]any{"email": "john.doe@example.com", "username": "john_doe"},
+				container: map[string]any{"email": "john.doe@example.com", "username": "john_doe", "details": map[string]any{"a": "a", "b": map[string]any{"c": "c", "a": "a"}}},
+				containee: map[string]any{"email": "john.doe@example.com", "username": "john_doe", "details": map[string]any{"a": "a", "b": map[string]any{"c": "c", "a": "a"}}},
+			},
+			want: want{
+				result: true,
+			},
+		},
+		"SuccessNestedJsons": {
+			args: args{
+				container: map[string]any{"email": "john.doe@example.com", "username": "john_doe", "details": map[string]any{"a": "a", "b": "b", "c": map[string]any{"c": "c", "a": "a"}}},
+				containee: map[string]any{"email": "john.doe@example.com", "username": "john_doe", "details": map[string]any{"b": "b", "c": map[string]any{"c": "c"}}},
 			},
 			want: want{
 				result: true,
@@ -82,6 +91,42 @@ func Test_Contains(t *testing.T) {
 			args: args{
 				container: map[string]any{"email": "john.doe@example.com", "username": "john_doe"},
 				containee: map[string]any{"false": "false.false@example.com"},
+			},
+			want: want{
+				result: false,
+			},
+		},
+		"NestedJsonsFail": {
+			args: args{
+				container: map[string]any{"email": "john.doe@example.com", "username": "john_doe", "details": map[string]any{"a": "a", "b": "b"}},
+				containee: map[string]any{"email": "john.doe@example.com", "username": "john_doe", "details": map[string]any{"a": "a", "c": "c"}},
+			},
+			want: want{
+				result: false,
+			},
+		},
+		"ExtraKeysInContainer": {
+			args: args{
+				container: map[string]any{"email": "john.doe@example.com", "username": "john_doe", "extra": "extra_value"},
+				containee: map[string]any{"email": "john.doe@example.com"},
+			},
+			want: want{
+				result: true,
+			},
+		},
+		"EmptyContainee": {
+			args: args{
+				container: map[string]any{"email": "john.doe@example.com", "username": "john_doe"},
+				containee: map[string]any{},
+			},
+			want: want{
+				result: true,
+			},
+		},
+		"EmptyContainer": {
+			args: args{
+				container: map[string]any{},
+				containee: map[string]any{"email": "john.doe@example.com"},
 			},
 			want: want{
 				result: false,
