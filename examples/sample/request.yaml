@@ -4,6 +4,7 @@ metadata:
   name: laundry
 spec:
   forProvider:
+    # Injecting data from secrets is possible, simply use the following syntax: {{ name:namespace:key }} (supported for body and headers only)
     insecureSkipTLSVerify: true
     waitTimeout: 5m
     headers:
