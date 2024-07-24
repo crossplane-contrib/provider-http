@@ -72,6 +72,7 @@ func (hc *client) SendRequest(ctx context.Context, method string, url string, bo
 		Transport: &http.Transport{
 			// #nosec G402
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: skipTLSVerify},
+			Proxy:           http.ProxyFromEnvironment, // Use proxy settings from environment
 		},
 		Timeout: hc.timeout,
 	}
