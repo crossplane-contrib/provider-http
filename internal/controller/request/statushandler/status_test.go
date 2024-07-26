@@ -165,7 +165,7 @@ func Test_SetRequestStatus(t *testing.T) {
 			want: want{
 				err:           errBoom,
 				httpRequest:   testRequest,
-				failuresIndex: 2,
+				failuresIndex: 1,
 			},
 		},
 		"ResetFailures": {
