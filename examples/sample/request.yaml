@@ -1,7 +1,7 @@
 apiVersion: http.crossplane.io/v1alpha2
 kind: Request
 metadata:
-  name: laundry
+  name: manage-user
 spec:
   forProvider:
     # Injecting data from secrets is possible, simply use the following syntax: {{ name:namespace:key }} (supported for body and headers only)
@@ -13,21 +13,22 @@ spec:
       Authorization:
         - ("Bearer {{ auth:default:token }}")
     payload:
-      baseUrl: http://todo.default.svc.cluster.local/todos
+      baseUrl: http://flask-api.default.svc.cluster.local/v1/users
       body: |
         {
-          "name": "Do Laundry", 
-          "reminder": "Every 1 hour", 
-          "responsible": "Dan",
-          "password": "secretdata {{ password:crossplane-system:secretKey }}"
+          "username": "mock_user", 
+          "password": "secretdata {{ user-password:crossplane-system:password }}",
+          "email": "mock_user@example.com", 
+          "age": 30
         }
     mappings:
       - method: "POST"
         body: |
           {
-            todo_name: .payload.body.name, 
-            reminder: .payload.body.reminder, 
-            responsible: .payload.body.responsible,
+            username: .payload.body.username, 
+            email: .payload.body.email, 
+            age: .payload.body.age,
+            password: .payload.body.password
           }
         url: .payload.baseUrl
         headers:
@@ -42,9 +43,8 @@ spec:
       - method: "PUT"
         body: |
           {
-            todo_name: .payload.body.name, 
-            reminder: .payload.body.reminder, 
-            responsible: .payload.body.responsible
+            email: .payload.body.email, 
+            age: .payload.body.age
           }
         url: (.payload.baseUrl + "/" + (.response.body.id|tostring))
       - method: "DELETE"
@@ -55,12 +55,21 @@ spec:
       - secretRef:
           name: response-secret
           namespace: default
-        secretKey: extracted-data
-        responsePath: .body.reminder
+        secretKey: extracted-user-email
+        responsePath: .body.email
+        # setOwnerReference determines if the secret should be deleted when the associated resource is deleted.
+        # When injecting multiple keys into the same secret, ensure this field is set consistently for all keys.        
+        setOwnerReference: true
       - secretRef:
           name: response-secret
           namespace: default
-        secretKey: extracted-data-headers
-        responsePath: .headers.Try[0]
+        secretKey: extracted-header-data
+        responsePath: .headers."X-Secret-Header"[0]
+        setOwnerReference: true
+      - secretRef:
+          name: response-user-password
+          namespace: default
+        secretKey: extracted-user-password
+        responsePath: .body.password
   providerConfigRef:
     name: http-conf

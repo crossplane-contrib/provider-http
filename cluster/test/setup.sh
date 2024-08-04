@@ -20,39 +20,39 @@ cat <<EOF | ${KUBECTL} apply -f -
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: todo
+  name: flask-api
+  namespace: default
   labels:
-    app: todo
+    app: flask-api
 spec:
-  replicas: 1 
+  replicas: 3
   selector:
     matchLabels:
-      app: todo
+      app: flask-api
   template:
     metadata:
       labels:
-        app: todo
+        app: flask-api
     spec:
       containers:
-      - name: todo
-        image: danielsinai/todo:v1.0.0
-        env:
-        - name: PORT
-          value: "80"
+      - name: flask-api
+        image: arielsepton/flask-api:latest
         ports:
-        - containerPort: 80
+        - containerPort: 5000
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: todo
+  name: flask-api
+  namespace: default
 spec:
-  type: ClusterIP
-  ports:
-  - name: "todo"
-    port: 80
   selector:
-    app: todo
+    app: flask-api
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 5000
+  type: ClusterIP
 EOF
 
 cat <<EOF | kubectl apply -f -
@@ -70,9 +70,20 @@ cat <<EOF | kubectl apply -f -
 kind: Secret
 apiVersion: v1
 metadata:
-  name: password
+  name: user-password
   namespace: crossplane-system
 type: Opaque
 data:
-  secretKey: bXktc2VjcmV0LXZhbHVl
+  password: bXktc2VjcmV0LXZhbHVl
+EOF
+
+cat <<EOF | kubectl apply -f -
+kind: Secret
+apiVersion: v1
+metadata:
+  name: basic-auth
+  namespace: crossplane-system
+type: Opaque
+data:
+  token: bXktc2VjcmV0LXZhbHVl
 EOF

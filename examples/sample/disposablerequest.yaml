@@ -1,28 +1,28 @@
 apiVersion: http.crossplane.io/v1alpha2
 kind: DisposableRequest
 metadata:
-  name: health-check
+  name: send-notification
 spec:
   deletionPolicy: Orphan
   forProvider:
     # Injecting data from secrets is possible, simply use the following syntax: {{ name:namespace:key }} (supported for body and headers only)
-    url:  http://todo.default.svc.cluster.local/health-check
+    url:  http://flask-api.default.svc.cluster.local/v1/notify
     method: POST
     body: |
       {
-        "check_type": "simple",
-        "additional_info": "optional",
-        "password": "secretdata {{ password:crossplane-system:secretKey }}"
+        "recipient": "user@example.com",
+        "subject": "Alert",
+        "message": "Your action is required immediately."
       }
     headers:
-      User-Agent:
-        - "Crossplane Health Checker"
+      Content-Type:
+        - application/json
       Authorization:
         - "Bearer {{ auth:default:token }}"
     insecureSkipTLSVerify: true
 
     # The 'expectedResponse' field is optional. If used, also set 'rollbackRetriesLimit', which determines the number of HTTP requests to be sent until the jq query returns true.
-    # expectedResponse: '.body.job_status == "success"'
+    expectedResponse: '.body.status == "sent"'
     rollbackRetriesLimit: 5
     waitTimeout: 5m
 
@@ -35,15 +35,19 @@ spec:
     # Secrets receiving patches from response data
     secretInjectionConfigs: 
       - secretRef:
-          name: response-secret
+          name: notification-response
           namespace: default
-        secretKey: extracted-data
-        responsePath: .body.reminder
+        secretKey: notification-status
+        responsePath: .body.status
+        # setOwnerReference determines if the secret should be deleted when the associated resource is deleted.
+        # When injecting multiple keys into the same secret, ensure this field is set consistently for all keys.        
+        setOwnerReference: true
       - secretRef:
-          name: response-secret
+          name: notification-response
           namespace: default
-        secretKey: extracted-data-headers
-        responsePath: .headers.Try[0]
+        secretKey: notification-id
+        responsePath: .body.id
+        setOwnerReference: true
   providerConfigRef:
     name: http-conf
 # TODO: check if it's possible to modify the deletionPolicy to be orphan by default.

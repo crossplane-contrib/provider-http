@@ -42,6 +42,7 @@ import (
 	"github.com/crossplane-contrib/provider-http/internal/controller/request/statushandler"
 	datapatcher "github.com/crossplane-contrib/provider-http/internal/data-patcher"
 	"github.com/crossplane-contrib/provider-http/internal/utils"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
@@ -189,7 +190,7 @@ func (c *external) deployAction(ctx context.Context, cr *v1alpha2.Request, metho
 		return nil
 	}
 
-	requestDetails, err := generateValidRequestDetails(ctx, c.localKube, cr, mapping)
+	requestDetails, err := c.generateValidRequestDetails(ctx, cr, mapping)
 	if err != nil {
 		return err
 	}
@@ -234,7 +235,13 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) error {
 
 func (c *external) patchResponseToSecret(ctx context.Context, cr *v1alpha2.Request, response *httpClient.HttpResponse) {
 	for _, ref := range cr.Spec.ForProvider.SecretInjectionConfigs {
-		err := datapatcher.PatchResponseToSecret(ctx, c.localKube, c.logger, response, ref.ResponsePath, ref.SecretKey, ref.SecretRef.Name, ref.SecretRef.Namespace)
+		var owner metav1.Object = nil
+
+		if ref.SetOwnerReference {
+			owner = cr
+		}
+
+		err := datapatcher.PatchResponseToSecret(ctx, c.localKube, c.logger, response, ref.ResponsePath, ref.SecretKey, ref.SecretRef.Name, ref.SecretRef.Namespace, owner)
 		if err != nil {
 			c.logger.Info(fmt.Sprintf(errPatchDataToSecret, ref.SecretRef.Name, ref.SecretRef.Namespace, ref.SecretKey, err.Error()))
 		}
@@ -246,13 +253,13 @@ func (c *external) patchResponseToSecret(ctx context.Context, cr *v1alpha2.Reque
 // details are valid, the function returns them. If not, it falls back to using the cached response in the Request's status
 // and attempts to generate request details again. The function returns the generated request details or an error if the
 // generation process fails.
-func generateValidRequestDetails(ctx context.Context, localKube client.Client, cr *v1alpha2.Request, mapping *v1alpha2.Mapping) (requestgen.RequestDetails, error) {
-	requestDetails, _, ok := requestgen.GenerateRequestDetails(ctx, localKube, *mapping, cr.Spec.ForProvider, cr.Status.Response)
+func (c *external) generateValidRequestDetails(ctx context.Context, cr *v1alpha2.Request, mapping *v1alpha2.Mapping) (requestgen.RequestDetails, error) {
+	requestDetails, _, ok := requestgen.GenerateRequestDetails(ctx, c.localKube, *mapping, cr.Spec.ForProvider, cr.Status.Response, c.logger)
 	if requestgen.IsRequestValid(requestDetails) && ok {
 		return requestDetails, nil
 	}
 
-	requestDetails, err, _ := requestgen.GenerateRequestDetails(ctx, localKube, *mapping, cr.Spec.ForProvider, cr.Status.Cache.Response)
+	requestDetails, err, _ := requestgen.GenerateRequestDetails(ctx, c.localKube, *mapping, cr.Spec.ForProvider, cr.Status.Cache.Response, c.logger)
 	if err != nil {
 		return requestgen.RequestDetails{}, err
 	}

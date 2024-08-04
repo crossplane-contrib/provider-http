@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/crossplane/crossplane-runtime/pkg/logging"
 	"github.com/crossplane/crossplane-runtime/pkg/test"
 	"github.com/google/go-cmp/cmp"
 	corev1 "k8s.io/api/core/v1"
@@ -294,7 +295,7 @@ func Test_patchSecretsToValue(t *testing.T) {
 		tc := tc // Create local copies of loop variables
 
 		t.Run(name, func(t *testing.T) {
-			got, err := patchSecretsToValue(context.Background(), tc.args.localKube, tc.args.valueToHandle)
+			got, err := patchSecretsToValue(context.Background(), tc.args.localKube, tc.args.valueToHandle, logging.NewNopLogger())
 			if err != nil {
 				t.Fatalf("patchSecretsToValue(...): unexpected error: %v", err)
 			}

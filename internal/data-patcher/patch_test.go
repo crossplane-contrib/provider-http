@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/crossplane/crossplane-runtime/pkg/logging"
 	"github.com/crossplane/crossplane-runtime/pkg/test"
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
@@ -75,7 +76,7 @@ func TestPatchSecretsIntoBody(t *testing.T) {
 		tc := tc // Create local copies of loop variables
 
 		t.Run(name, func(t *testing.T) {
-			got, gotErr := PatchSecretsIntoBody(tc.args.ctx, tc.args.localKube, tc.args.body)
+			got, gotErr := PatchSecretsIntoBody(tc.args.ctx, tc.args.localKube, tc.args.body, logging.NewNopLogger())
 			if diff := cmp.Diff(tc.want.err, gotErr, test.EquateErrors()); diff != "" {
 				t.Fatalf("isUpToDate(...): -want error, +got error: %s", diff)
 			}
@@ -184,7 +185,7 @@ func TestPatchSecretsIntoHeaders(t *testing.T) {
 		tc := tc // Create local copies of loop variables
 
 		t.Run(name, func(t *testing.T) {
-			got, gotErr := PatchSecretsIntoHeaders(tc.args.ctx, tc.args.localKube, tc.args.headers)
+			got, gotErr := PatchSecretsIntoHeaders(tc.args.ctx, tc.args.localKube, tc.args.headers, logging.NewNopLogger())
 			if diff := cmp.Diff(tc.want.err, gotErr, test.EquateErrors()); diff != "" {
 				t.Fatalf("isUpToDate(...): -want error, +got error: %s", diff)
 			}

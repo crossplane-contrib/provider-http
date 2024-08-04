@@ -189,7 +189,7 @@ func Test_GenerateRequestDetails(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			got, gotErr, ok := GenerateRequestDetails(context.Background(), tc.args.localKube, tc.args.methodMapping, tc.args.forProvider, tc.args.response)
+			got, gotErr, ok := GenerateRequestDetails(context.Background(), tc.args.localKube, tc.args.methodMapping, tc.args.forProvider, tc.args.response, tc.args.logger)
 			if diff := cmp.Diff(tc.want.err, gotErr, test.EquateErrors()); diff != "" {
 				t.Fatalf("GenerateRequestDetails(...): -want error, +got error: %s", diff)
 			}

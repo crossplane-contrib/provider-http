@@ -42,6 +42,7 @@ import (
 	apisv1alpha1 "github.com/crossplane-contrib/provider-http/apis/v1alpha1"
 	httpClient "github.com/crossplane-contrib/provider-http/internal/clients/http"
 	"github.com/crossplane-contrib/provider-http/internal/utils"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
@@ -171,12 +172,12 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 }
 
 func (c *external) deployAction(ctx context.Context, cr *v1alpha2.DisposableRequest) error {
-	sensitiveBody, err := datapatcher.PatchSecretsIntoBody(ctx, c.localKube, cr.Spec.ForProvider.Body)
+	sensitiveBody, err := datapatcher.PatchSecretsIntoBody(ctx, c.localKube, cr.Spec.ForProvider.Body, c.logger)
 	if err != nil {
 		return err
 	}
 
-	sensitiveHeaders, err := datapatcher.PatchSecretsIntoHeaders(ctx, c.localKube, cr.Spec.ForProvider.Headers)
+	sensitiveHeaders, err := datapatcher.PatchSecretsIntoHeaders(ctx, c.localKube, cr.Spec.ForProvider.Headers, c.logger)
 	if err != nil {
 		return err
 	}
@@ -288,7 +289,13 @@ func (c *external) Delete(_ context.Context, _ resource.Managed) error {
 
 func (c *external) patchResponseToSecret(ctx context.Context, cr *v1alpha2.DisposableRequest, response *httpClient.HttpResponse) {
 	for _, ref := range cr.Spec.ForProvider.SecretInjectionConfigs {
-		err := datapatcher.PatchResponseToSecret(ctx, c.localKube, c.logger, response, ref.ResponsePath, ref.SecretKey, ref.SecretRef.Name, ref.SecretRef.Namespace)
+		var owner metav1.Object = nil
+
+		if ref.SetOwnerReference {
+			owner = cr
+		}
+
+		err := datapatcher.PatchResponseToSecret(ctx, c.localKube, c.logger, response, ref.ResponsePath, ref.SecretKey, ref.SecretRef.Name, ref.SecretRef.Namespace, owner)
 		if err != nil {
 			c.logger.Info(fmt.Sprintf(errPatchDataToSecret, ref.SecretRef.Name, ref.SecretRef.Namespace, ref.SecretKey, err.Error()))
 		}
