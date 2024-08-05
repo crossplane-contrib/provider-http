@@ -23,6 +23,7 @@ import (
 const (
 	errEmptyKey    = "Warning, value at field %s is empty, skipping secret update for: %s"
 	errConvertData = "failed to convert data to map"
+	errPatchFailed = "failed to patch secret, %s"
 )
 
 const (
@@ -69,7 +70,7 @@ func replacePlaceholderWithSecretValue(originalString, old string, secret *corev
 }
 
 // patchSecretsToValue patches secrets referenced in the provided value.
-func patchSecretsToValue(ctx context.Context, localKube client.Client, valueToHandle string) (string, error) {
+func patchSecretsToValue(ctx context.Context, localKube client.Client, valueToHandle string, logger logging.Logger) (string, error) {
 	placeholders := removeDuplicates(findPlaceholders(valueToHandle))
 	for _, placeholder := range placeholders {
 
@@ -79,6 +80,7 @@ func patchSecretsToValue(ctx context.Context, localKube client.Client, valueToHa
 		}
 		secret, err := kubehandler.GetSecret(ctx, localKube, name, namespace)
 		if err != nil {
+			logger.Info(fmt.Sprintf(errPatchFailed, err.Error()))
 			return "", err
 		}
 

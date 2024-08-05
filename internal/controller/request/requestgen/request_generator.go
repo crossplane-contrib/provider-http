@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/crossplane/crossplane-runtime/pkg/logging"
 	"github.com/pkg/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -25,7 +26,7 @@ type RequestDetails struct {
 }
 
 // GenerateRequestDetails generates request details.
-func GenerateRequestDetails(ctx context.Context, localKube client.Client, methodMapping v1alpha2.Mapping, forProvider v1alpha2.RequestParameters, response v1alpha2.Response) (RequestDetails, error, bool) {
+func GenerateRequestDetails(ctx context.Context, localKube client.Client, methodMapping v1alpha2.Mapping, forProvider v1alpha2.RequestParameters, response v1alpha2.Response, logger logging.Logger) (RequestDetails, error, bool) {
 	jqObject := generateRequestObject(forProvider, response)
 	url, err := generateURL(methodMapping.URL, jqObject)
 	if err != nil {
@@ -36,12 +37,12 @@ func GenerateRequestDetails(ctx context.Context, localKube client.Client, method
 		return RequestDetails{}, errors.Errorf(utils.ErrInvalidURL, url), false
 	}
 
-	bodyData, err := generateBody(ctx, localKube, methodMapping.Body, jqObject)
+	bodyData, err := generateBody(ctx, localKube, methodMapping.Body, jqObject, logger)
 	if err != nil {
 		return RequestDetails{}, err, false
 	}
 
-	headersData, err := generateHeaders(ctx, localKube, coalesceHeaders(methodMapping.Headers, forProvider.Headers), jqObject)
+	headersData, err := generateHeaders(ctx, localKube, coalesceHeaders(methodMapping.Headers, forProvider.Headers), jqObject, logger)
 	if err != nil {
 		return RequestDetails{}, err, false
 	}
@@ -86,7 +87,7 @@ func generateURL(urlJQFilter string, jqObject map[string]interface{}) (string, e
 }
 
 // generateBody applies a mapping body to generate the request body.
-func generateBody(ctx context.Context, localKube client.Client, mappingBody string, jqObject map[string]interface{}) (httpClient.Data, error) {
+func generateBody(ctx context.Context, localKube client.Client, mappingBody string, jqObject map[string]interface{}, logger logging.Logger) (httpClient.Data, error) {
 	if mappingBody == "" {
 		return httpClient.Data{
 			Encrypted: "",
@@ -100,7 +101,7 @@ func generateBody(ctx context.Context, localKube client.Client, mappingBody stri
 		return httpClient.Data{}, err
 	}
 
-	sensitiveBody, err := datapatcher.PatchSecretsIntoBody(ctx, localKube, body)
+	sensitiveBody, err := datapatcher.PatchSecretsIntoBody(ctx, localKube, body, logger)
 	if err != nil {
 		return httpClient.Data{}, err
 	}
@@ -112,13 +113,13 @@ func generateBody(ctx context.Context, localKube client.Client, mappingBody stri
 }
 
 // generateHeaders applies JQ queries to generate headers.
-func generateHeaders(ctx context.Context, localKube client.Client, headers map[string][]string, jqObject map[string]interface{}) (httpClient.Data, error) {
+func generateHeaders(ctx context.Context, localKube client.Client, headers map[string][]string, jqObject map[string]interface{}, logger logging.Logger) (httpClient.Data, error) {
 	generatedHeaders, err := requestprocessing.ApplyJQOnMapStrings(headers, jqObject)
 	if err != nil {
 		return httpClient.Data{}, err
 	}
 
-	sensitiveHeaders, err := datapatcher.PatchSecretsIntoHeaders(ctx, localKube, generatedHeaders)
+	sensitiveHeaders, err := datapatcher.PatchSecretsIntoHeaders(ctx, localKube, generatedHeaders, logger)
 	if err != nil {
 		return httpClient.Data{}, err
 	}

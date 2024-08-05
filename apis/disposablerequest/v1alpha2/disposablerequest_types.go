@@ -76,6 +76,9 @@ type SecretInjectionConfig struct {
 
 	// ResponsePath is is a jq filter expression represents the path in the response where the secret value will be extracted from.
 	ResponsePath string `json:"responsePath"`
+
+	// SetOwnerReference determines whether to set the owner reference on the Kubernetes secret.
+	SetOwnerReference bool `json:"setOwnerReference,omitempty"`
 }
 
 // SecretRef contains the name and namespace of a Kubernetes secret.

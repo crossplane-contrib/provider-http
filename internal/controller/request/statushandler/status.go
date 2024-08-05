@@ -99,7 +99,7 @@ func (r *requestStatusHandler) appendExtraSetters(forProvider v1alpha2.RequestPa
 func (r *requestStatusHandler) shouldSetCache(forProvider v1alpha2.RequestParameters) bool {
 	for _, mapping := range forProvider.Mappings {
 		response := responseconverter.HttpResponseToV1alpha1Response(r.resource.HttpResponse)
-		requestDetails, _, ok := requestgen.GenerateRequestDetails(r.resource.RequestContext, r.resource.LocalClient, mapping, forProvider, response)
+		requestDetails, _, ok := requestgen.GenerateRequestDetails(r.resource.RequestContext, r.resource.LocalClient, mapping, forProvider, response, r.logger)
 		if !(requestgen.IsRequestValid(requestDetails) && ok) {
 			return false
 		}

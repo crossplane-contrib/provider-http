@@ -116,7 +116,7 @@ func (c *external) requestDetails(ctx context.Context, cr *v1alpha2.Request, met
 		return requestgen.RequestDetails{}, errors.Errorf(errMappingNotFound, method)
 	}
 
-	return generateValidRequestDetails(ctx, c.localKube, cr, mapping)
+	return c.generateValidRequestDetails(ctx, cr, mapping)
 }
 
 // isErrorMappingNotFound checks if the provided error indicates that the
