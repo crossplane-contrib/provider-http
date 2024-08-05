@@ -3,6 +3,7 @@ package kubehandler
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -19,15 +20,20 @@ var (
 )
 
 func createSpecificSecret(name, namespace, key, value string) *corev1.Secret {
-	return &corev1.Secret{
+	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
 		},
-		Data: map[string][]byte{
-			key: []byte(value),
-		},
 	}
+
+	if key != "" && value != "" {
+		secret.Data = map[string][]byte{
+			key: []byte(value),
+		}
+	}
+
+	return secret
 }
 
 func Test_GetSecret(t *testing.T) {
@@ -83,8 +89,8 @@ func Test_GetSecret(t *testing.T) {
 				namespace: "default",
 			},
 			want: want{
-				result: &corev1.Secret{},
-				err:    errorspkg.Wrap(errBoom, errGetSecret),
+				result: nil,
+				err:    errorspkg.Wrap(errBoom, fmt.Sprintf(errGetSecret, "secret", "default")),
 			},
 		},
 	}
@@ -195,8 +201,8 @@ func Test_GetOrCreateSecret(t *testing.T) {
 				namespace: "default",
 			},
 			want: want{
-				result: &corev1.Secret{},
-				err:    errorspkg.Wrap(errBoom, errGetSecret),
+				result: nil,
+				err:    errorspkg.Wrap(errBoom, fmt.Sprintf(errGetSecret, "secret", "default")),
 			},
 		},
 	}
@@ -204,7 +210,7 @@ func Test_GetOrCreateSecret(t *testing.T) {
 		tc := tc // Create local copies of loop variables
 
 		t.Run(name, func(t *testing.T) {
-			got, gotErr := GetOrCreateSecret(context.Background(), tc.args.localKube, tc.args.name, tc.args.namespace)
+			got, gotErr := GetOrCreateSecret(context.Background(), tc.args.localKube, tc.args.name, tc.args.namespace, nil)
 			if diff := cmp.Diff(tc.want.err, gotErr, test.EquateErrors()); diff != "" {
 				t.Fatalf("GetOrCreateSecret(...): -want error, +got error: %s", diff)
 			}
@@ -232,25 +238,10 @@ func Test_UpdateSecret(t *testing.T) {
 			args: args{
 				localKube: &test.MockClient{
 					MockUpdate: func(ctx context.Context, obj client.Object, opts ...client.UpdateOption) error {
-						secret, ok := obj.(*corev1.Secret)
-						if !ok {
-							return errors.New("object is not a Secret")
-						}
-
-						// Simulate updating the secret
-						secret.Data["updated-key"] = []byte("updated-value")
 						return nil
 					},
 				},
-				secret: &corev1.Secret{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: "specific-secret-namespace",
-						Name:      "specific-secret-name",
-					},
-					Data: map[string][]byte{
-						"specific-key": []byte("specific-value"),
-					},
-				},
+				secret: createSpecificSecret("update-secret-name", "update-secret-namespace", "update-key", "update-value"),
 			},
 			want: want{
 				err: nil,
@@ -261,15 +252,7 @@ func Test_UpdateSecret(t *testing.T) {
 				localKube: &test.MockClient{
 					MockUpdate: test.NewMockUpdateFn(errBoom),
 				},
-				secret: &corev1.Secret{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: "specific-secret-namespace",
-						Name:      "specific-secret-name",
-					},
-					Data: map[string][]byte{
-						"specific-key": []byte("specific-value"),
-					},
-				},
+				secret: createSpecificSecret("update-secret-name", "update-secret-namespace", "update-key", "update-value"),
 			},
 			want: want{
 				err: errorspkg.Wrap(errBoom, errUpdateFailed),
@@ -283,6 +266,136 @@ func Test_UpdateSecret(t *testing.T) {
 			gotErr := UpdateSecret(context.Background(), tc.args.localKube, tc.args.secret)
 			if diff := cmp.Diff(tc.want.err, gotErr, test.EquateErrors()); diff != "" {
 				t.Fatalf("UpdateSecret(...): -want error, +got error: %s", diff)
+			}
+		})
+	}
+}
+
+func Test_createSecret(t *testing.T) {
+	type args struct {
+		localKube client.Client
+		name      string
+		namespace string
+		owner     metav1.Object
+	}
+	type want struct {
+		result *corev1.Secret
+		err    error
+	}
+
+	cases := map[string]struct {
+		args args
+		want want
+	}{
+		"ShouldCreateSecret": {
+			args: args{
+				localKube: &test.MockClient{
+					MockUpdate: test.NewMockUpdateFn(nil),
+					MockCreate: test.NewMockCreateFn(nil),
+					MockGet:    test.NewMockGetFn(nil),
+				},
+				name:      "new-secret-name",
+				namespace: "new-secret-namespace",
+				owner:     nil,
+			},
+			want: want{
+				result: createSpecificSecret("new-secret-name", "new-secret-namespace", "", ""),
+				err:    nil,
+			},
+		},
+		"ShouldFailToCreateSecret": {
+			args: args{
+				localKube: &test.MockClient{
+					MockCreate: test.NewMockCreateFn(errBoom),
+				},
+				name:      "new-secret-name",
+				namespace: "new-secret-namespace",
+				owner:     nil,
+			},
+			want: want{
+				result: nil,
+				err:    errorspkg.Wrap(errBoom, errCreateSecret),
+			},
+		},
+	}
+	for name, tc := range cases {
+		tc := tc // Create local copies of loop variables
+
+		t.Run(name, func(t *testing.T) {
+			got, gotErr := createSecret(context.Background(), tc.args.localKube, tc.args.name, tc.args.namespace, tc.args.owner)
+			if diff := cmp.Diff(tc.want.err, gotErr, test.EquateErrors()); diff != "" {
+				t.Fatalf("createSecret(...): -want error, +got error: %s", diff)
+			}
+			if diff := cmp.Diff(tc.want.result, got); diff != "" {
+				t.Errorf("createSecret(...): -want result, +got result: %s", diff)
+			}
+		})
+	}
+}
+
+func Test_hasOwnerReference(t *testing.T) {
+	type args struct {
+		secret *corev1.Secret
+		owner  metav1.Object
+	}
+	type want struct {
+		result bool
+	}
+
+	cases := map[string]struct {
+		args args
+		want want
+	}{
+		"ShouldHaveOwnerReference": {
+			args: args{
+				secret: &corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								UID: "owner-uid",
+							},
+						},
+					},
+				},
+				owner: &corev1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{
+						UID: "owner-uid",
+					},
+				},
+			},
+			want: want{
+				result: true,
+			},
+		},
+		"ShouldNotHaveOwnerReference": {
+			args: args{
+				secret: &corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								UID: "other-owner-uid",
+							},
+						},
+					},
+				},
+				owner: &corev1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{
+						UID: "owner-uid",
+					},
+				},
+			},
+			want: want{
+				result: false,
+			},
+		},
+	}
+	for name, tc := range cases {
+		tc := tc // Create local copies of loop variables
+
+		t.Run(name, func(t *testing.T) {
+			got := hasOwnerReference(tc.args.secret, tc.args.owner)
+			if diff := cmp.Diff(tc.want.result, got); diff != "" {
+				t.Errorf("hasOwnerReference(...): -want result, +got result: %s", diff)
 			}
 		})
 	}
@@ -307,10 +420,10 @@ func Test_GetOrCreateSecret_EmptyName(t *testing.T) {
 		MockGet: test.NewMockGetFn(errBoom),
 	}
 	// Pass an empty secret name
-	_, err := GetOrCreateSecret(context.Background(), kubeClient, "", "some-namespace")
+	_, err := GetOrCreateSecret(context.Background(), kubeClient, "", "some-namespace", nil)
 
 	// Verify that an error is returned for an empty secret name
-	if err == nil || !strings.Contains(err.Error(), errGetSecret) {
+	if err == nil || !strings.Contains(err.Error(), fmt.Sprintf(errGetSecret, "", "some-namespace")) {
 		t.Errorf("GetOrCreateSecret() with empty name: expected error, got: %v", err)
 	}
 }

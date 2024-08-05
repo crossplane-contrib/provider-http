@@ -514,6 +514,10 @@ spec:
                           - name
                           - namespace
                           type: object
+                        setOwnerReference:
+                          description: SetOwnerReference determines whether to set
+                            the owner reference on the Kubernetes secret.
+                          type: boolean
                       required:
                       - responsePath
                       - secretKey

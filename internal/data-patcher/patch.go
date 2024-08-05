@@ -7,6 +7,7 @@ import (
 	kubehandler "github.com/crossplane-contrib/provider-http/internal/kube-handler"
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
 	"github.com/pkg/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -15,8 +16,8 @@ const (
 )
 
 // PatchSecretsIntoBody patches secrets into the provided string body.
-func PatchSecretsIntoBody(ctx context.Context, localKube client.Client, body string) (string, error) {
-	return patchSecretsToValue(ctx, localKube, body)
+func PatchSecretsIntoBody(ctx context.Context, localKube client.Client, body string, logger logging.Logger) (string, error) {
+	return patchSecretsToValue(ctx, localKube, body, logger)
 }
 
 // PatchSecretsIntoHeaders takes a map of headers and applies security measures to
@@ -24,12 +25,12 @@ func PatchSecretsIntoBody(ctx context.Context, localKube client.Client, body str
 // to avoid modifying the original map and iterates over the copied map
 // to process each list of headers. It then applies the necessary modifications
 // to each header using patchSecretsToValue function.
-func PatchSecretsIntoHeaders(ctx context.Context, localKube client.Client, headers map[string][]string) (map[string][]string, error) {
+func PatchSecretsIntoHeaders(ctx context.Context, localKube client.Client, headers map[string][]string, logger logging.Logger) (map[string][]string, error) {
 	headersCopy := copyHeaders(headers)
 
 	for _, headersList := range headersCopy {
 		for i, header := range headersList {
-			newHeader, err := patchSecretsToValue(ctx, localKube, header)
+			newHeader, err := patchSecretsToValue(ctx, localKube, header, logger)
 			if err != nil {
 				return nil, err
 			}
@@ -51,8 +52,8 @@ func copyHeaders(headers map[string][]string) map[string][]string {
 }
 
 // PatchResponseToSecret patches response data into a Kubernetes secret.
-func PatchResponseToSecret(ctx context.Context, localKube client.Client, logger logging.Logger, data *httpClient.HttpResponse, path, secretKey, secretName, secretNamespace string) error {
-	secret, err := kubehandler.GetOrCreateSecret(ctx, localKube, secretName, secretNamespace)
+func PatchResponseToSecret(ctx context.Context, localKube client.Client, logger logging.Logger, data *httpClient.HttpResponse, path, secretKey, secretName, secretNamespace string, owner metav1.Object) error {
+	secret, err := kubehandler.GetOrCreateSecret(ctx, localKube, secretName, secretNamespace, owner)
 	if err != nil {
 		return err
 	}
