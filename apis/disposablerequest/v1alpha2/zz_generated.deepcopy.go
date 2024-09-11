@@ -113,6 +113,7 @@ func (in *DisposableRequestParameters) DeepCopyInto(out *DisposableRequestParame
 		*out = new(int32)
 		**out = **in
 	}
+	out.TlsSecretRef = in.TlsSecretRef
 	if in.NextReconcile != nil {
 		in, out := &in.NextReconcile, &out.NextReconcile
 		*out = new(v1.Duration)

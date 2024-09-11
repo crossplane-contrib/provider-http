@@ -178,6 +178,7 @@ func (in *RequestParameters) DeepCopyInto(out *RequestParameters) {
 		*out = new(v1.Duration)
 		**out = **in
 	}
+	out.TlsSecretRef = in.TlsSecretRef
 	if in.SecretInjectionConfigs != nil {
 		in, out := &in.SecretInjectionConfigs, &out.SecretInjectionConfigs
 		*out = make([]SecretInjectionConfig, len(*in))

@@ -42,6 +42,7 @@ import (
 	"github.com/crossplane-contrib/provider-http/internal/controller/request/statushandler"
 	datapatcher "github.com/crossplane-contrib/provider-http/internal/data-patcher"
 	"github.com/crossplane-contrib/provider-http/internal/utils"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -57,6 +58,7 @@ const (
 	errMappingNotFound              = "%s mapping doesn't exist in request, skipping operation"
 	errPatchDataToSecret            = "Warning, couldn't patch data from request to secret %s:%s:%s, error: %s"
 	errGetLatestVersion             = "failed to get the latest version of the resource"
+	errGetReferencedSecret          = "cannot get referenced secret"
 )
 
 // Setup adds a controller that reconciles Request managed resources.
@@ -92,7 +94,7 @@ type connector struct {
 	logger          logging.Logger
 	kube            client.Client
 	usage           resource.Tracker
-	newHttpClientFn func(log logging.Logger, timeout time.Duration) (httpClient.Client, error)
+	newHttpClientFn func(log logging.Logger, timeout time.Duration, certPEMBlock, keyPEMBlock, caPEMBlock []byte, insecureSkipVerify bool) (httpClient.Client, error)
 }
 
 // Connect typically produces an ExternalClient by:
@@ -118,7 +120,21 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 		return nil, errors.Wrap(err, errProviderNotRetrieved)
 	}
 
-	h, err := c.newHttpClientFn(l, utils.WaitTimeout(cr.Spec.ForProvider.WaitTimeout))
+	secret := &corev1.Secret{}
+
+	if cr.Spec.ForProvider.TlsSecretRef.Name != "" && cr.Spec.ForProvider.TlsSecretRef.Namespace != "" {
+		if err := c.kube.Get(ctx, types.NamespacedName{
+			Namespace: cr.Spec.ForProvider.TlsSecretRef.Namespace,
+			Name:      cr.Spec.ForProvider.TlsSecretRef.Name,
+		}, secret); err != nil {
+			return nil, errors.Wrap(err, errGetReferencedSecret)
+		}
+	}
+	certPEMBlock := secret.Data["tls.crt"]
+	keyPEMBlock := secret.Data["tls.key"]
+	caPEMBlock := secret.Data["ca.crt"]
+
+	h, err := c.newHttpClientFn(l, utils.WaitTimeout(cr.Spec.ForProvider.WaitTimeout), certPEMBlock, keyPEMBlock, caPEMBlock, cr.Spec.ForProvider.InsecureSkipTLSVerify)
 	if err != nil {
 		return nil, errors.Wrap(err, errNewHttpClient)
 	}
@@ -195,7 +211,7 @@ func (c *external) deployAction(ctx context.Context, cr *v1alpha2.Request, metho
 		return err
 	}
 
-	details, err := c.http.SendRequest(ctx, mapping.Method, requestDetails.Url, requestDetails.Body, requestDetails.Headers, cr.Spec.ForProvider.InsecureSkipTLSVerify)
+	details, err := c.http.SendRequest(ctx, mapping.Method, requestDetails.Url, requestDetails.Body, requestDetails.Headers)
 	c.patchResponseToSecret(ctx, cr, &details.HttpResponse)
 
 	statusHandler, err := statushandler.NewStatusHandler(ctx, cr, details, err, c.localKube, c.logger)

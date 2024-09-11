@@ -42,6 +42,7 @@ import (
 	apisv1alpha1 "github.com/crossplane-contrib/provider-http/apis/v1alpha1"
 	httpClient "github.com/crossplane-contrib/provider-http/internal/clients/http"
 	"github.com/crossplane-contrib/provider-http/internal/utils"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -94,7 +95,7 @@ type connector struct {
 	logger          logging.Logger
 	kube            client.Client
 	usage           resource.Tracker
-	newHttpClientFn func(log logging.Logger, timeout time.Duration) (httpClient.Client, error)
+	newHttpClientFn func(log logging.Logger, timeout time.Duration, certPEMBlock, keyPEMBlock, caPEMBlock []byte, insecureSkipVerify bool) (httpClient.Client, error)
 }
 
 func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.ExternalClient, error) {
@@ -115,7 +116,21 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 		return nil, errors.Wrap(err, errProviderNotRetrieved)
 	}
 
-	h, err := c.newHttpClientFn(l, utils.WaitTimeout(cr.Spec.ForProvider.WaitTimeout))
+	secret := &corev1.Secret{}
+
+	if cr.Spec.ForProvider.TlsSecretRef.Name != "" && cr.Spec.ForProvider.TlsSecretRef.Namespace != "" {
+		if err := c.kube.Get(ctx, types.NamespacedName{
+			Namespace: cr.Spec.ForProvider.TlsSecretRef.Namespace,
+			Name:      cr.Spec.ForProvider.TlsSecretRef.Name,
+		}, secret); err != nil {
+			return nil, errors.Wrap(err, errGetReferencedSecret)
+		}
+	}
+	certPEMBlock := secret.Data["tls.crt"]
+	keyPEMBlock := secret.Data["tls.key"]
+	caPEMBlock := secret.Data["ca.crt"]
+
+	h, err := c.newHttpClientFn(l, utils.WaitTimeout(cr.Spec.ForProvider.WaitTimeout), certPEMBlock, keyPEMBlock, caPEMBlock, cr.Spec.ForProvider.InsecureSkipTLSVerify)
 	if err != nil {
 		return nil, errors.Wrap(err, errNewHttpClient)
 	}
@@ -184,7 +199,7 @@ func (c *external) deployAction(ctx context.Context, cr *v1alpha2.DisposableRequ
 
 	bodyData := httpClient.Data{Encrypted: cr.Spec.ForProvider.Body, Decrypted: sensitiveBody}
 	headersData := httpClient.Data{Encrypted: cr.Spec.ForProvider.Headers, Decrypted: sensitiveHeaders}
-	details, err := c.http.SendRequest(ctx, cr.Spec.ForProvider.Method, cr.Spec.ForProvider.URL, bodyData, headersData, cr.Spec.ForProvider.InsecureSkipTLSVerify)
+	details, err := c.http.SendRequest(ctx, cr.Spec.ForProvider.Method, cr.Spec.ForProvider.URL, bodyData, headersData)
 
 	sensitiveResponse := details.HttpResponse
 	resource := &utils.RequestResource{

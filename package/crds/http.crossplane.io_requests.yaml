@@ -556,6 +556,20 @@ spec:
                       - secretRef
                       type: object
                     type: array
+                  tlsSecretRef:
+                    description: TlsSecretRef expects a reference to an opaque secret
+                      containing tls.crt and tls.key or/and ca.crt
+                    properties:
+                      name:
+                        description: Name of the secret.
+                        type: string
+                      namespace:
+                        description: Namespace of the secret.
+                        type: string
+                    required:
+                    - name
+                    - namespace
+                    type: object
                   waitTimeout:
                     description: WaitTimeout specifies the maximum time duration for
                       waiting.

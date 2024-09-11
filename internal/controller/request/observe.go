@@ -54,7 +54,7 @@ func (c *external) isUpToDate(ctx context.Context, cr *v1alpha2.Request) (Observ
 		return FailedObserve(), err
 	}
 
-	details, responseErr := c.http.SendRequest(ctx, http.MethodGet, requestDetails.Url, requestDetails.Body, requestDetails.Headers, cr.Spec.ForProvider.InsecureSkipTLSVerify)
+	details, responseErr := c.http.SendRequest(ctx, http.MethodGet, requestDetails.Url, requestDetails.Body, requestDetails.Headers)
 	if details.HttpResponse.StatusCode == http.StatusNotFound {
 		return FailedObserve(), errors.New(errObjectNotFound)
 	}

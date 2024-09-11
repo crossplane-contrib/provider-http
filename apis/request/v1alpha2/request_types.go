@@ -42,6 +42,9 @@ type RequestParameters struct {
 	// InsecureSkipTLSVerify, when set to true, skips TLS certificate checks for the HTTP request
 	InsecureSkipTLSVerify bool `json:"insecureSkipTLSVerify,omitempty"`
 
+	// TlsSecretRef expects a reference to an opaque secret containing tls.crt and tls.key or/and ca.crt
+	TlsSecretRef xpv1.SecretReference `json:"tlsSecretRef,omitempty"`
+
 	// SecretInjectionConfig specifies the secrets receiving patches for response data.
 	SecretInjectionConfigs []SecretInjectionConfig `json:"secretInjectionConfigs,omitempty"`
 }

@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -15,12 +17,12 @@ import (
 
 // Client is the interface to interact with Http
 type Client interface {
-	SendRequest(ctx context.Context, method string, url string, body Data, headers Data, skipTLSVerify bool) (resp HttpDetails, err error)
+	SendRequest(ctx context.Context, method string, url string, body Data, headers Data) (resp HttpDetails, err error)
 }
 
 type client struct {
-	log     logging.Logger
-	timeout time.Duration
+	client http.Client
+	log    logging.Logger
 }
 
 type HttpResponse struct {
@@ -46,7 +48,7 @@ type HttpDetails struct {
 	HttpRequest  HttpRequest
 }
 
-func (hc *client) SendRequest(ctx context.Context, method string, url string, body Data, headers Data, skipTLSVerify bool) (details HttpDetails, err error) {
+func (hc *client) SendRequest(ctx context.Context, method string, url string, body Data, headers Data) (details HttpDetails, err error) {
 	requestBody := []byte(body.Decrypted.(string))
 	request, err := http.NewRequestWithContext(ctx, method, url, bytes.NewBuffer(requestBody))
 	requestDetails := HttpRequest{
@@ -68,16 +70,7 @@ func (hc *client) SendRequest(ctx context.Context, method string, url string, bo
 		}
 	}
 
-	client := &http.Client{
-		Transport: &http.Transport{
-			// #nosec G402
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: skipTLSVerify},
-			Proxy:           http.ProxyFromEnvironment, // Use proxy settings from environment
-		},
-		Timeout: hc.timeout,
-	}
-
-	response, err := client.Do(request)
+	response, err := hc.client.Do(request)
 	if err != nil {
 		return HttpDetails{
 			HttpRequest: requestDetails,
@@ -113,10 +106,21 @@ func (hc *client) SendRequest(ctx context.Context, method string, url string, bo
 }
 
 // NewClient returns a new Http Client
-func NewClient(log logging.Logger, timeout time.Duration) (Client, error) {
+func NewClient(log logging.Logger, timeout time.Duration, certPEMBlock, keyPEMBlock, caPEMBlock []byte, insecureSkipVerify bool) (Client, error) {
+	tlsConfig, err := tlsConfig(certPEMBlock, keyPEMBlock, caPEMBlock, insecureSkipVerify)
+	if err != nil {
+		return nil, err
+	}
+	httpClient := http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: tlsConfig,
+			Proxy:           http.ProxyFromEnvironment, // Use proxy settings from environment
+		},
+		Timeout: timeout,
+	}
 	return &client{
-		log:     log,
-		timeout: timeout,
+		client: httpClient,
+		log:    log,
 	}, nil
 }
 
@@ -127,4 +131,27 @@ func toJSON(request HttpRequest) string {
 	}
 
 	return string(jsonBytes)
+}
+
+func tlsConfig(certPEMBlock, keyPEMBlock, caPEMBlock []byte, insecureSkipVerify bool) (*tls.Config, error) {
+	tlsConfig := &tls.Config{}
+	if len(certPEMBlock) > 0 && len(keyPEMBlock) > 0 {
+		certificate, err := tls.X509KeyPair(certPEMBlock, keyPEMBlock)
+		if err != nil {
+			return nil, err
+		}
+		tlsConfig.Certificates = []tls.Certificate{certificate}
+	}
+
+	if len(caPEMBlock) > 0 {
+		caPool := x509.NewCertPool()
+		if !caPool.AppendCertsFromPEM(caPEMBlock) {
+			return nil, errors.New("some error appending the ca.crt")
+		}
+		tlsConfig.RootCAs = caPool
+	}
+
+	tlsConfig.InsecureSkipVerify = insecureSkipVerify
+
+	return tlsConfig, nil
 }

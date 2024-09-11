@@ -424,6 +424,10 @@ func Test_generateRequestObject(t *testing.T) {
 						"body":       map[string]any{"id": "123"},
 						"statusCode": float64(200),
 					},
+					"tlsSecretRef": map[string]any{
+						"name":      "",
+						"namespace": "",
+					},
 				},
 			},
 		},
