@@ -134,6 +134,7 @@ func toJSON(request HttpRequest) string {
 }
 
 func tlsConfig(certPEMBlock, keyPEMBlock, caPEMBlock []byte, insecureSkipVerify bool) (*tls.Config, error) {
+	// #nosec G402
 	tlsConfig := &tls.Config{}
 	if len(certPEMBlock) > 0 && len(keyPEMBlock) > 0 {
 		certificate, err := tls.X509KeyPair(certPEMBlock, keyPEMBlock)
