@@ -90,7 +90,7 @@ func Test_newClient(t *testing.T) {
 		tc := tc // Create local copies of loop variables
 
 		t.Run(name, func(t *testing.T) {
-			client, gotErr := NewClient(log, 10*time.Second, []byte(tc.args.cert), []byte(tc.args.key), []byte(tc.args.ca), tc.args.insecure)
+			client, gotErr := NewClient(log, 10*time.Second, tc.args.cert, tc.args.key, tc.args.ca, tc.args.insecure)
 			if diff := cmp.Diff(tc.want.newClientErr, gotErr, test.EquateErrors()); diff != "" {
 				t.Fatalf("NewClient(...): -want error, +got error: %s", diff)
 			}
