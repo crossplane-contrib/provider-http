@@ -139,7 +139,7 @@ func Test_DefaultResponseCheck(t *testing.T) {
 				client: &external{
 					localKube: nil,
 					http:      nil,
-					logger:    nil,
+					logger:    logging.NewNopLogger(),
 				},
 			}
 			got, gotErr := e.Check(tc.args.ctx, tc.args.cr, tc.args.details, tc.args.responseErr)
