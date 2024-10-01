@@ -76,7 +76,7 @@ func TestPatchSecretsIntoBody(t *testing.T) {
 		tc := tc // Create local copies of loop variables
 
 		t.Run(name, func(t *testing.T) {
-			got, gotErr := PatchSecretsIntoBody(tc.args.ctx, tc.args.localKube, tc.args.body, logging.NewNopLogger())
+			got, gotErr := PatchSecretsIntoString(tc.args.ctx, tc.args.localKube, tc.args.body, logging.NewNopLogger())
 			if diff := cmp.Diff(tc.want.err, gotErr, test.EquateErrors()); diff != "" {
 				t.Fatalf("isUpToDate(...): -want error, +got error: %s", diff)
 			}

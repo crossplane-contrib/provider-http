@@ -25,6 +25,11 @@ import (
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 )
 
+const (
+	ExpectedResponseCheckTypeDefault = "DEFAULT"
+	ExpectedResponseCheckTypeCustom  = "CUSTOM"
+)
+
 // RequestParameters are the configurable fields of a Request.
 type RequestParameters struct {
 	// Mappings defines the HTTP mappings for different methods.
@@ -44,19 +49,41 @@ type RequestParameters struct {
 
 	// SecretInjectionConfig specifies the secrets receiving patches for response data.
 	SecretInjectionConfigs []SecretInjectionConfig `json:"secretInjectionConfigs,omitempty"`
+
+	// ExpectedResponseCheck specifies the mechanism to validate the GET response against expected value.
+	ExpectedResponseCheck ExpectedResponseCheck `json:"expectedResponseCheck,omitempty"`
 }
 
 type Mapping struct {
 	// +kubebuilder:validation:Enum=POST;GET;PUT;DELETE
-	Method  string              `json:"method"`
-	Body    string              `json:"body,omitempty"`
-	URL     string              `json:"url"`
+	// Method specifies the HTTP method for the request.
+	Method string `json:"method"`
+
+	// Body specifies the body of the request.
+	Body string `json:"body,omitempty"`
+
+	// URL specifies the URL for the request.
+	URL string `json:"url"`
+
+	// Headers specifies the headers for the request.
 	Headers map[string][]string `json:"headers,omitempty"`
 }
 
+type ExpectedResponseCheck struct {
+	// Type specifies the type of the expected response check.
+	// +kubebuilder:validation:Enum=DEFAULT;CUSTOM
+	Type string `json:"type,omitempty"`
+
+	// Logic specifies the custom logic for the expected response check.
+	Logic string `json:"logic,omitempty"`
+}
+
 type Payload struct {
+	// BaseUrl specifies the base URL for the request.
 	BaseUrl string `json:"baseUrl,omitempty"`
-	Body    string `json:"body,omitempty"`
+
+	// Body specifies data to be used in the request body.
+	Body string `json:"body,omitempty"`
 }
 
 // A RequestSpec defines the desired state of a Request.

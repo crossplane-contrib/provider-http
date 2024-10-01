@@ -50,6 +50,22 @@ spec:
       - method: "DELETE"
         url: (.payload.baseUrl + "/" + (.response.body.id|tostring))
     
+    # expectedResponseCheck is optional. If not specified or if the type is "DEFAULT", 
+    # the resource is considered up to date if the GET response matches the PUT body.
+    # If specified, the JQ logic determines if the resource is up to date:
+    # - If the JQ query is false, a PUT request is sent to update the resource.
+    # - If true, the resource is considered up to date.
+    expectedResponseCheck:
+      type: CUSTOM
+      logic: |
+        if .response.body.password == .payload.body.password
+         and .response.body.age == 30
+         and .response.headers."Content-Type" == ["application/json"]
+         and .response.headers."X-Secret-Header"[0] == "{{ response-secret:default:extracted-header-data }}"
+         then true 
+         else false 
+         end
+
     # Secrets receiving patches from response data
     secretInjectionConfigs: 
       - secretRef:

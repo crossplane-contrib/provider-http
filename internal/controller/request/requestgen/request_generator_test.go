@@ -62,6 +62,10 @@ var (
 			testPutMapping,
 			testDeleteMapping,
 		},
+		ExpectedResponseCheck: v1alpha2.ExpectedResponseCheck{
+			Type:  v1alpha2.ExpectedResponseCheckTypeCustom,
+			Logic: "logic example",
+		},
 	}
 )
 
@@ -384,6 +388,10 @@ func Test_generateRequestObject(t *testing.T) {
 			},
 			want: want{
 				result: map[string]any{
+					"expectedResponseCheck": map[string]any{
+						"type":  v1alpha2.ExpectedResponseCheckTypeCustom,
+						"logic": "logic example",
+					},
 					"mappings": []any{
 						map[string]any{
 							"body":   "{ username: .payload.body.username, email: .payload.body.email }",
@@ -431,7 +439,7 @@ func Test_generateRequestObject(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			got := generateRequestObject(tc.args.forProvider, tc.args.response)
+			got := GenerateRequestObject(tc.args.forProvider, tc.args.response)
 			if diff := cmp.Diff(tc.want.result, got); diff != "" {
 				t.Fatalf("generateRequestObject(...): -want result, +got result: %s", diff)
 			}
