@@ -301,6 +301,10 @@ func Test_StructToMap(t *testing.T) {
 						"baseUrl": "https://api.example.com/users",
 						"body":    `{"username": "john_doe", "email": "john.doe@example.com"}`,
 					},
+					"tlsSecretRef": map[string]any{
+						"name":      "",
+						"namespace": "",
+					},
 				},
 				errMessage: "",
 			},

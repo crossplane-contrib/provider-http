@@ -528,6 +528,20 @@ spec:
                     description: ShouldLoopInfinitely specifies whether the reconciliation
                       should loop indefinitely.
                     type: boolean
+                  tlsSecretRef:
+                    description: TlsSecretRef expects a reference to an opaque secret
+                      containing tls.crt and tls.key or/and ca.crt
+                    properties:
+                      name:
+                        description: Name of the secret.
+                        type: string
+                      namespace:
+                        description: Namespace of the secret.
+                        type: string
+                    required:
+                    - name
+                    - namespace
+                    type: object
                   url:
                     type: string
                     x-kubernetes-validations:

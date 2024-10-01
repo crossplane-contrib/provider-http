@@ -1,0 +1,15 @@
+apiVersion: http.crossplane.io/v1alpha2
+kind: DisposableRequest
+metadata:
+  name: mtls-get
+spec:
+  deletionPolicy: Orphan
+  forProvider:
+    tlsSecretRef: # reference to a secret containing tls.crt, tls.key and ca.crt
+      name: client-tls
+      namespace: default
+    method: GET
+    url: https://example.com
+    waitTimeout: 5m
+  providerConfigRef:
+    name: http-conf

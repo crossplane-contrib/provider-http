@@ -32,7 +32,7 @@ GO_TEST_PARALLEL := $(shell echo $$(( $(NPROCS) / 2 )))
 GO_STATIC_PACKAGES = $(GO_PROJECT)/cmd/provider
 GO_SUBDIRS += cmd internal apis
 GO111MODULE = on
-GOLANGCILINT_VERSION = 1.51.2
+GOLANGCILINT_VERSION = 1.61.0
 -include build/makelib/golang.mk
 
 # ====================================================================================

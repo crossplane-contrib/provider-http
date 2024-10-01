@@ -45,6 +45,9 @@ type DisposableRequestParameters struct {
 	// InsecureSkipTLSVerify, when set to true, skips TLS certificate checks for the HTTP request
 	InsecureSkipTLSVerify bool `json:"insecureSkipTLSVerify,omitempty"`
 
+	// TlsSecretRef expects a reference to an opaque secret containing tls.crt and tls.key or/and ca.crt
+	TlsSecretRef xpv1.SecretReference `json:"tlsSecretRef,omitempty"`
+
 	// ExpectedResponse is a jq filter expression used to evaluate the HTTP response and determine if it matches the expected criteria.
 	// The expression should return a boolean; if true, the response is considered expected.
 	// Example: '.body.job_status == "success"'
