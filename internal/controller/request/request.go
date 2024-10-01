@@ -183,6 +183,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	}, nil
 }
 
+// deployAction executes the action based on the given Request resource and Mapping configuration.
 func (c *external) deployAction(ctx context.Context, cr *v1alpha2.Request, method string) error {
 	mapping, ok := getMappingByMethod(&cr.Spec.ForProvider, method)
 	if !ok {
@@ -233,6 +234,7 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) error {
 	return errors.Wrap(c.deployAction(ctx, cr, http.MethodDelete), errFailedToSendHttpRequest)
 }
 
+// patchResponseToSecret patches the response data to the secret based on the given Request resource and Mapping configuration.
 func (c *external) patchResponseToSecret(ctx context.Context, cr *v1alpha2.Request, response *httpClient.HttpResponse) {
 	for _, ref := range cr.Spec.ForProvider.SecretInjectionConfigs {
 		var owner metav1.Object = nil

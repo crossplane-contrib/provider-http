@@ -469,6 +469,22 @@ spec:
               forProvider:
                 description: RequestParameters are the configurable fields of a Request.
                 properties:
+                  expectedResponseCheck:
+                    description: ExpectedResponseCheck specifies the mechanism to
+                      validate the GET response against expected value.
+                    properties:
+                      logic:
+                        description: Logic specifies the custom logic for the expected
+                          response check.
+                        type: string
+                      type:
+                        description: Type specifies the type of the expected response
+                          check.
+                        enum:
+                        - DEFAULT
+                        - CUSTOM
+                        type: string
+                    type: object
                   headers:
                     additionalProperties:
                       items:
@@ -486,14 +502,17 @@ spec:
                     items:
                       properties:
                         body:
+                          description: Body specifies the body of the request.
                           type: string
                         headers:
                           additionalProperties:
                             items:
                               type: string
                             type: array
+                          description: Headers specifies the headers for the request.
                           type: object
                         method:
+                          description: Method specifies the HTTP method for the request.
                           enum:
                           - POST
                           - GET
@@ -501,6 +520,7 @@ spec:
                           - DELETE
                           type: string
                         url:
+                          description: URL specifies the URL for the request.
                           type: string
                       required:
                       - method
@@ -511,8 +531,11 @@ spec:
                     description: Payload defines the payload for the request.
                     properties:
                       baseUrl:
+                        description: BaseUrl specifies the base URL for the request.
                         type: string
                       body:
+                        description: Body specifies data to be used in the request
+                          body.
                         type: string
                     type: object
                   secretInjectionConfigs:
@@ -815,14 +838,17 @@ spec:
               requestDetails:
                 properties:
                   body:
+                    description: Body specifies the body of the request.
                     type: string
                   headers:
                     additionalProperties:
                       items:
                         type: string
                       type: array
+                    description: Headers specifies the headers for the request.
                     type: object
                   method:
+                    description: Method specifies the HTTP method for the request.
                     enum:
                     - POST
                     - GET
@@ -830,6 +856,7 @@ spec:
                     - DELETE
                     type: string
                   url:
+                    description: URL specifies the URL for the request.
                     type: string
                 required:
                 - method

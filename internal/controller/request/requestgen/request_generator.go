@@ -27,7 +27,7 @@ type RequestDetails struct {
 
 // GenerateRequestDetails generates request details.
 func GenerateRequestDetails(ctx context.Context, localKube client.Client, methodMapping v1alpha2.Mapping, forProvider v1alpha2.RequestParameters, response v1alpha2.Response, logger logging.Logger) (RequestDetails, error, bool) {
-	jqObject := generateRequestObject(forProvider, response)
+	jqObject := GenerateRequestObject(forProvider, response)
 	url, err := generateURL(methodMapping.URL, jqObject)
 	if err != nil {
 		return RequestDetails{}, err, false
@@ -50,9 +50,9 @@ func GenerateRequestDetails(ctx context.Context, localKube client.Client, method
 	return RequestDetails{Body: bodyData, Url: url, Headers: headersData}, nil, true
 }
 
-// generateRequestObject creates a JSON-compatible map from the specified Request's ForProvider and Response fields.
+// GenerateRequestObject creates a JSON-compatible map from the specified Request's ForProvider and Response fields.
 // It merges the two maps, converts JSON strings to nested maps, and returns the resulting map.
-func generateRequestObject(forProvider v1alpha2.RequestParameters, response v1alpha2.Response) map[string]interface{} {
+func GenerateRequestObject(forProvider v1alpha2.RequestParameters, response v1alpha2.Response) map[string]interface{} {
 	baseMap, _ := json_util.StructToMap(forProvider)
 	statusMap, _ := json_util.StructToMap(map[string]interface{}{
 		"response": response,
@@ -64,6 +64,7 @@ func generateRequestObject(forProvider v1alpha2.RequestParameters, response v1al
 	return baseMap
 }
 
+// IsRequestValid checks if the request details are valid.
 func IsRequestValid(requestDetails RequestDetails) bool {
 	return (!strings.Contains(fmt.Sprint(requestDetails), "null")) && (requestDetails.Url != "")
 }
@@ -95,13 +96,13 @@ func generateBody(ctx context.Context, localKube client.Client, mappingBody stri
 		}, nil
 	}
 
-	jqQuery := requestprocessing.ConvertStringToJQQuery(mappingBody)
+	jqQuery := utils.NormalizeWhitespace(mappingBody)
 	body, err := requestprocessing.ApplyJQOnStr(jqQuery, jqObject)
 	if err != nil {
 		return httpClient.Data{}, err
 	}
 
-	sensitiveBody, err := datapatcher.PatchSecretsIntoBody(ctx, localKube, body, logger)
+	sensitiveBody, err := datapatcher.PatchSecretsIntoString(ctx, localKube, body, logger)
 	if err != nil {
 		return httpClient.Data{}, err
 	}

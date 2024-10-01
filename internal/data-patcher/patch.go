@@ -15,9 +15,9 @@ const (
 	errPatchToReferencedSecret = "cannot patch to referenced secret"
 )
 
-// PatchSecretsIntoBody patches secrets into the provided string body.
-func PatchSecretsIntoBody(ctx context.Context, localKube client.Client, body string, logger logging.Logger) (string, error) {
-	return patchSecretsToValue(ctx, localKube, body, logger)
+// PatchSecretsIntoString patches secrets into the provided string.
+func PatchSecretsIntoString(ctx context.Context, localKube client.Client, str string, logger logging.Logger) (string, error) {
+	return patchSecretsToValue(ctx, localKube, str, logger)
 }
 
 // PatchSecretsIntoHeaders takes a map of headers and applies security measures to
@@ -63,5 +63,73 @@ func PatchResponseToSecret(ctx context.Context, localKube client.Client, logger 
 		return errors.Wrap(err, errPatchToReferencedSecret)
 	}
 
+	return nil
+}
+
+// PatchSecretsIntoMap takes a map of string to interface{} and patches secrets
+// into any string values within the map, including nested maps and slices.
+func PatchSecretsIntoMap(ctx context.Context, localKube client.Client, data map[string]interface{}, logger logging.Logger) (map[string]interface{}, error) {
+	dataCopy := copyMap(data)
+
+	err := patchSecretsInMap(ctx, localKube, dataCopy, logger)
+	if err != nil {
+		return nil, err
+	}
+
+	return dataCopy, nil
+}
+
+// copyMap creates a deep copy of a map[string]interface{}.
+func copyMap(original map[string]interface{}) map[string]interface{} {
+	copy := make(map[string]interface{}, len(original))
+	for k, v := range original {
+		copy[k] = deepCopy(v)
+	}
+	return copy
+}
+
+// deepCopy performs a deep copy of the value, handling maps and slices recursively.
+func deepCopy(value interface{}) interface{} {
+	switch v := value.(type) {
+	case map[string]interface{}:
+		return copyMap(v)
+	case []interface{}:
+		copy := make([]interface{}, len(v))
+		for i, item := range v {
+			copy[i] = deepCopy(item)
+		}
+		return copy
+	default:
+		return v
+	}
+}
+
+// patchSecretsInSlice traverses a slice and patches secrets into any string values.
+func patchSecretsInSlice(ctx context.Context, localKube client.Client, data []interface{}, logger logging.Logger) error {
+	for i, item := range data {
+		switch v := item.(type) {
+		case string:
+			// Patch secrets in string values
+			patchedValue, err := patchSecretsToValue(ctx, localKube, v, logger)
+			if err != nil {
+				return err
+			}
+			data[i] = patchedValue
+
+		case map[string]interface{}:
+			// Recursively patch secrets in nested maps
+			err := patchSecretsInMap(ctx, localKube, v, logger)
+			if err != nil {
+				return err
+			}
+
+		case []interface{}:
+			// Recursively patch secrets in nested slices
+			err := patchSecretsInSlice(ctx, localKube, v, logger)
+			if err != nil {
+				return err
+			}
+		}
+	}
 	return nil
 }

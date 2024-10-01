@@ -172,7 +172,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 }
 
 func (c *external) deployAction(ctx context.Context, cr *v1alpha2.DisposableRequest) error {
-	sensitiveBody, err := datapatcher.PatchSecretsIntoBody(ctx, c.localKube, cr.Spec.ForProvider.Body, c.logger)
+	sensitiveBody, err := datapatcher.PatchSecretsIntoString(ctx, c.localKube, cr.Spec.ForProvider.Body, c.logger)
 	if err != nil {
 		return err
 	}
@@ -195,8 +195,6 @@ func (c *external) deployAction(ctx context.Context, cr *v1alpha2.DisposableRequ
 		HttpRequest:    details.HttpRequest,
 	}
 
-	c.patchResponseToSecret(ctx, cr, &resource.HttpResponse)
-
 	// Get the latest version of the resource before updating
 	if err := c.localKube.Get(ctx, types.NamespacedName{Name: cr.Name, Namespace: cr.Namespace}, cr); err != nil {
 		return errors.Wrap(err, errGetLatestVersion)
@@ -204,6 +202,7 @@ func (c *external) deployAction(ctx context.Context, cr *v1alpha2.DisposableRequ
 
 	if err != nil {
 		setErr := resource.SetError(err)
+		c.patchResponseToSecret(ctx, cr, &resource.HttpResponse)
 		if settingError := utils.SetRequestResourceStatus(*resource, setErr, resource.SetLastReconcileTime(), resource.SetRequestDetails()); settingError != nil {
 			return errors.Wrap(settingError, utils.ErrFailedToSetStatus)
 		}
@@ -211,6 +210,7 @@ func (c *external) deployAction(ctx context.Context, cr *v1alpha2.DisposableRequ
 	}
 
 	if utils.IsHTTPError(resource.HttpResponse.StatusCode) {
+		c.patchResponseToSecret(ctx, cr, &resource.HttpResponse)
 		if settingError := utils.SetRequestResourceStatus(*resource, resource.SetStatusCode(), resource.SetLastReconcileTime(), resource.SetHeaders(), resource.SetBody(), resource.SetRequestDetails(), resource.SetError(nil)); settingError != nil {
 			return errors.Wrap(settingError, utils.ErrFailedToSetStatus)
 		}
@@ -223,6 +223,7 @@ func (c *external) deployAction(ctx context.Context, cr *v1alpha2.DisposableRequ
 		return err
 	}
 
+	c.patchResponseToSecret(ctx, cr, &resource.HttpResponse)
 	if !isExpectedResponse {
 		limit := utils.GetRollbackRetriesLimit(cr.Spec.ForProvider.RollbackRetriesLimit)
 		return utils.SetRequestResourceStatus(*resource, resource.SetStatusCode(), resource.SetLastReconcileTime(), resource.SetHeaders(), resource.SetBody(),

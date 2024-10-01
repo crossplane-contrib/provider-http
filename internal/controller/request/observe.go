@@ -2,21 +2,21 @@ package request
 
 import (
 	"context"
-	"fmt"
 	"net/http"
-	"strings"
 
 	"github.com/crossplane-contrib/provider-http/apis/request/v1alpha2"
 	httpClient "github.com/crossplane-contrib/provider-http/internal/clients/http"
 	"github.com/crossplane-contrib/provider-http/internal/controller/request/requestgen"
-	"github.com/crossplane-contrib/provider-http/internal/json"
 	"github.com/crossplane-contrib/provider-http/internal/utils"
 	"github.com/pkg/errors"
 )
 
 const (
-	errObjectNotFound = "object wasn't found"
-	errNotValidJSON   = "%s is not a valid JSON string: %s"
+	errObjectNotFound            = "object wasn't found"
+	errNotValidJSON              = "%s is not a valid JSON string: %s"
+	errConvertResToMap           = "failed to convert response to map"
+	ErrExpectedFormat            = "expectedResponseCheck.Logic JQ filter should return a boolean, but returned error: %s"
+	errExpectedResponseCheckType = "expectedResponseCheck.Type should be either DEFAULT, CUSTOM or empty"
 )
 
 type ObserveRequestDetails struct {
@@ -60,56 +60,26 @@ func (c *external) isUpToDate(ctx context.Context, cr *v1alpha2.Request) (Observ
 	}
 
 	c.patchResponseToSecret(ctx, cr, &details.HttpResponse)
-	desiredState, err := c.desiredState(ctx, cr)
-	if err != nil {
-		if isErrorMappingNotFound(err) {
-			// Since there is no PUT mapping, we skip the check for its presence in the GET response.
-			return NewObserve(details, responseErr, true), nil
-		}
-
-		// For any other error, we return a failed observation.
-		return FailedObserve(), err
-	}
-
-	return c.compareResponseAndDesiredState(details, responseErr, desiredState)
+	return c.determineResponseCheck(ctx, cr, details, responseErr)
 }
 
+// determineResponseCheck determines the response check based on the expectedResponseCheck.Type
+func (c *external) determineResponseCheck(ctx context.Context, cr *v1alpha2.Request, details httpClient.HttpDetails, responseErr error) (ObserveRequestDetails, error) {
+	responseChecker := c.getResponseCheck(cr)
+	if responseChecker == nil {
+		return FailedObserve(), errors.New(errExpectedResponseCheckType)
+	}
+
+	return responseChecker.Check(ctx, cr, details, responseErr)
+}
+
+// isObjectValidForObservation checks if the object is valid for observation
 func (c *external) isObjectValidForObservation(cr *v1alpha2.Request) bool {
 	return cr.Status.Response.Body != "" &&
 		!(cr.Status.RequestDetails.Method == http.MethodPost && utils.IsHTTPError(cr.Status.Response.StatusCode))
 }
 
-func (c *external) compareResponseAndDesiredState(details httpClient.HttpDetails, err error, desiredState string) (ObserveRequestDetails, error) {
-	observeRequestDetails := NewObserve(details, err, false)
-
-	if json.IsJSONString(details.HttpResponse.Body) && json.IsJSONString(desiredState) {
-		responseBodyMap := json.JsonStringToMap(details.HttpResponse.Body)
-		desiredStateMap := json.JsonStringToMap(desiredState)
-		observeRequestDetails.Synced = json.Contains(responseBodyMap, desiredStateMap) && utils.IsHTTPSuccess(details.HttpResponse.StatusCode)
-		return observeRequestDetails, nil
-	}
-
-	if !json.IsJSONString(details.HttpResponse.Body) && json.IsJSONString(desiredState) {
-		return FailedObserve(), errors.Errorf(errNotValidJSON, "response body", details.HttpResponse.Body)
-	}
-
-	if json.IsJSONString(details.HttpResponse.Body) && !json.IsJSONString(desiredState) {
-		return FailedObserve(), errors.Errorf(errNotValidJSON, "PUT mapping result", desiredState)
-	}
-
-	observeRequestDetails.Synced = strings.Contains(details.HttpResponse.Body, desiredState) && utils.IsHTTPSuccess(details.HttpResponse.StatusCode)
-	return observeRequestDetails, nil
-}
-
-func (c *external) desiredState(ctx context.Context, cr *v1alpha2.Request) (string, error) {
-	requestDetails, err := c.requestDetails(ctx, cr, http.MethodPut)
-	if err != nil {
-		return "", err
-	}
-
-	return requestDetails.Body.Encrypted.(string), nil
-}
-
+// requestDetails generates the request details for a given request
 func (c *external) requestDetails(ctx context.Context, cr *v1alpha2.Request, method string) (requestgen.RequestDetails, error) {
 	mapping, ok := getMappingByMethod(&cr.Spec.ForProvider, method)
 	if !ok {
@@ -117,10 +87,4 @@ func (c *external) requestDetails(ctx context.Context, cr *v1alpha2.Request, met
 	}
 
 	return c.generateValidRequestDetails(ctx, cr, mapping)
-}
-
-// isErrorMappingNotFound checks if the provided error indicates that the
-// mapping for an HTTP PUT request is not found.
-func isErrorMappingNotFound(err error) bool {
-	return errors.Cause(err).Error() == fmt.Sprintf(errMappingNotFound, http.MethodPut)
 }
