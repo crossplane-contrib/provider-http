@@ -133,3 +133,30 @@ func patchValueToSecret(ctx context.Context, kubeClient client.Client, logger lo
 
 	return kubehandler.UpdateSecret(ctx, kubeClient, secret)
 }
+
+// patchSecretsInMap traverses a map and patches secrets into any string values.
+func patchSecretsInMap(ctx context.Context, localKube client.Client, data map[string]interface{}, logger logging.Logger) error {
+	for key, value := range data {
+		switch v := value.(type) {
+		case string:
+			patchedValue, err := patchSecretsToValue(ctx, localKube, v, logger)
+			if err != nil {
+				return err
+			}
+			data[key] = patchedValue
+
+		case map[string]interface{}:
+			err := patchSecretsInMap(ctx, localKube, v, logger)
+			if err != nil {
+				return err
+			}
+
+		case []interface{}:
+			err := patchSecretsInSlice(ctx, localKube, v, logger)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}

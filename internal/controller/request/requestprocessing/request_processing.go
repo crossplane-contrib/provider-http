@@ -2,14 +2,9 @@ package requestprocessing
 
 import (
 	"encoding/json"
-	"strings"
 
 	"github.com/crossplane-contrib/provider-http/internal/jq"
 )
-
-func ConvertStringToJQQuery(input string) string {
-	return strings.Join(strings.Fields(input), " ")
-}
 
 // ApplyJQOnStr applies a jq query to a Request, returning the result as a string.
 // The function handles complex results by converting them to JSON format.

@@ -68,13 +68,14 @@ func StructToMap(obj interface{}) (newMap map[string]interface{}, err error) {
 	return
 }
 
-// ConvertMapToJson converts a map to a JSON byte slice.
-func ConvertMapToJson(m map[string]interface{}) ([]byte, bool) {
-	jsonData, err := json.Marshal(m)
+// ConvertMapToJson converts a map to a JSON string.
+func ConvertMapToJson(m map[string]interface{}) (string, error) {
+	jsonBytes, err := json.Marshal(m)
 	if err != nil {
-		return nil, false
+		return "", err
 	}
-	return jsonData, true
+
+	return string(jsonBytes), nil
 }
 
 // deepEqual checks if two interfaces are deeply equal by comparing their JSON representations.
