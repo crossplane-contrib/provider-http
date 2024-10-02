@@ -7,6 +7,7 @@ import (
 	"github.com/crossplane-contrib/provider-http/apis/request/v1alpha2"
 	httpClient "github.com/crossplane-contrib/provider-http/internal/clients/http"
 	"github.com/crossplane-contrib/provider-http/internal/controller/request/requestgen"
+	"github.com/crossplane-contrib/provider-http/internal/controller/request/requestmapping"
 	"github.com/crossplane-contrib/provider-http/internal/utils"
 	"github.com/pkg/errors"
 )
@@ -49,12 +50,17 @@ func (c *external) isUpToDate(ctx context.Context, cr *v1alpha2.Request) (Observ
 		return FailedObserve(), errors.New(errObjectNotFound)
 	}
 
-	requestDetails, err := c.requestDetails(ctx, cr, http.MethodGet)
+	mapping, err := requestmapping.GetMapping(&cr.Spec.ForProvider, v1alpha2.ActionObserve, c.logger)
 	if err != nil {
 		return FailedObserve(), err
 	}
 
-	details, responseErr := c.http.SendRequest(ctx, http.MethodGet, requestDetails.Url, requestDetails.Body, requestDetails.Headers, cr.Spec.ForProvider.InsecureSkipTLSVerify)
+	requestDetails, err := c.generateValidRequestDetails(ctx, cr, mapping)
+	if err != nil {
+		return FailedObserve(), err
+	}
+
+	details, responseErr := c.http.SendRequest(ctx, mapping.Method, requestDetails.Url, requestDetails.Body, requestDetails.Headers, cr.Spec.ForProvider.InsecureSkipTLSVerify)
 	if details.HttpResponse.StatusCode == http.StatusNotFound {
 		return FailedObserve(), errors.New(errObjectNotFound)
 	}
@@ -79,11 +85,11 @@ func (c *external) isObjectValidForObservation(cr *v1alpha2.Request) bool {
 		!(cr.Status.RequestDetails.Method == http.MethodPost && utils.IsHTTPError(cr.Status.Response.StatusCode))
 }
 
-// requestDetails generates the request details for a given request
-func (c *external) requestDetails(ctx context.Context, cr *v1alpha2.Request, method string) (requestgen.RequestDetails, error) {
-	mapping, ok := getMappingByMethod(&cr.Spec.ForProvider, method)
-	if !ok {
-		return requestgen.RequestDetails{}, errors.Errorf(errMappingNotFound, method)
+// requestDetails generates the request details for a given method or action.
+func (c *external) requestDetails(ctx context.Context, cr *v1alpha2.Request, action string) (requestgen.RequestDetails, error) {
+	mapping, err := requestmapping.GetMapping(&cr.Spec.ForProvider, action, c.logger)
+	if err != nil {
+		return requestgen.RequestDetails{}, err
 	}
 
 	return c.generateValidRequestDetails(ctx, cr, mapping)

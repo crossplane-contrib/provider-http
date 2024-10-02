@@ -8,6 +8,7 @@ import (
 	"github.com/crossplane-contrib/provider-http/apis/request/v1alpha2"
 	httpClient "github.com/crossplane-contrib/provider-http/internal/clients/http"
 	"github.com/crossplane-contrib/provider-http/internal/controller/request/requestgen"
+	"github.com/crossplane-contrib/provider-http/internal/controller/request/requestmapping"
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
 	"github.com/crossplane/crossplane-runtime/pkg/test"
 	"github.com/google/go-cmp/cmp"
@@ -17,6 +18,30 @@ import (
 
 var (
 	errNotFound = errors.New(errObjectNotFound)
+)
+
+var (
+	testPostMapping = v1alpha2.Mapping{
+		Method: "POST",
+		Body:   "{ username: .payload.body.username, email: .payload.body.email }",
+		URL:    ".payload.baseUrl",
+	}
+
+	testPutMapping = v1alpha2.Mapping{
+		Method: "PUT",
+		Body:   "{ username: \"john_doe_new_username\" }",
+		URL:    "(.payload.baseUrl + \"/\" + .response.body.id)",
+	}
+
+	testGetMapping = v1alpha2.Mapping{
+		Method: "GET",
+		URL:    "(.payload.baseUrl + \"/\" + .response.body.id)",
+	}
+
+	testDeleteMapping = v1alpha2.Mapping{
+		Method: "DELETE",
+		URL:    "(.payload.baseUrl + \"/\" + .response.body.id)",
+	}
 )
 
 func Test_isUpToDate(t *testing.T) {
@@ -537,7 +562,7 @@ func Test_requestDetails(t *testing.T) {
 	type args struct {
 		ctx    context.Context
 		cr     *v1alpha2.Request
-		method string
+		action string
 	}
 
 	type want struct {
@@ -565,7 +590,7 @@ func Test_requestDetails(t *testing.T) {
 						},
 					},
 				},
-				method: "GET",
+				action: v1alpha2.ActionObserve,
 			},
 			want: want{
 				result: requestgen.RequestDetails{
@@ -597,7 +622,7 @@ func Test_requestDetails(t *testing.T) {
 						},
 					},
 				},
-				method: "POST",
+				action: v1alpha2.ActionCreate,
 			},
 			want: want{
 				result: requestgen.RequestDetails{
@@ -619,15 +644,14 @@ func Test_requestDetails(t *testing.T) {
 				ctx: context.Background(),
 				cr: &v1alpha2.Request{
 					Spec: v1alpha2.RequestSpec{
-
 						ForProvider: v1alpha2.RequestParameters{},
 					},
 				},
-				method: "UNKNOWN_METHOD",
+				action: "UNKNOWN_METHOD",
 			},
 			want: want{
 				result: requestgen.RequestDetails{},
-				err:    errors.Errorf(errMappingNotFound, "UNKNOWN_METHOD"),
+				err:    errors.Errorf(requestmapping.ErrMappingNotFound, "UNKNOWN_METHOD", http.MethodGet),
 			},
 		},
 	}
@@ -636,9 +660,11 @@ func Test_requestDetails(t *testing.T) {
 		tc := tc
 
 		t.Run(name, func(t *testing.T) {
-			e := &external{}
+			e := &external{
+				logger: logging.NewNopLogger(),
+			}
 
-			got, gotErr := e.requestDetails(tc.args.ctx, tc.args.cr, tc.args.method)
+			got, gotErr := e.requestDetails(tc.args.ctx, tc.args.cr, tc.args.action)
 			if diff := cmp.Diff(tc.want.err, gotErr, test.EquateErrors()); diff != "" {
 				t.Fatalf("requestDetails(...): -want error, +got error: %s", diff)
 			}
