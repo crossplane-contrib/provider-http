@@ -501,6 +501,15 @@ spec:
                       methods.
                     items:
                       properties:
+                        action:
+                          description: Action specifies the intended action for the
+                            request.
+                          enum:
+                          - CREATE
+                          - OBSERVE
+                          - UPDATE
+                          - REMOVE
+                          type: string
                         body:
                           description: Body specifies the body of the request.
                           type: string
@@ -512,7 +521,9 @@ spec:
                           description: Headers specifies the headers for the request.
                           type: object
                         method:
-                          description: Method specifies the HTTP method for the request.
+                          description: |-
+                            Either Method or Action must be specified. If both are omitted, the mapping will not be used.
+                            Method specifies the HTTP method for the request.
                           enum:
                           - POST
                           - GET
@@ -523,7 +534,6 @@ spec:
                           description: URL specifies the URL for the request.
                           type: string
                       required:
-                      - method
                       - url
                       type: object
                     type: array
@@ -837,6 +847,14 @@ spec:
                 type: integer
               requestDetails:
                 properties:
+                  action:
+                    description: Action specifies the intended action for the request.
+                    enum:
+                    - CREATE
+                    - OBSERVE
+                    - UPDATE
+                    - REMOVE
+                    type: string
                   body:
                     description: Body specifies the body of the request.
                     type: string
@@ -848,7 +866,9 @@ spec:
                     description: Headers specifies the headers for the request.
                     type: object
                   method:
-                    description: Method specifies the HTTP method for the request.
+                    description: |-
+                      Either Method or Action must be specified. If both are omitted, the mapping will not be used.
+                      Method specifies the HTTP method for the request.
                     enum:
                     - POST
                     - GET
@@ -859,7 +879,6 @@ spec:
                     description: URL specifies the URL for the request.
                     type: string
                 required:
-                - method
                 - url
                 type: object
               response:

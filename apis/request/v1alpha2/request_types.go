@@ -30,6 +30,13 @@ const (
 	ExpectedResponseCheckTypeCustom  = "CUSTOM"
 )
 
+const (
+	ActionCreate  = "CREATE"
+	ActionObserve = "OBSERVE"
+	ActionUpdate  = "UPDATE"
+	ActionRemove  = "REMOVE"
+)
+
 // RequestParameters are the configurable fields of a Request.
 type RequestParameters struct {
 	// Mappings defines the HTTP mappings for different methods.
@@ -55,9 +62,14 @@ type RequestParameters struct {
 }
 
 type Mapping struct {
+	// Either Method or Action must be specified. If both are omitted, the mapping will not be used.
 	// +kubebuilder:validation:Enum=POST;GET;PUT;DELETE
 	// Method specifies the HTTP method for the request.
-	Method string `json:"method"`
+	Method string `json:"method,omitempty"`
+
+	// +kubebuilder:validation:Enum=CREATE;OBSERVE;UPDATE;REMOVE
+	// Action specifies the intended action for the request.
+	Action string `json:"action,omitempty"`
 
 	// Body specifies the body of the request.
 	Body string `json:"body,omitempty"`

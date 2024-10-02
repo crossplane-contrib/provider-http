@@ -9,6 +9,7 @@ import (
 	"github.com/crossplane-contrib/provider-http/apis/request/v1alpha2"
 	httpClient "github.com/crossplane-contrib/provider-http/internal/clients/http"
 	"github.com/crossplane-contrib/provider-http/internal/controller/request/requestgen"
+	"github.com/crossplane-contrib/provider-http/internal/controller/request/requestmapping"
 	"github.com/crossplane-contrib/provider-http/internal/controller/request/responseconverter"
 	datapatcher "github.com/crossplane-contrib/provider-http/internal/data-patcher"
 	"github.com/crossplane-contrib/provider-http/internal/jq"
@@ -102,7 +103,7 @@ func (d *DefaultResponseCheck) compareJSON(body, desiredState string, statusCode
 
 // desiredState returns the desired state for a given request
 func (d *DefaultResponseCheck) desiredState(ctx context.Context, cr *v1alpha2.Request) (string, error) {
-	requestDetails, err := d.client.requestDetails(ctx, cr, http.MethodPut)
+	requestDetails, err := d.client.requestDetails(ctx, cr, v1alpha2.ActionUpdate)
 	if err != nil {
 		return "", err
 	}
@@ -162,5 +163,5 @@ func (c *external) getResponseCheck(cr *v1alpha2.Request) ResponseCheck {
 // isErrorMappingNotFound checks if the provided error indicates that the
 // mapping for an HTTP PUT request is not found.
 func isErrorMappingNotFound(err error) bool {
-	return errors.Cause(err).Error() == fmt.Sprintf(errMappingNotFound, http.MethodPut)
+	return errors.Cause(err).Error() == fmt.Sprintf(requestmapping.ErrMappingNotFound, v1alpha2.ActionUpdate, http.MethodPut)
 }

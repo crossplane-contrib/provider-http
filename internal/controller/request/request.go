@@ -19,7 +19,6 @@ package request
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"time"
 
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
@@ -39,6 +38,7 @@ import (
 	apisv1alpha1 "github.com/crossplane-contrib/provider-http/apis/v1alpha1"
 	httpClient "github.com/crossplane-contrib/provider-http/internal/clients/http"
 	"github.com/crossplane-contrib/provider-http/internal/controller/request/requestgen"
+	"github.com/crossplane-contrib/provider-http/internal/controller/request/requestmapping"
 	"github.com/crossplane-contrib/provider-http/internal/controller/request/statushandler"
 	datapatcher "github.com/crossplane-contrib/provider-http/internal/data-patcher"
 	"github.com/crossplane-contrib/provider-http/internal/utils"
@@ -54,7 +54,6 @@ const (
 	errFailedToCheckIfUpToDate      = "failed to check if request is up to date"
 	errFailedToUpdateStatusFailures = "failed to reset status failures counter"
 	errFailedUpdateStatusConditions = "failed updating status conditions"
-	errMappingNotFound              = "%s mapping doesn't exist in request, skipping operation"
 	errPatchDataToSecret            = "Warning, couldn't patch data from request to secret %s:%s:%s, error: %s"
 	errGetLatestVersion             = "failed to get the latest version of the resource"
 )
@@ -184,10 +183,10 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 }
 
 // deployAction executes the action based on the given Request resource and Mapping configuration.
-func (c *external) deployAction(ctx context.Context, cr *v1alpha2.Request, method string) error {
-	mapping, ok := getMappingByMethod(&cr.Spec.ForProvider, method)
-	if !ok {
-		c.logger.Info(fmt.Sprintf(errMappingNotFound, method))
+func (c *external) deployAction(ctx context.Context, cr *v1alpha2.Request, action string) error {
+	mapping, err := requestmapping.GetMapping(&cr.Spec.ForProvider, action, c.logger)
+	if err != nil {
+		c.logger.Info(err.Error())
 		return nil
 	}
 
@@ -213,7 +212,7 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalCreation{}, errors.New(errNotRequest)
 	}
 
-	return managed.ExternalCreation{}, errors.Wrap(c.deployAction(ctx, cr, http.MethodPost), errFailedToSendHttpRequest)
+	return managed.ExternalCreation{}, errors.Wrap(c.deployAction(ctx, cr, v1alpha2.ActionCreate), errFailedToSendHttpRequest)
 }
 
 func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.ExternalUpdate, error) {
@@ -222,7 +221,7 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalUpdate{}, errors.New(errNotRequest)
 	}
 
-	return managed.ExternalUpdate{}, errors.Wrap(c.deployAction(ctx, cr, http.MethodPut), errFailedToSendHttpRequest)
+	return managed.ExternalUpdate{}, errors.Wrap(c.deployAction(ctx, cr, v1alpha2.ActionUpdate), errFailedToSendHttpRequest)
 }
 
 func (c *external) Delete(ctx context.Context, mg resource.Managed) error {
@@ -231,7 +230,7 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) error {
 		return errors.New(errNotRequest)
 	}
 
-	return errors.Wrap(c.deployAction(ctx, cr, http.MethodDelete), errFailedToSendHttpRequest)
+	return errors.Wrap(c.deployAction(ctx, cr, v1alpha2.ActionRemove), errFailedToSendHttpRequest)
 }
 
 // patchResponseToSecret patches the response data to the secret based on the given Request resource and Mapping configuration.
