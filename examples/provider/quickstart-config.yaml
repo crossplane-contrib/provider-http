@@ -4,4 +4,4 @@ metadata:
   name: http-conf
 spec:
   credentials:
-    source: InjectedIdentity
+    source: None

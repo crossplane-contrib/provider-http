@@ -60,6 +60,7 @@ const (
 	errConvertResToMap                   = "failed to convert response to map"
 	errGetLatestVersion                  = "failed to get the latest version of the resource"
 	errResponseFormat                    = "Response does not match the expected format, retries limit "
+	errExtractCredentials                = "cannot extract credentials"
 )
 
 // Setup adds a controller that reconciles DisposableRequest managed resources.
@@ -94,9 +95,10 @@ type connector struct {
 	logger          logging.Logger
 	kube            client.Client
 	usage           resource.Tracker
-	newHttpClientFn func(log logging.Logger, timeout time.Duration) (httpClient.Client, error)
+	newHttpClientFn func(log logging.Logger, timeout time.Duration, creds string) (httpClient.Client, error)
 }
 
+// Connect returns a new ExternalClient.
 func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.ExternalClient, error) {
 	cr, ok := mg.(*v1alpha2.DisposableRequest)
 	if !ok {
@@ -115,7 +117,17 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 		return nil, errors.Wrap(err, errProviderNotRetrieved)
 	}
 
-	h, err := c.newHttpClientFn(l, utils.WaitTimeout(cr.Spec.ForProvider.WaitTimeout))
+	var creds string = ""
+	if pc.Spec.Credentials.Source == xpv1.CredentialsSourceSecret {
+		data, err := resource.CommonCredentialExtractor(ctx, pc.Spec.Credentials.Source, c.kube, pc.Spec.Credentials.CommonCredentialSelectors)
+		if err != nil {
+			return nil, errors.Wrap(err, errExtractCredentials)
+		}
+
+		creds = string(data)
+	}
+
+	h, err := c.newHttpClientFn(l, utils.WaitTimeout(cr.Spec.ForProvider.WaitTimeout), creds)
 	if err != nil {
 		return nil, errors.Wrap(err, errNewHttpClient)
 	}
