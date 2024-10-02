@@ -13,14 +13,19 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
 )
 
+const (
+	authKey = "Authorization"
+)
+
 // Client is the interface to interact with Http
 type Client interface {
 	SendRequest(ctx context.Context, method string, url string, body Data, headers Data, skipTLSVerify bool) (resp HttpDetails, err error)
 }
 
 type client struct {
-	log     logging.Logger
-	timeout time.Duration
+	log                logging.Logger
+	timeout            time.Duration
+	authorizationToken string
 }
 
 type HttpResponse struct {
@@ -46,6 +51,7 @@ type HttpDetails struct {
 	HttpRequest  HttpRequest
 }
 
+// SendRequest sends an HTTP request to the specified URL with the given method, body, headers and skipTLSVerify.
 func (hc *client) SendRequest(ctx context.Context, method string, url string, body Data, headers Data, skipTLSVerify bool) (details HttpDetails, err error) {
 	requestBody := []byte(body.Decrypted.(string))
 	request, err := http.NewRequestWithContext(ctx, method, url, bytes.NewBuffer(requestBody))
@@ -66,6 +72,11 @@ func (hc *client) SendRequest(ctx context.Context, method string, url string, bo
 		for _, value := range values {
 			request.Header.Add(key, value)
 		}
+	}
+
+	// Add the authorization token to the request if it doesn't already exist.
+	if _, exists := request.Header[authKey]; !exists && hc.authorizationToken != "" {
+		request.Header[authKey] = []string{hc.authorizationToken}
 	}
 
 	client := &http.Client{
@@ -113,13 +124,15 @@ func (hc *client) SendRequest(ctx context.Context, method string, url string, bo
 }
 
 // NewClient returns a new Http Client
-func NewClient(log logging.Logger, timeout time.Duration) (Client, error) {
+func NewClient(log logging.Logger, timeout time.Duration, authorizationToken string) (Client, error) {
 	return &client{
-		log:     log,
-		timeout: timeout,
+		log:                log,
+		timeout:            timeout,
+		authorizationToken: authorizationToken,
 	}, nil
 }
 
+// toJSON converts the request to a JSON string.
 func toJSON(request HttpRequest) string {
 	jsonBytes, err := json.Marshal(request)
 	if err != nil {

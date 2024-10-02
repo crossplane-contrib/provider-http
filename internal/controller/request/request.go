@@ -56,6 +56,7 @@ const (
 	errFailedUpdateStatusConditions = "failed updating status conditions"
 	errPatchDataToSecret            = "Warning, couldn't patch data from request to secret %s:%s:%s, error: %s"
 	errGetLatestVersion             = "failed to get the latest version of the resource"
+	errExtractCredentials           = "cannot extract credentials"
 )
 
 // Setup adds a controller that reconciles Request managed resources.
@@ -91,14 +92,10 @@ type connector struct {
 	logger          logging.Logger
 	kube            client.Client
 	usage           resource.Tracker
-	newHttpClientFn func(log logging.Logger, timeout time.Duration) (httpClient.Client, error)
+	newHttpClientFn func(log logging.Logger, timeout time.Duration, creds string) (httpClient.Client, error)
 }
 
-// Connect typically produces an ExternalClient by:
-// 1. Tracking that the managed resource is using a ProviderConfig.
-// 2. Getting the managed resource's ProviderConfig.
-// 3. Getting the credentials specified by the ProviderConfig.
-// 4. Using the credentials to form a client.
+// Connect creates a new external client using the provider config.
 func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.ExternalClient, error) {
 	cr, ok := mg.(*v1alpha2.Request)
 	if !ok {
@@ -117,7 +114,17 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 		return nil, errors.Wrap(err, errProviderNotRetrieved)
 	}
 
-	h, err := c.newHttpClientFn(l, utils.WaitTimeout(cr.Spec.ForProvider.WaitTimeout))
+	var creds string = ""
+	if pc.Spec.Credentials.Source == xpv1.CredentialsSourceSecret {
+		data, err := resource.CommonCredentialExtractor(ctx, pc.Spec.Credentials.Source, c.kube, pc.Spec.Credentials.CommonCredentialSelectors)
+		if err != nil {
+			return nil, errors.Wrap(err, errExtractCredentials)
+		}
+
+		creds = string(data)
+	}
+
+	h, err := c.newHttpClientFn(l, utils.WaitTimeout(cr.Spec.ForProvider.WaitTimeout), creds)
 	if err != nil {
 		return nil, errors.Wrap(err, errNewHttpClient)
 	}
