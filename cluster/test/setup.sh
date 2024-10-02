@@ -13,7 +13,7 @@ metadata:
   name: http-conf
 spec:
   credentials:
-    source: InjectedIdentity
+    source: None
 EOF
 
 cat <<EOF | ${KUBECTL} apply -f -
