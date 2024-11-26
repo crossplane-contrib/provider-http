@@ -81,7 +81,7 @@ func (c *external) determineResponseCheck(ctx context.Context, cr *v1alpha2.Requ
 
 // isObjectValidForObservation checks if the object is valid for observation
 func (c *external) isObjectValidForObservation(cr *v1alpha2.Request) bool {
-	return cr.Status.Response.Body != "" &&
+	return cr.Status.Response.StatusCode != 0 &&
 		!(cr.Status.RequestDetails.Method == http.MethodPost && utils.IsHTTPError(cr.Status.Response.StatusCode))
 }
 

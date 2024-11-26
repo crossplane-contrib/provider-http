@@ -54,7 +54,11 @@ type HttpDetails struct {
 // SendRequest sends an HTTP request to the specified URL with the given method, body, headers and skipTLSVerify.
 func (hc *client) SendRequest(ctx context.Context, method string, url string, body Data, headers Data, skipTLSVerify bool) (details HttpDetails, err error) {
 	requestBody := []byte(body.Decrypted.(string))
+
+	// request contains the HTTP request that will be sent.
 	request, err := http.NewRequestWithContext(ctx, method, url, bytes.NewBuffer(requestBody))
+
+	// requestDetails contains the request details that will be logged.
 	requestDetails := HttpRequest{
 		URL:     url,
 		Body:    body.Encrypted.(string),

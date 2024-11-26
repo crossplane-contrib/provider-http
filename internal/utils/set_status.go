@@ -11,8 +11,10 @@ const (
 	ErrFailedToSetStatus = "failed to update status"
 )
 
+// SetRequestStatusFunc is a function that sets the status of a resource.
 type SetRequestStatusFunc func()
 
+// RequestResource is a struct that holds the resource, request context, http response, http request, and local client.
 type RequestResource struct {
 	Resource       client.Object
 	RequestContext context.Context
@@ -101,36 +103,44 @@ func (rr *RequestResource) ResetFailures() SetRequestStatusFunc {
 	}
 }
 
+// ResponseSetter is an interface that defines the methods to set the status code, headers, and body of a resource.
 type ResponseSetter interface {
 	SetStatusCode(statusCode int)
 	SetHeaders(headers map[string][]string)
 	SetBody(body string)
 }
 
+// CacheSetter is an interface that defines the method to set the cache of a resource.
 type CacheSetter interface {
 	SetCache(statusCode int, headers map[string][]string, body string)
 }
 
+// SyncedSetter is an interface that defines the method to set the synced status of a resource.
 type SyncedSetter interface {
 	SetSynced(synced bool)
 }
 
+// ErrorSetter is an interface that defines the method to set the error of a resource.
 type ErrorSetter interface {
 	SetError(err error)
 }
 
+// ResetFailures is an interface that defines the method to reset the failures of a resource.
 type ResetFailures interface {
 	ResetFailures()
 }
 
+// LastReconcileTimeSetter is an interface that defines the method to set the last reconcile time of a resource.
 type LastReconcileTimeSetter interface {
 	SetLastReconcileTime()
 }
 
+// RequestDetailsSetter is an interface that defines the method to set the request details of a resource.
 type RequestDetailsSetter interface {
 	SetRequestDetails(url, method, body string, headers map[string][]string)
 }
 
+// SetRequestResourceStatus sets the status of a resource.
 func SetRequestResourceStatus(rr RequestResource, statusFuncs ...SetRequestStatusFunc) error {
 	for _, updateStatusFunc := range statusFuncs {
 		updateStatusFunc()

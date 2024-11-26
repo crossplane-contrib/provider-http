@@ -61,7 +61,7 @@ spec:
         url: (.payload.baseUrl + "/" + (.response.body.id|tostring))
     
     # expectedResponseCheck is optional. If not specified or if the type is "DEFAULT", 
-    # the resource is considered up to date if the GET response matches the PUT body.
+    # the resource is considered up to date if the GET response containes the PUT body.
     # If specified, the JQ logic determines if the resource is up to date:
     # - If the JQ query is false, a PUT request is sent to update the resource.
     # - If true, the resource is considered up to date.
