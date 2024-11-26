@@ -14,16 +14,12 @@ spec:
     url:  http://flask-api.default.svc.cluster.local/v1/login
     method: POST
     
+    # Indicates whether the reconciliation should loop indefinitely. If `rollbackRetriesLimit` is set and the request returns an error, it will stop reconciliation once the limit is reached.
     shouldLoopInfinitely: true
+    # Specifies the duration after which the next reconcile should occur.
     nextReconcile: 72h # 3 days
 
     # waitTimeout: 5m
-
-    # Indicates whether the reconciliation should loop indefinitely. If `rollbackRetriesLimit` is set and the request returns an error, it will stop reconciliation once the limit is reached.
-    # shouldLoopInfinitely: true
-
-    # Specifies the duration after which the next reconcile should occur.
-    # nextReconcile: 3m 
 
     # Secrets receiving patches from response data
     secretInjectionConfigs: 
