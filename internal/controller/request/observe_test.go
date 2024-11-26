@@ -59,7 +59,7 @@ func Test_isUpToDate(t *testing.T) {
 		args args
 		want want
 	}{
-		"ObjectNotFoundEmptyBody": {
+		"ObjectNotFoundEmptyStatus": {
 			args: args{
 				http: &MockHttpClient{
 					MockSendRequest: func(ctx context.Context, method string, url string, body, headers httpClient.Data, skipTLSVerify bool) (resp httpClient.HttpDetails, err error) {
@@ -71,6 +71,7 @@ func Test_isUpToDate(t *testing.T) {
 				},
 				mg: httpRequest(func(r *v1alpha2.Request) {
 					r.Status.Response.Body = ""
+					r.Status.Response.StatusCode = 0
 				}),
 			},
 			want: want{
@@ -100,14 +101,19 @@ func Test_isUpToDate(t *testing.T) {
 			args: args{
 				http: &MockHttpClient{
 					MockSendRequest: func(ctx context.Context, method string, url string, body, headers httpClient.Data, skipTLSVerify bool) (resp httpClient.HttpDetails, err error) {
-						return httpClient.HttpDetails{}, nil
+						return httpClient.HttpDetails{
+							HttpResponse: httpClient.HttpResponse{
+								Body:       "",
+								StatusCode: http.StatusNotFound,
+							},
+						}, nil
 					},
 				},
 				localKube: &test.MockClient{
 					MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
 				},
 				mg: httpRequest(func(r *v1alpha2.Request) {
-					r.Status.Response.StatusCode = 404
+					r.Status.Response.StatusCode = http.StatusNotFound
 				}),
 			},
 			want: want{
@@ -130,6 +136,7 @@ func Test_isUpToDate(t *testing.T) {
 				},
 				mg: httpRequest(func(r *v1alpha2.Request) {
 					r.Status.Response.Body = `{"username":"john_doe_new_username"}`
+					r.Status.Response.StatusCode = http.StatusOK
 				}),
 			},
 			want: want{
@@ -153,6 +160,7 @@ func Test_isUpToDate(t *testing.T) {
 				},
 				mg: httpRequest(func(r *v1alpha2.Request) {
 					r.Status.Response.Body = `{"username":"john_doe_new_username"}`
+					r.Status.Response.StatusCode = http.StatusOK
 				}),
 			},
 			want: want{
@@ -474,12 +482,13 @@ func Test_isObjectValidForObservation(t *testing.T) {
 		args args
 		want want
 	}{
-		"ValidResponseBody": {
+		"ValidStatusCode": {
 			args: args{
 				cr: &v1alpha2.Request{
 					Status: v1alpha2.RequestStatus{
 						Response: v1alpha2.Response{
-							Body: "some response",
+							Body:       "",
+							StatusCode: http.StatusOK,
 						},
 						RequestDetails: v1alpha2.Mapping{
 							Method: http.MethodGet,
@@ -491,12 +500,13 @@ func Test_isObjectValidForObservation(t *testing.T) {
 				valid: true,
 			},
 		},
-		"EmptyResponseBody": {
+		"EmptyStatusCode": {
 			args: args{
 				cr: &v1alpha2.Request{
 					Status: v1alpha2.RequestStatus{
 						Response: v1alpha2.Response{
-							Body: "",
+							Body:       "",
+							StatusCode: 0,
 						},
 					},
 				},

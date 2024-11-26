@@ -12,6 +12,7 @@ const (
 	ErrStatusCode  = "HTTP %s request failed with status code: %s"
 )
 
+// IsRequestValid checks if an HTTP request is valid.
 func IsRequestValid(method string, url string) error {
 	if method == "" {
 		return errors.New(errEmptyMethod)

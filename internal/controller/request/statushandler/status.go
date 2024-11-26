@@ -2,6 +2,7 @@ package statushandler
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -38,6 +39,7 @@ type requestStatusHandler struct {
 // based on the outcome of the HTTP request and the presence of an error.
 func (r *requestStatusHandler) SetRequestStatus() error {
 	if r.responseError != nil {
+		r.logger.Debug("error occurred during HTTP request", "error", r.responseError)
 		return r.setErrorAndReturn(r.responseError)
 	}
 
@@ -65,7 +67,9 @@ func (r *requestStatusHandler) SetRequestStatus() error {
 	return nil
 }
 
+// setErrorAndReturn sets the error message in the status of the Request.
 func (r *requestStatusHandler) setErrorAndReturn(err error) error {
+	r.logger.Debug("Error occurred during HTTP request", "error", err)
 	if settingError := utils.SetRequestResourceStatus(*r.resource, r.resource.SetError(err)); settingError != nil {
 		return errors.Wrap(settingError, utils.ErrFailedToSetStatus)
 	}
@@ -73,6 +77,7 @@ func (r *requestStatusHandler) setErrorAndReturn(err error) error {
 	return err
 }
 
+// incrementFailuresAndReturn increments the failures counter and sets the error message in the status of the Request.
 func (r *requestStatusHandler) incrementFailuresAndReturn(combinedSetters []utils.SetRequestStatusFunc) error {
 	combinedSetters = append(combinedSetters, r.resource.SetError(nil)) // should increment failures counter
 
@@ -80,6 +85,7 @@ func (r *requestStatusHandler) incrementFailuresAndReturn(combinedSetters []util
 		return errors.Wrap(settingError, utils.ErrFailedToSetStatus)
 	}
 
+	r.logger.Debug(fmt.Sprintf("HTTP request failed with status code %s, and response %s", strconv.Itoa(r.resource.HttpResponse.StatusCode), r.resource.HttpResponse.Body))
 	return errors.Errorf(utils.ErrStatusCode, r.resource.HttpRequest.Method, strconv.Itoa(r.resource.HttpResponse.StatusCode))
 }
 
@@ -108,6 +114,7 @@ func (r *requestStatusHandler) shouldSetCache(forProvider v1alpha2.RequestParame
 	return true
 }
 
+// ResetFailures resets the failures counter in the status of the Request.
 func (r *requestStatusHandler) ResetFailures() {
 	if r.extraSetters == nil {
 		r.extraSetters = &[]utils.SetRequestStatusFunc{}
