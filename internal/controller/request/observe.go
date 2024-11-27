@@ -6,6 +6,7 @@ import (
 
 	"github.com/crossplane-contrib/provider-http/apis/request/v1alpha2"
 	httpClient "github.com/crossplane-contrib/provider-http/internal/clients/http"
+	"github.com/crossplane-contrib/provider-http/internal/controller/request/observe"
 	"github.com/crossplane-contrib/provider-http/internal/controller/request/requestgen"
 	"github.com/crossplane-contrib/provider-http/internal/controller/request/requestmapping"
 	"github.com/crossplane-contrib/provider-http/internal/utils"
@@ -13,11 +14,9 @@ import (
 )
 
 const (
-	errObjectNotFound            = "object wasn't found"
 	errNotValidJSON              = "%s is not a valid JSON string: %s"
 	errConvertResToMap           = "failed to convert response to map"
-	ErrExpectedFormat            = "expectedResponseCheck.Logic JQ filter should return a boolean, but returned error: %s"
-	errExpectedResponseCheckType = "expectedResponseCheck.Type should be either DEFAULT, CUSTOM or empty"
+	errExpectedResponseCheckType = "%s.Type should be either DEFAULT, CUSTOM or empty"
 )
 
 type ObserveRequestDetails struct {
@@ -47,7 +46,7 @@ func FailedObserve() ObserveRequestDetails {
 // isUpToDate checks whether desired spec up to date with the observed state for a given request
 func (c *external) isUpToDate(ctx context.Context, cr *v1alpha2.Request) (ObserveRequestDetails, error) {
 	if !c.isObjectValidForObservation(cr) {
-		return FailedObserve(), errors.New(errObjectNotFound)
+		return FailedObserve(), errors.New(observe.ErrObjectNotFound)
 	}
 
 	mapping, err := requestmapping.GetMapping(&cr.Spec.ForProvider, v1alpha2.ActionObserve, c.logger)
@@ -55,25 +54,40 @@ func (c *external) isUpToDate(ctx context.Context, cr *v1alpha2.Request) (Observ
 		return FailedObserve(), err
 	}
 
-	requestDetails, err := c.generateValidRequestDetails(ctx, cr, mapping)
+	requestDetails, err := requestgen.GenerateValidRequestDetails(ctx, cr, mapping, c.localKube, c.logger)
 	if err != nil {
 		return FailedObserve(), err
 	}
 
 	details, responseErr := c.http.SendRequest(ctx, mapping.Method, requestDetails.Url, requestDetails.Body, requestDetails.Headers, cr.Spec.ForProvider.InsecureSkipTLSVerify)
-	if details.HttpResponse.StatusCode == http.StatusNotFound {
-		return FailedObserve(), errors.New(errObjectNotFound)
+	if err := c.determineIfRemoved(ctx, cr, details, responseErr); err != nil {
+		return FailedObserve(), err
 	}
 
 	c.patchResponseToSecret(ctx, cr, &details.HttpResponse)
-	return c.determineResponseCheck(ctx, cr, details, responseErr)
+	return c.determineIfUpToDate(ctx, cr, details, responseErr)
 }
 
-// determineResponseCheck determines the response check based on the expectedResponseCheck.Type
-func (c *external) determineResponseCheck(ctx context.Context, cr *v1alpha2.Request, details httpClient.HttpDetails, responseErr error) (ObserveRequestDetails, error) {
-	responseChecker := c.getResponseCheck(cr)
+// determineIfUpToDate determines if the object is up to date based on the response check.
+func (c *external) determineIfUpToDate(ctx context.Context, cr *v1alpha2.Request, details httpClient.HttpDetails, responseErr error) (ObserveRequestDetails, error) {
+	responseChecker := observe.GetIsUpToDateResponseCheck(cr, c.localKube, c.logger, c.http)
 	if responseChecker == nil {
-		return FailedObserve(), errors.New(errExpectedResponseCheckType)
+		return FailedObserve(), errors.Errorf(errExpectedResponseCheckType, "expectedResponseCheck")
+	}
+
+	result, err := responseChecker.Check(ctx, cr, details, responseErr)
+	if err != nil {
+		return FailedObserve(), err
+	}
+
+	return NewObserve(details, responseErr, result), nil
+}
+
+// determineIfRemoved determines if the object is removed based on the response check.
+func (c *external) determineIfRemoved(ctx context.Context, cr *v1alpha2.Request, details httpClient.HttpDetails, responseErr error) error {
+	responseChecker := observe.GetIsRemovedResponseCheck(cr, c.localKube, c.logger, c.http)
+	if responseChecker == nil {
+		return errors.Errorf(errExpectedResponseCheckType, "isRemovedCheck")
 	}
 
 	return responseChecker.Check(ctx, cr, details, responseErr)
@@ -92,5 +106,5 @@ func (c *external) requestDetails(ctx context.Context, cr *v1alpha2.Request, act
 		return requestgen.RequestDetails{}, err
 	}
 
-	return c.generateValidRequestDetails(ctx, cr, mapping)
+	return requestgen.GenerateValidRequestDetails(ctx, cr, mapping, c.localKube, c.logger)
 }

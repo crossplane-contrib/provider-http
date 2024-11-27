@@ -57,8 +57,11 @@ type RequestParameters struct {
 	// SecretInjectionConfig specifies the secrets receiving patches for response data.
 	SecretInjectionConfigs []SecretInjectionConfig `json:"secretInjectionConfigs,omitempty"`
 
-	// ExpectedResponseCheck specifies the mechanism to validate the GET response against expected value.
+	// ExpectedResponseCheck specifies the mechanism to validate the OBSERVE response against expected value.
 	ExpectedResponseCheck ExpectedResponseCheck `json:"expectedResponseCheck,omitempty"`
+
+	// IsRemovedCheck specifies the mechanism to validate the OBSERVE response after removal against expected value.
+	IsRemovedCheck ExpectedResponseCheck `json:"isRemovedCheck,omitempty"`
 }
 
 type Mapping struct {

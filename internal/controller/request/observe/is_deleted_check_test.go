@@ -1,7 +1,8 @@
-package request
+package observe
 
 import (
 	"context"
+	"net/http"
 	"testing"
 
 	"github.com/crossplane-contrib/provider-http/apis/request/v1alpha2"
@@ -12,7 +13,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-func Test_DefaultResponseCheck(t *testing.T) {
+func Test_DefaultIsRemovedCheck(t *testing.T) {
 	type args struct {
 		ctx         context.Context
 		cr          *v1alpha2.Request
@@ -21,15 +22,14 @@ func Test_DefaultResponseCheck(t *testing.T) {
 	}
 
 	type want struct {
-		result ObserveRequestDetails
-		err    error
+		err error
 	}
 
 	cases := map[string]struct {
 		args args
 		want want
 	}{
-		"ValidJSONSyncedState": {
+		"ValidRemovedState": {
 			args: args{
 				ctx: context.Background(),
 				cr:  &v1alpha2.Request{},
@@ -37,19 +37,16 @@ func Test_DefaultResponseCheck(t *testing.T) {
 					HttpResponse: httpClient.HttpResponse{
 						Body:       ``,
 						Headers:    nil,
-						StatusCode: 0,
+						StatusCode: http.StatusNotFound,
 					},
 				},
 				responseErr: nil,
 			},
 			want: want{
-				result: ObserveRequestDetails{
-					Synced: true,
-				},
-				err: nil,
+				err: errors.New(ErrObjectNotFound),
 			},
 		},
-		"UnsyncedStateWithValidJSON": {
+		"RemovedStateWithValidJSON": {
 			args: args{
 				ctx: context.Background(),
 				cr: &v1alpha2.Request{
@@ -74,59 +71,30 @@ func Test_DefaultResponseCheck(t *testing.T) {
 					HttpResponse: httpClient.HttpResponse{
 						Body:       `{"username": "john_doe"}`,
 						Headers:    nil,
-						StatusCode: 0,
+						StatusCode: http.StatusNotFound,
 					},
 				},
 				responseErr: nil,
 			},
 			want: want{
-				result: ObserveRequestDetails{
-					Details: httpClient.HttpDetails{
-						HttpResponse: httpClient.HttpResponse{
-							Body: `{"username": "john_doe"}`,
-						},
-					},
-					Synced: false,
-				},
-				err: nil,
+				err: errors.New(ErrObjectNotFound),
 			},
 		},
-		"InvalidResponseJSON": {
+		"ValidNotRemovedState": {
 			args: args{
 				ctx: context.Background(),
-				cr: &v1alpha2.Request{
-					Spec: v1alpha2.RequestSpec{
-						ForProvider: v1alpha2.RequestParameters{
-							Payload: v1alpha2.Payload{
-								Body:    "{\"username\": \"john_doe\", \"email\": \"john.doe@example.com\"}",
-								BaseUrl: "https://api.example.com/users",
-							},
-							Mappings: []v1alpha2.Mapping{
-								testPostMapping,
-								testGetMapping,
-								testPutMapping,
-								testDeleteMapping,
-							},
-							ExpectedResponseCheck: v1alpha2.ExpectedResponseCheck{
-								Type: v1alpha2.ExpectedResponseCheckTypeDefault,
-							},
-						},
-					},
-				},
+				cr:  &v1alpha2.Request{},
 				details: httpClient.HttpDetails{
 					HttpResponse: httpClient.HttpResponse{
-						Body:       `{`,
+						Body:       ``,
 						Headers:    nil,
-						StatusCode: 200,
+						StatusCode: http.StatusOK,
 					},
 				},
 				responseErr: nil,
 			},
 			want: want{
-				result: ObserveRequestDetails{
-					Synced: false,
-				},
-				err: errors.New("response body is not a valid JSON string: {"),
+				err: nil,
 			},
 		},
 	}
@@ -135,26 +103,20 @@ func Test_DefaultResponseCheck(t *testing.T) {
 		tc := tc
 
 		t.Run(name, func(t *testing.T) {
-			e := &DefaultResponseCheck{
-				client: &external{
-					localKube: nil,
-					http:      nil,
-					logger:    logging.NewNopLogger(),
-				},
+			e := &defaultIsRemovedResponseCheck{
+				localKube: nil,
+				http:      nil,
+				logger:    logging.NewNopLogger(),
 			}
-			got, gotErr := e.Check(tc.args.ctx, tc.args.cr, tc.args.details, tc.args.responseErr)
+			gotErr := e.Check(tc.args.ctx, tc.args.cr, tc.args.details, tc.args.responseErr)
 			if diff := cmp.Diff(tc.want.err, gotErr, test.EquateErrors()); diff != "" {
 				t.Fatalf("Check(...): -want error, +got error: %s", diff)
-			}
-
-			if diff := cmp.Diff(tc.want.result, got); diff != "" {
-				t.Fatalf("Check(...): -want result, +got result: %s", diff)
 			}
 		})
 	}
 }
 
-func Test_CustomResponseCheck(t *testing.T) {
+func Test_CustomIsRemovedCheck(t *testing.T) {
 	type args struct {
 		ctx         context.Context
 		cr          *v1alpha2.Request
@@ -163,8 +125,7 @@ func Test_CustomResponseCheck(t *testing.T) {
 	}
 
 	type want struct {
-		result ObserveRequestDetails
-		err    error
+		err error
 	}
 
 	cases := map[string]struct {
@@ -184,6 +145,10 @@ func Test_CustomResponseCheck(t *testing.T) {
 								Type:  v1alpha2.ExpectedResponseCheckTypeCustom,
 								Logic: `.response.body.password == .payload.body.password`,
 							},
+							IsRemovedCheck: v1alpha2.ExpectedResponseCheck{
+								Type:  v1alpha2.ExpectedResponseCheckTypeCustom,
+								Logic: `.response.body.password == .payload.body.password`,
+							},
 						},
 					},
 				},
@@ -197,15 +162,7 @@ func Test_CustomResponseCheck(t *testing.T) {
 				responseErr: nil,
 			},
 			want: want{
-				result: ObserveRequestDetails{
-					Details: httpClient.HttpDetails{
-						HttpResponse: httpClient.HttpResponse{
-							Body: `{"password":"password"}`,
-						},
-					},
-					Synced: true,
-				},
-				err: nil,
+				err: errors.New(ErrObjectNotFound),
 			},
 		},
 		"CustomCheckFails": {
@@ -218,6 +175,10 @@ func Test_CustomResponseCheck(t *testing.T) {
 								Body: `{"password": "password"}`,
 							},
 							ExpectedResponseCheck: v1alpha2.ExpectedResponseCheck{
+								Type:  v1alpha2.ExpectedResponseCheckTypeCustom,
+								Logic: `.response.body.password == .payload.body.password`,
+							},
+							IsRemovedCheck: v1alpha2.ExpectedResponseCheck{
 								Type:  v1alpha2.ExpectedResponseCheckTypeCustom,
 								Logic: `.response.body.password == .payload.body.password`,
 							},
@@ -234,15 +195,32 @@ func Test_CustomResponseCheck(t *testing.T) {
 				responseErr: nil,
 			},
 			want: want{
-				result: ObserveRequestDetails{
-					Details: httpClient.HttpDetails{
-						HttpResponse: httpClient.HttpResponse{
-							Body: `{"password":"wrong_password"}`,
+				err: nil,
+			},
+		},
+		"FailedParsing": {
+			args: args{
+				ctx: context.Background(),
+				cr: &v1alpha2.Request{
+					Spec: v1alpha2.RequestSpec{
+						ForProvider: v1alpha2.RequestParameters{
+							Payload: v1alpha2.Payload{
+								Body: `{"password": "password"}`,
+							},
 						},
 					},
-					Synced: false,
 				},
-				err: nil,
+				details: httpClient.HttpDetails{
+					HttpResponse: httpClient.HttpResponse{
+						Body:       `{"password":"wrong_password"}`,
+						Headers:    nil,
+						StatusCode: 0,
+					},
+				},
+				responseErr: nil,
+			},
+			want: want{
+				err: errors.Errorf(errExpectedFormat, "isRemovedCheck", "failed to parse string: map[expectedResponseCheck:map[] isRemovedCheck:map[] mappings:<nil> payload:map[body:map[password:password]] response:map[body:map[password:wrong_password]]]"),
 			},
 		},
 	}
@@ -251,20 +229,14 @@ func Test_CustomResponseCheck(t *testing.T) {
 		tc := tc // Create local copies of loop variables
 
 		t.Run(name, func(t *testing.T) {
-			e := &CustomResponseCheck{
-				client: &external{
-					localKube: nil,
-					http:      nil,
-					logger:    logging.NewNopLogger(),
-				},
+			e := &customIsRemovedResponseCheck{
+				localKube: nil,
+				http:      nil,
+				logger:    logging.NewNopLogger(),
 			}
-			got, gotErr := e.Check(tc.args.ctx, tc.args.cr, tc.args.details, tc.args.responseErr)
+			gotErr := e.Check(tc.args.ctx, tc.args.cr, tc.args.details, tc.args.responseErr)
 			if diff := cmp.Diff(tc.want.err, gotErr, test.EquateErrors()); diff != "" {
 				t.Fatalf("Check(...): -want error, +got error: %s", diff)
-			}
-
-			if diff := cmp.Diff(tc.want.result, got); diff != "" {
-				t.Fatalf("Check(...): -want result, +got result: %s", diff)
 			}
 		})
 	}

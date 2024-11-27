@@ -471,7 +471,7 @@ spec:
                 properties:
                   expectedResponseCheck:
                     description: ExpectedResponseCheck specifies the mechanism to
-                      validate the GET response against expected value.
+                      validate the OBSERVE response against expected value.
                     properties:
                       logic:
                         description: Logic specifies the custom logic for the expected
@@ -496,6 +496,22 @@ spec:
                     description: InsecureSkipTLSVerify, when set to true, skips TLS
                       certificate checks for the HTTP request
                     type: boolean
+                  isRemovedCheck:
+                    description: IsRemovedCheck specifies the mechanism to validate
+                      the OBSERVE response after removal against expected value.
+                    properties:
+                      logic:
+                        description: Logic specifies the custom logic for the expected
+                          response check.
+                        type: string
+                      type:
+                        description: Type specifies the type of the expected response
+                          check.
+                        enum:
+                        - DEFAULT
+                        - CUSTOM
+                        type: string
+                    type: object
                   mappings:
                     description: Mappings defines the HTTP mappings for different
                       methods.

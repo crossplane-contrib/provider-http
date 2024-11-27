@@ -53,7 +53,7 @@ func (r *requestStatusHandler) SetRequestStatus() error {
 	basicSetters = append(basicSetters, *r.extraSetters...)
 
 	if utils.IsHTTPError(r.resource.HttpResponse.StatusCode) {
-		return r.incrementFailuresAndReturn(basicSetters)
+		return r.incrementFailures(basicSetters)
 	}
 
 	if utils.IsHTTPSuccess(r.resource.HttpResponse.StatusCode) {
@@ -77,16 +77,16 @@ func (r *requestStatusHandler) setErrorAndReturn(err error) error {
 	return err
 }
 
-// incrementFailuresAndReturn increments the failures counter and sets the error message in the status of the Request.
-func (r *requestStatusHandler) incrementFailuresAndReturn(combinedSetters []utils.SetRequestStatusFunc) error {
+// incrementFailures increments the failures counter and sets the error message in the status of the Request.
+func (r *requestStatusHandler) incrementFailures(combinedSetters []utils.SetRequestStatusFunc) error {
 	combinedSetters = append(combinedSetters, r.resource.SetError(nil)) // should increment failures counter
 
 	if settingError := utils.SetRequestResourceStatus(*r.resource, combinedSetters...); settingError != nil {
 		return errors.Wrap(settingError, utils.ErrFailedToSetStatus)
 	}
 
-	r.logger.Debug(fmt.Sprintf("HTTP request failed with status code %s, and response %s", strconv.Itoa(r.resource.HttpResponse.StatusCode), r.resource.HttpResponse.Body))
-	return errors.Errorf(utils.ErrStatusCode, r.resource.HttpRequest.Method, strconv.Itoa(r.resource.HttpResponse.StatusCode))
+	r.logger.Debug(fmt.Sprintf("HTTP %s request failed with status code %s, and response %s", strconv.Itoa(r.resource.HttpResponse.StatusCode), strconv.Itoa(r.resource.HttpResponse.StatusCode), r.resource.HttpResponse.Body))
+	return nil
 }
 
 func (r *requestStatusHandler) appendExtraSetters(forProvider v1alpha2.RequestParameters, combinedSetters *[]utils.SetRequestStatusFunc) {
