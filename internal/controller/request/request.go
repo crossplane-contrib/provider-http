@@ -37,6 +37,7 @@ import (
 	"github.com/crossplane-contrib/provider-http/apis/request/v1alpha2"
 	apisv1alpha1 "github.com/crossplane-contrib/provider-http/apis/v1alpha1"
 	httpClient "github.com/crossplane-contrib/provider-http/internal/clients/http"
+	"github.com/crossplane-contrib/provider-http/internal/controller/request/observe"
 	"github.com/crossplane-contrib/provider-http/internal/controller/request/requestgen"
 	"github.com/crossplane-contrib/provider-http/internal/controller/request/requestmapping"
 	"github.com/crossplane-contrib/provider-http/internal/controller/request/statushandler"
@@ -151,7 +152,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	}
 
 	observeRequestDetails, err := c.isUpToDate(ctx, cr)
-	if err != nil && err.Error() == errObjectNotFound {
+	if err != nil && err.Error() == observe.ErrObjectNotFound {
 		return managed.ExternalObservation{
 			ResourceExists: false,
 		}, nil
@@ -197,7 +198,7 @@ func (c *external) deployAction(ctx context.Context, cr *v1alpha2.Request, actio
 		return nil
 	}
 
-	requestDetails, err := c.generateValidRequestDetails(ctx, cr, mapping)
+	requestDetails, err := requestgen.GenerateValidRequestDetails(ctx, cr, mapping, c.localKube, c.logger)
 	if err != nil {
 		return err
 	}
@@ -254,23 +255,4 @@ func (c *external) patchResponseToSecret(ctx context.Context, cr *v1alpha2.Reque
 			c.logger.Info(fmt.Sprintf(errPatchDataToSecret, ref.SecretRef.Name, ref.SecretRef.Namespace, ref.SecretKey, err.Error()))
 		}
 	}
-}
-
-// generateValidRequestDetails generates valid request details based on the given Request resource and Mapping configuration.
-// It first attempts to generate request details using the HTTP response stored in the Request's status. If the generated
-// details are valid, the function returns them. If not, it falls back to using the cached response in the Request's status
-// and attempts to generate request details again. The function returns the generated request details or an error if the
-// generation process fails.
-func (c *external) generateValidRequestDetails(ctx context.Context, cr *v1alpha2.Request, mapping *v1alpha2.Mapping) (requestgen.RequestDetails, error) {
-	requestDetails, _, ok := requestgen.GenerateRequestDetails(ctx, c.localKube, *mapping, cr.Spec.ForProvider, cr.Status.Response, c.logger)
-	if requestgen.IsRequestValid(requestDetails) && ok {
-		return requestDetails, nil
-	}
-
-	requestDetails, err, _ := requestgen.GenerateRequestDetails(ctx, c.localKube, *mapping, cr.Spec.ForProvider, cr.Status.Cache.Response, c.logger)
-	if err != nil {
-		return requestgen.RequestDetails{}, err
-	}
-
-	return requestDetails, nil
 }
