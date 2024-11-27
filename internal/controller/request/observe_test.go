@@ -7,6 +7,7 @@ import (
 
 	"github.com/crossplane-contrib/provider-http/apis/request/v1alpha2"
 	httpClient "github.com/crossplane-contrib/provider-http/internal/clients/http"
+	"github.com/crossplane-contrib/provider-http/internal/controller/request/observe"
 	"github.com/crossplane-contrib/provider-http/internal/controller/request/requestgen"
 	"github.com/crossplane-contrib/provider-http/internal/controller/request/requestmapping"
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
@@ -17,7 +18,7 @@ import (
 )
 
 var (
-	errNotFound = errors.New(errObjectNotFound)
+	errNotFound = errors.New(observe.ErrObjectNotFound)
 )
 
 var (
@@ -457,7 +458,7 @@ func Test_determineResponseCheck(t *testing.T) {
 				http:      nil,
 			}
 
-			got, gotErr := e.determineResponseCheck(tc.args.ctx, tc.args.cr, tc.args.details, tc.args.responseErr)
+			got, gotErr := e.determineIfUpToDate(tc.args.ctx, tc.args.cr, tc.args.details, tc.args.responseErr)
 			if diff := cmp.Diff(tc.want.err, gotErr, test.EquateErrors()); diff != "" {
 				t.Fatalf("determineResponseCheck(...): -want error, +got error: %s", diff)
 			}

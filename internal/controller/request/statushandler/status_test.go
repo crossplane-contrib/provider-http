@@ -2,14 +2,12 @@ package statushandler
 
 import (
 	"context"
-	"strconv"
 	"testing"
 
 	"github.com/pkg/errors"
 
 	"github.com/crossplane-contrib/provider-http/apis/request/v1alpha2"
 	httpClient "github.com/crossplane-contrib/provider-http/internal/clients/http"
-	"github.com/crossplane-contrib/provider-http/internal/utils"
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
 	"github.com/crossplane/crossplane-runtime/pkg/test"
 	"github.com/google/go-cmp/cmp"
@@ -140,7 +138,7 @@ func Test_SetRequestStatus(t *testing.T) {
 				err: nil,
 			},
 			want: want{
-				err:           errors.Errorf(utils.ErrStatusCode, testMethod, strconv.Itoa(400)),
+				err:           nil,
 				httpRequest:   testRequest,
 				failuresIndex: 1,
 			},

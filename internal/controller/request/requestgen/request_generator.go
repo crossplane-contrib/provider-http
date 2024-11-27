@@ -64,6 +64,25 @@ func GenerateRequestObject(forProvider v1alpha2.RequestParameters, response v1al
 	return baseMap
 }
 
+// GenerateValidRequestDetails generates valid request details based on the given Request resource and Mapping configuration.
+// It first attempts to generate request details using the HTTP response stored in the Request's status. If the generated
+// details are valid, the function returns them. If not, it falls back to using the cached response in the Request's status
+// and attempts to generate request details again. The function returns the generated request details or an error if the
+// generation process fails.
+func GenerateValidRequestDetails(ctx context.Context, cr *v1alpha2.Request, mapping *v1alpha2.Mapping, localKube client.Client, logger logging.Logger) (RequestDetails, error) {
+	requestDetails, _, ok := GenerateRequestDetails(ctx, localKube, *mapping, cr.Spec.ForProvider, cr.Status.Response, logger)
+	if IsRequestValid(requestDetails) && ok {
+		return requestDetails, nil
+	}
+
+	requestDetails, err, _ := GenerateRequestDetails(ctx, localKube, *mapping, cr.Spec.ForProvider, cr.Status.Cache.Response, logger)
+	if err != nil {
+		return RequestDetails{}, err
+	}
+
+	return requestDetails, nil
+}
+
 // IsRequestValid checks if the request details are valid.
 func IsRequestValid(requestDetails RequestDetails) bool {
 	return (!strings.Contains(fmt.Sprint(requestDetails), "null")) && (requestDetails.Url != "")

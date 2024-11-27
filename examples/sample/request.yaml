@@ -48,6 +48,7 @@ spec:
 
       # Scenario 3: Method specified, action not specified (PUT implies UPDATE)
       - method: "PUT"
+        # action: UPDATE
         body: |
           {
             email: .payload.body.email, 
@@ -75,6 +76,20 @@ spec:
          then true 
          else false 
          end
+
+    # isRemovedCheck is optional. If not specified or if the type is "DEFAULT", 
+    # the resource is considered removed if the OBSERVE response after REMOVE has 404 status code.
+    # If specified, the JQ logic determines if the resource is removed:
+    # - If the JQ query is false, a REMOVE request is sent to remove the resource.
+    # - If true, the resource is considered up to date.
+    isRemovedCheck:
+      type: CUSTOM
+      logic: |
+        if .response.statusCode == 404
+          and .response.body.error == "User not found"
+          then true 
+          else false 
+          end
 
     # Secrets receiving patches from response data
     secretInjectionConfigs: 
