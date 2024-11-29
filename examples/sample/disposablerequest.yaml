@@ -37,17 +37,19 @@ spec:
       - secretRef:
           name: notification-response
           namespace: default
-        secretKey: notification-status
-        responsePath: .body.status
+        metadata:
+          labels:
+            status: .body.status
+          annotations:
+            key: value
+        keyMappings:
+          - secretKey: notification-status
+            responseJQ: .body.status
+          - secretKey: notification-id
+            responseJQ: .body.id
         # setOwnerReference determines if the secret should be deleted when the associated resource is deleted.
-        # When injecting multiple keys into the same secret, ensure this field is set consistently for all keys.        
         setOwnerReference: true
-      - secretRef:
-          name: notification-response
-          namespace: default
-        secretKey: notification-id
-        responsePath: .body.id
-        setOwnerReference: true
+ 
   providerConfigRef:
     name: http-conf
 # TODO: check if it's possible to modify the deletionPolicy to be orphan by default.

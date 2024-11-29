@@ -571,14 +571,54 @@ spec:
                       description: SecretInjectionConfig represents the configuration
                         for injecting secret data into a Kubernetes secret.
                       properties:
+                        keyMappings:
+                          description: KeyMappings allows injecting data into single
+                            or multiple keys within the same Kubernetes secret.
+                          items:
+                            description: KeyInjection represents the configuration
+                              for injecting data into a specific key in a Kubernetes
+                              secret.
+                            properties:
+                              responseJQ:
+                                description: ResponseJQ is a jq filter expression
+                                  representing the path in the response where the
+                                  secret value will be extracted from.
+                                type: string
+                              secretKey:
+                                description: SecretKey is the key within the Kubernetes
+                                  secret where the data will be injected.
+                                type: string
+                            required:
+                            - responseJQ
+                            - secretKey
+                            type: object
+                          type: array
+                        metadata:
+                          description: Metadata contains labels and annotations to
+                            apply to the Kubernetes secret.
+                          properties:
+                            annotations:
+                              additionalProperties:
+                                type: string
+                              description: Annotations contains key-value pairs to
+                                apply as annotations to the Kubernetes secret.
+                              type: object
+                            labels:
+                              additionalProperties:
+                                type: string
+                              description: Labels contains key-value pairs to apply
+                                as labels to the Kubernetes secret.
+                              type: object
+                          type: object
                         responsePath:
-                          description: ResponsePath is is a jq filter expression represents
-                            the path in the response where the secret value will be
-                            extracted from.
+                          description: |-
+                            ResponsePath is a jq filter expression representing the path in the response where the secret value will be extracted from.
+                            Deprecated: Use KeyMappings for injecting single or multiple keys.
                           type: string
                         secretKey:
-                          description: SecretKey is the key within the Kubernetes
-                            secret where the data will be injected.
+                          description: |-
+                            SecretKey is the key within the Kubernetes secret where the data will be injected.
+                            Deprecated: Use KeyMappings for injecting single or multiple keys.
                           type: string
                         secretRef:
                           description: SecretRef contains the name and namespace of
@@ -600,8 +640,6 @@ spec:
                             the owner reference on the Kubernetes secret.
                           type: boolean
                       required:
-                      - responsePath
-                      - secretKey
                       - secretRef
                       type: object
                     type: array

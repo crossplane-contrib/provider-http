@@ -30,7 +30,7 @@ var testJQObject = map[string]any{
 	},
 	"payload": map[string]any{
 		"baseUrl": "https://api.example.com/users",
-		"body":    map[string]any{"email": "john.doe@example.com", "username": "john_doe"},
+		"body":    map[string]any{"email": "john.doe@example.com", "username": "john_doe", "age": float64(30)},
 	},
 	"response": map[string]any{
 		"body":       map[string]any{"id": "123"},
@@ -115,6 +115,91 @@ func Test_ParseString(t *testing.T) {
 	}
 }
 
+func Test_ParseFloat(t *testing.T) {
+	type args struct {
+		jqQuery string
+		obj     interface{}
+	}
+	type want struct {
+		result interface{}
+		err    error
+	}
+	cases := map[string]struct {
+		args args
+		want want
+	}{
+		"SuccessFloatObject": {
+			args: args{
+				jqQuery: `.payload.body.age`,
+				obj:     testJQObject,
+			},
+			want: want{
+				result: float64(30),
+				err:    nil,
+			},
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			got, gotErr := ParseFloat(tc.args.jqQuery, tc.args.obj)
+			if diff := cmp.Diff(tc.want.err, gotErr, test.EquateErrors()); diff != "" {
+				t.Fatalf("ParseFloat(...): -want error, +got error: %s", diff)
+			}
+
+			if diff := cmp.Diff(tc.want.result, got); diff != "" {
+				t.Fatalf("ParseFloat(...): -want result, +got result: %s", diff)
+			}
+		})
+	}
+}
+
+func Test_ParseBool(t *testing.T) {
+	type args struct {
+		jqQuery string
+		obj     interface{}
+	}
+	type want struct {
+		result interface{}
+		err    error
+	}
+	cases := map[string]struct {
+		args args
+		want want
+	}{
+		"SuccessBoolObjectTrue": {
+			args: args{
+				jqQuery: `.payload.body.age == 30`,
+				obj:     testJQObject,
+			},
+			want: want{
+				result: true,
+				err:    nil,
+			},
+		},
+		"SuccessBoolObjectFalse": {
+			args: args{
+				jqQuery: `.payload.body.age == 31`,
+				obj:     testJQObject,
+			},
+			want: want{
+				result: false,
+				err:    nil,
+			},
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			got, gotErr := ParseBool(tc.args.jqQuery, tc.args.obj)
+			if diff := cmp.Diff(tc.want.err, gotErr, test.EquateErrors()); diff != "" {
+				t.Fatalf("ParseBool(...): -want error, +got error: %s", diff)
+			}
+
+			if diff := cmp.Diff(tc.want.result, got); diff != "" {
+				t.Fatalf("ParseBool(...): -want result, +got result: %s", diff)
+			}
+		})
+	}
+}
 func Test_ParseMapInterface(t *testing.T) {
 	type args struct {
 		jqQuery string

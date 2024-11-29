@@ -11,6 +11,7 @@ import (
 
 const (
 	errStringParseFailed = "failed to parse string: %s"
+	errFloatParseFailed  = "failed to parse float: %s"
 	errResultParseFailed = "failed to parse result on jq query: %s"
 	errMapParseFailed    = "failed to parse map: %s"
 	errQueryFailed       = "query should return at least one value, failed on: %s"
@@ -19,6 +20,7 @@ const (
 
 var mutex = &sync.Mutex{}
 
+// runJQQuery runs a jq query on a given object and returns the result.
 func runJQQuery(jqQuery string, obj interface{}) (interface{}, error) {
 	query, err := gojq.Parse(jqQuery)
 	if err != nil {
@@ -41,6 +43,7 @@ func runJQQuery(jqQuery string, obj interface{}) (interface{}, error) {
 	return queryRes, nil
 }
 
+// ParseString runs a jq query on a given object and returns the result as a string.
 func ParseString(jqQuery string, obj interface{}) (string, error) {
 	queryRes, err := runJQQuery(jqQuery, obj)
 	if err != nil {
@@ -55,6 +58,22 @@ func ParseString(jqQuery string, obj interface{}) (string, error) {
 	return str, nil
 }
 
+// ParseFloat runs a jq query on a given object and returns the result as a float64.
+func ParseFloat(jqQuery string, obj interface{}) (float64, error) {
+	queryRes, err := runJQQuery(jqQuery, obj)
+	if err != nil {
+		return 0, err
+	}
+
+	floatVal, ok := queryRes.(float64)
+	if !ok {
+		return 0, errors.Errorf(errFloatParseFailed, fmt.Sprint(queryRes))
+	}
+
+	return floatVal, nil
+}
+
+// ParseBool runs a jq query on a given object and returns the result as a bool.
 func ParseBool(jqQuery string, obj interface{}) (bool, error) {
 	queryRes, err := runJQQuery(jqQuery, obj)
 	if err != nil {
@@ -69,6 +88,7 @@ func ParseBool(jqQuery string, obj interface{}) (bool, error) {
 	return boolean, nil
 }
 
+// ParseMapInterface runs a jq query on a given object and returns the result as a map[string]interface{}.
 func ParseMapInterface(jqQuery string, obj interface{}) (map[string]interface{}, error) {
 	queryRes, err := runJQQuery(jqQuery, obj)
 	if err != nil {
@@ -88,6 +108,7 @@ func ParseMapInterface(jqQuery string, obj interface{}) (map[string]interface{},
 	return nil, errors.Errorf(errMapParseFailed, fmt.Sprint(queryRes))
 }
 
+// ParseMapStrings runs a jq query on a given object and returns the result as a map[string][]string.
 func ParseMapStrings(keyToJQQueries map[string][]string, obj interface{}) (map[string][]string, error) {
 	result := make(map[string][]string, len(keyToJQQueries))
 
@@ -115,4 +136,11 @@ func ParseMapStrings(keyToJQQueries map[string][]string, obj interface{}) (map[s
 	}
 
 	return result, nil
+}
+
+// IsJQQuery checks if a given string is a valid jq query.
+// It attempts to compile the string as a jq expression and returns true if successful.
+func IsJQQuery(query string) bool {
+	_, err := gojq.Parse(query)
+	return err == nil
 }
