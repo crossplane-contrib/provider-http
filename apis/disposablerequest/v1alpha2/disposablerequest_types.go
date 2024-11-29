@@ -22,6 +22,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
+	"github.com/crossplane-contrib/provider-http/apis/common"
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 )
 
@@ -57,37 +58,13 @@ type DisposableRequestParameters struct {
 	ShouldLoopInfinitely bool `json:"shouldLoopInfinitely,omitempty"`
 
 	// SecretInjectionConfig specifies the secrets receiving patches from response data.
-	SecretInjectionConfigs []SecretInjectionConfig `json:"secretInjectionConfigs,omitempty"`
+	SecretInjectionConfigs []common.SecretInjectionConfig `json:"secretInjectionConfigs,omitempty"`
 }
 
 // A DisposableRequestSpec defines the desired state of a DisposableRequest.
 type DisposableRequestSpec struct {
 	xpv1.ResourceSpec `json:",inline"`
 	ForProvider       DisposableRequestParameters `json:"forProvider"`
-}
-
-// SecretInjectionConfig represents the configuration for injecting secret data into a Kubernetes secret.
-type SecretInjectionConfig struct {
-	// SecretRef contains the name and namespace of the Kubernetes secret where the data will be injected.
-	SecretRef SecretRef `json:"secretRef"`
-
-	// SecretKey is the key within the Kubernetes secret where the data will be injected.
-	SecretKey string `json:"secretKey"`
-
-	// ResponsePath is is a jq filter expression represents the path in the response where the secret value will be extracted from.
-	ResponsePath string `json:"responsePath"`
-
-	// SetOwnerReference determines whether to set the owner reference on the Kubernetes secret.
-	SetOwnerReference bool `json:"setOwnerReference,omitempty"`
-}
-
-// SecretRef contains the name and namespace of a Kubernetes secret.
-type SecretRef struct {
-	// Name is the name of the Kubernetes secret.
-	Name string `json:"name"`
-
-	// Namespace is the namespace of the Kubernetes secret.
-	Namespace string `json:"namespace"`
 }
 
 type Response struct {

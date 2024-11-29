@@ -9,6 +9,7 @@ import (
 	"github.com/crossplane-contrib/provider-http/internal/controller/request/observe"
 	"github.com/crossplane-contrib/provider-http/internal/controller/request/requestgen"
 	"github.com/crossplane-contrib/provider-http/internal/controller/request/requestmapping"
+	datapatcher "github.com/crossplane-contrib/provider-http/internal/data-patcher"
 	"github.com/crossplane-contrib/provider-http/internal/utils"
 	"github.com/pkg/errors"
 )
@@ -64,7 +65,7 @@ func (c *external) isUpToDate(ctx context.Context, cr *v1alpha2.Request) (Observ
 		return FailedObserve(), err
 	}
 
-	c.patchResponseToSecret(ctx, cr, &details.HttpResponse)
+	datapatcher.ApplyResponseDataToSecrets(ctx, c.localKube, c.logger, &details.HttpResponse, cr.Spec.ForProvider.SecretInjectionConfigs, cr)
 	return c.determineIfUpToDate(ctx, cr, details, responseErr)
 }
 

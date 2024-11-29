@@ -18,7 +18,6 @@ package request
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
@@ -43,7 +42,6 @@ import (
 	"github.com/crossplane-contrib/provider-http/internal/controller/request/statushandler"
 	datapatcher "github.com/crossplane-contrib/provider-http/internal/data-patcher"
 	"github.com/crossplane-contrib/provider-http/internal/utils"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
@@ -204,7 +202,7 @@ func (c *external) deployAction(ctx context.Context, cr *v1alpha2.Request, actio
 	}
 
 	details, err := c.http.SendRequest(ctx, mapping.Method, requestDetails.Url, requestDetails.Body, requestDetails.Headers, cr.Spec.ForProvider.InsecureSkipTLSVerify)
-	c.patchResponseToSecret(ctx, cr, &details.HttpResponse)
+	datapatcher.ApplyResponseDataToSecrets(ctx, c.localKube, c.logger, &details.HttpResponse, cr.Spec.ForProvider.SecretInjectionConfigs, cr)
 
 	statusHandler, err := statushandler.NewStatusHandler(ctx, cr, details, err, c.localKube, c.logger)
 	if err != nil {
@@ -239,20 +237,4 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) error {
 	}
 
 	return errors.Wrap(c.deployAction(ctx, cr, v1alpha2.ActionRemove), errFailedToSendHttpRequest)
-}
-
-// patchResponseToSecret patches the response data to the secret based on the given Request resource and Mapping configuration.
-func (c *external) patchResponseToSecret(ctx context.Context, cr *v1alpha2.Request, response *httpClient.HttpResponse) {
-	for _, ref := range cr.Spec.ForProvider.SecretInjectionConfigs {
-		var owner metav1.Object = nil
-
-		if ref.SetOwnerReference {
-			owner = cr
-		}
-
-		err := datapatcher.PatchResponseToSecret(ctx, c.localKube, c.logger, response, ref.ResponsePath, ref.SecretKey, ref.SecretRef.Name, ref.SecretRef.Namespace, owner)
-		if err != nil {
-			c.logger.Info(fmt.Sprintf(errPatchDataToSecret, ref.SecretRef.Name, ref.SecretRef.Namespace, ref.SecretKey, err.Error()))
-		}
-	}
 }

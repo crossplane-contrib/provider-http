@@ -5,19 +5,13 @@ import (
 	"regexp"
 	"strings"
 
-	"strconv"
-
 	"context"
 
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	httpClient "github.com/crossplane-contrib/provider-http/internal/clients/http"
-	"github.com/crossplane-contrib/provider-http/internal/jq"
-	json_util "github.com/crossplane-contrib/provider-http/internal/json"
 	kubehandler "github.com/crossplane-contrib/provider-http/internal/kube-handler"
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
-	"github.com/pkg/errors"
 )
 
 const (
@@ -89,49 +83,6 @@ func patchSecretsToValue(ctx context.Context, localKube client.Client, valueToHa
 
 	return valueToHandle, nil
 
-}
-
-// patchValueToSecret patches a value to a secret.
-func patchValueToSecret(ctx context.Context, kubeClient client.Client, logger logging.Logger, data *httpClient.HttpResponse, secret *corev1.Secret, secretKey string, requestFieldPath string) error {
-	dataMap, err := json_util.StructToMap(data)
-	if err != nil {
-		return errors.Wrap(err, errConvertData)
-	}
-
-	json_util.ConvertJSONStringsToMaps(&dataMap)
-
-	valueToPatch, err := jq.ParseString(requestFieldPath, dataMap)
-	if err != nil {
-		boolResult, err := jq.ParseBool(requestFieldPath, dataMap)
-		if err != nil {
-			valueToPatch = ""
-		} else {
-			valueToPatch = strconv.FormatBool(boolResult)
-		}
-	}
-
-	if valueToPatch == "" {
-		logger.Info(fmt.Sprintf(errEmptyKey, requestFieldPath, fmt.Sprint(data)))
-		return nil
-	}
-
-	if secret.Data == nil {
-		secret.Data = make(map[string][]byte)
-	}
-
-	secret.Data[secretKey] = []byte(valueToPatch)
-
-	// patch the {{name:namespace:key}} of secret instead of the sensitive value
-	placeholder := fmt.Sprintf("{{%s:%s:%s}}", secret.Name, secret.Namespace, secretKey)
-	data.Body = strings.ReplaceAll(data.Body, valueToPatch, placeholder)
-	for _, headersList := range data.Headers {
-		for i, header := range headersList {
-			newHeader := strings.ReplaceAll(header, valueToPatch, placeholder)
-			headersList[i] = newHeader
-		}
-	}
-
-	return kubehandler.UpdateSecret(ctx, kubeClient, secret)
 }
 
 // patchSecretsInMap traverses a map and patches secrets into any string values.

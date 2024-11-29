@@ -42,7 +42,6 @@ import (
 	apisv1alpha1 "github.com/crossplane-contrib/provider-http/apis/v1alpha1"
 	httpClient "github.com/crossplane-contrib/provider-http/internal/clients/http"
 	"github.com/crossplane-contrib/provider-http/internal/utils"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
@@ -214,7 +213,7 @@ func (c *external) deployAction(ctx context.Context, cr *v1alpha2.DisposableRequ
 
 	if err != nil {
 		setErr := resource.SetError(err)
-		c.patchResponseToSecret(ctx, cr, &resource.HttpResponse)
+		datapatcher.ApplyResponseDataToSecrets(ctx, c.localKube, c.logger, &resource.HttpResponse, cr.Spec.ForProvider.SecretInjectionConfigs, cr)
 		if settingError := utils.SetRequestResourceStatus(*resource, setErr, resource.SetLastReconcileTime(), resource.SetRequestDetails()); settingError != nil {
 			return errors.Wrap(settingError, utils.ErrFailedToSetStatus)
 		}
@@ -222,7 +221,7 @@ func (c *external) deployAction(ctx context.Context, cr *v1alpha2.DisposableRequ
 	}
 
 	if utils.IsHTTPError(resource.HttpResponse.StatusCode) {
-		c.patchResponseToSecret(ctx, cr, &resource.HttpResponse)
+		datapatcher.ApplyResponseDataToSecrets(ctx, c.localKube, c.logger, &resource.HttpResponse, cr.Spec.ForProvider.SecretInjectionConfigs, cr)
 		if settingError := utils.SetRequestResourceStatus(*resource, resource.SetStatusCode(), resource.SetLastReconcileTime(), resource.SetHeaders(), resource.SetBody(), resource.SetRequestDetails(), resource.SetError(nil)); settingError != nil {
 			return errors.Wrap(settingError, utils.ErrFailedToSetStatus)
 		}
@@ -235,7 +234,7 @@ func (c *external) deployAction(ctx context.Context, cr *v1alpha2.DisposableRequ
 		return err
 	}
 
-	c.patchResponseToSecret(ctx, cr, &resource.HttpResponse)
+	datapatcher.ApplyResponseDataToSecrets(ctx, c.localKube, c.logger, &resource.HttpResponse, cr.Spec.ForProvider.SecretInjectionConfigs, cr)
 	if !isExpectedResponse {
 		limit := utils.GetRollbackRetriesLimit(cr.Spec.ForProvider.RollbackRetriesLimit)
 		return utils.SetRequestResourceStatus(*resource, resource.SetStatusCode(), resource.SetLastReconcileTime(), resource.SetHeaders(), resource.SetBody(),
@@ -298,21 +297,6 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 
 func (c *external) Delete(_ context.Context, _ resource.Managed) error {
 	return nil
-}
-
-func (c *external) patchResponseToSecret(ctx context.Context, cr *v1alpha2.DisposableRequest, response *httpClient.HttpResponse) {
-	for _, ref := range cr.Spec.ForProvider.SecretInjectionConfigs {
-		var owner metav1.Object = nil
-
-		if ref.SetOwnerReference {
-			owner = cr
-		}
-
-		err := datapatcher.PatchResponseToSecret(ctx, c.localKube, c.logger, response, ref.ResponsePath, ref.SecretKey, ref.SecretRef.Name, ref.SecretRef.Namespace, owner)
-		if err != nil {
-			c.logger.Info(fmt.Sprintf(errPatchDataToSecret, ref.SecretRef.Name, ref.SecretRef.Namespace, ref.SecretKey, err.Error()))
-		}
-	}
 }
 
 // WithCustomPollIntervalHook returns a managed.ReconcilerOption that sets a custom poll interval based on the DisposableRequest spec.
