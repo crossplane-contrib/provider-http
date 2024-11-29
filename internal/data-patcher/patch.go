@@ -2,17 +2,21 @@ package datapatcher
 
 import (
 	"context"
+	"fmt"
 
+	"github.com/crossplane-contrib/provider-http/apis/common"
 	httpClient "github.com/crossplane-contrib/provider-http/internal/clients/http"
 	kubehandler "github.com/crossplane-contrib/provider-http/internal/kube-handler"
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
 	"github.com/pkg/errors"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
 	errPatchToReferencedSecret = "cannot patch to referenced secret"
+	errPatchDataToSecret       = "Warning, couldn't patch data from request to secret %s:%s, error: %s"
 )
 
 // PatchSecretsIntoString patches secrets into the provided string.
@@ -51,19 +55,63 @@ func copyHeaders(headers map[string][]string) map[string][]string {
 	return headersCopy
 }
 
-// PatchResponseToSecret patches response data into a Kubernetes secret.
-func PatchResponseToSecret(ctx context.Context, localKube client.Client, logger logging.Logger, data *httpClient.HttpResponse, path, secretKey, secretName, secretNamespace string, owner metav1.Object) error {
-	secret, err := kubehandler.GetOrCreateSecret(ctx, localKube, secretName, secretNamespace, owner)
+// patchResponseDataToSecret patches response data into a Kubernetes secret.
+func patchResponseDataToSecret(ctx context.Context, localKube client.Client, logger logging.Logger, data *httpClient.HttpResponse, owner metav1.Object, secretConfig common.SecretInjectionConfig) error {
+	secret, err := kubehandler.GetOrCreateSecret(ctx, localKube, secretConfig.SecretRef.Name, secretConfig.SecretRef.Namespace, owner)
 	if err != nil {
 		return err
 	}
 
-	err = patchValueToSecret(ctx, localKube, logger, data, secret, secretKey, path)
+	err = applySecretConfig(ctx, localKube, logger, data, secretConfig, secret)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// applySecretConfig applies the secret configuration to the secret.
+func applySecretConfig(ctx context.Context, localKube client.Client, logger logging.Logger, data *httpClient.HttpResponse, secretConfig common.SecretInjectionConfig, secret *v1.Secret) error {
+	var err error
+
+	if secretConfig.KeyMappings != nil {
+		for _, mapping := range secretConfig.KeyMappings {
+			err = updateSecretWithPatchedValue(ctx, localKube, logger, data, secret, mapping.SecretKey, mapping.ResponseJQ)
+			if err != nil {
+				return errors.Wrap(err, errPatchToReferencedSecret)
+			}
+		}
+	} else {
+		err = updateSecretWithPatchedValue(ctx, localKube, logger, data, secret, secretConfig.SecretKey, secretConfig.ResponsePath)
+		if err != nil {
+			return errors.Wrap(err, errPatchToReferencedSecret)
+		}
+	}
+
+	err = updateSecretLabelsAndAnnotations(ctx, localKube, logger, data, secret, secretConfig.Metadata.Labels, secretConfig.Metadata.Annotations)
 	if err != nil {
 		return errors.Wrap(err, errPatchToReferencedSecret)
 	}
 
 	return nil
+}
+
+// ApplyResponseDataToSecrets applies response data to Kubernetes Secrets as specified in the resource's SecretInjectionConfigs.
+// For each SecretInjectionConfig, it extracts a value from the HTTP response and patches it into the referenced Secret.
+// Ownership of the Secret is optionally set based on the configuration.
+func ApplyResponseDataToSecrets(ctx context.Context, localKube client.Client, logger logging.Logger, response *httpClient.HttpResponse, secretConfigs []common.SecretInjectionConfig, cr metav1.Object) {
+	for _, ref := range secretConfigs {
+		var owner metav1.Object = nil
+
+		if ref.SetOwnerReference {
+			owner = cr
+		}
+
+		err := patchResponseDataToSecret(ctx, localKube, logger, response, owner, ref)
+		if err != nil {
+			logger.Info(fmt.Sprintf(errPatchDataToSecret, ref.SecretRef.Name, ref.SecretRef.Namespace, err.Error()))
+		}
+	}
 }
 
 // PatchSecretsIntoMap takes a map of string to interface{} and patches secrets

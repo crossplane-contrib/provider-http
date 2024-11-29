@@ -96,21 +96,27 @@ spec:
       - secretRef:
           name: response-secret
           namespace: default
-        secretKey: extracted-user-email
-        responsePath: .body.email
+        metadata:
+          labels:
+            managed-by: provider-http
+          annotations:
+            username: .body.username
+        keyMappings:
+          - secretKey: extracted-user-email
+            responseJQ: .body.email
+          - secretKey: extracted-header-data
+            responseJQ: .headers."X-Secret-Header"[0]
         # setOwnerReference determines if the secret should be deleted when the associated resource is deleted.
-        # When injecting multiple keys into the same secret, ensure this field is set consistently for all keys.        
         setOwnerReference: true
-      - secretRef:
-          name: response-secret
-          namespace: default
-        secretKey: extracted-header-data
-        responsePath: .headers."X-Secret-Header"[0]
-        setOwnerReference: true
+      
       - secretRef:
           name: response-user-password
           namespace: default
-        secretKey: extracted-user-password
-        responsePath: .body.password
+        keyMappings:
+          - secretKey: extracted-user-password
+            responseJQ: .body.password
+          - secretKey: extracted-user-age
+            responseJQ: .body.age
+
   providerConfigRef:
     name: http-conf
