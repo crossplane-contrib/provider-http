@@ -32,13 +32,11 @@ Here is an example `DisposableRequest` resource definition:
           - secretRef:
               name: response-secret
               namespace: default
-            secretKey: extracted-data
-            responsePath: .body.reminder
-          - secretRef:
-              name: response-secret
-              namespace: default
-            secretKey: extracted-data-headers
-            responsePath: .headers.Try[0]
+            keyMappings:
+              - secretKey: extracted-data
+                responseJQ: .body.reminder
+              - secretKey: extracted-data-headers
+                responseJQ: .headers.Try[0]
 ```
 
 -  deletionPolicy: specifies what will happen to the underlying external when this managed resource is   deleted. in this case it should be set to "Orphan" the external resource.
