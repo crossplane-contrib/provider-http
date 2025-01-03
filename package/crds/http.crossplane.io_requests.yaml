@@ -513,8 +513,9 @@ spec:
                         type: string
                     type: object
                   mappings:
-                    description: Mappings defines the HTTP mappings for different
-                      methods.
+                    description: |-
+                      Mappings defines the HTTP mappings for different methods.
+                      Either Method or Action must be specified. If both are omitted, the mapping will not be used.
                     items:
                       properties:
                         action:
@@ -537,14 +538,15 @@ spec:
                           description: Headers specifies the headers for the request.
                           type: object
                         method:
-                          description: |-
-                            Either Method or Action must be specified. If both are omitted, the mapping will not be used.
-                            Method specifies the HTTP method for the request.
+                          description: Method specifies the HTTP method for the request.
                           enum:
                           - POST
                           - GET
                           - PUT
                           - DELETE
+                          - PATCH
+                          - HEAD
+                          - OPTIONS
                           type: string
                         url:
                           description: URL specifies the URL for the request.
@@ -552,6 +554,7 @@ spec:
                       required:
                       - url
                       type: object
+                    minItems: 1
                     type: array
                   payload:
                     description: Payload defines the payload for the request.
@@ -920,14 +923,15 @@ spec:
                     description: Headers specifies the headers for the request.
                     type: object
                   method:
-                    description: |-
-                      Either Method or Action must be specified. If both are omitted, the mapping will not be used.
-                      Method specifies the HTTP method for the request.
+                    description: Method specifies the HTTP method for the request.
                     enum:
                     - POST
                     - GET
                     - PUT
                     - DELETE
+                    - PATCH
+                    - HEAD
+                    - OPTIONS
                     type: string
                   url:
                     description: URL specifies the URL for the request.
