@@ -234,8 +234,9 @@ func (c *external) deployAction(ctx context.Context, cr *v1alpha2.DisposableRequ
 		return err
 	}
 
-	datapatcher.ApplyResponseDataToSecrets(ctx, c.localKube, c.logger, &resource.HttpResponse, cr.Spec.ForProvider.SecretInjectionConfigs, cr)
-	if !isExpectedResponse {
+	if isExpectedResponse {
+		datapatcher.ApplyResponseDataToSecrets(ctx, c.localKube, c.logger, &resource.HttpResponse, cr.Spec.ForProvider.SecretInjectionConfigs, cr)
+	} else {
 		limit := utils.GetRollbackRetriesLimit(cr.Spec.ForProvider.RollbackRetriesLimit)
 		return utils.SetRequestResourceStatus(*resource, resource.SetStatusCode(), resource.SetLastReconcileTime(), resource.SetHeaders(), resource.SetBody(),
 			resource.SetError(errors.New(errResponseFormat+fmt.Sprint(limit))), resource.SetRequestDetails())
