@@ -41,6 +41,8 @@ const (
 // RequestParameters are the configurable fields of a Request.
 type RequestParameters struct {
 	// Mappings defines the HTTP mappings for different methods.
+	// Either Method or Action must be specified. If both are omitted, the mapping will not be used.
+	// +kubebuilder:validation:MinItems=1
 	Mappings []Mapping `json:"mappings"`
 
 	// Payload defines the payload for the request.
@@ -66,8 +68,7 @@ type RequestParameters struct {
 }
 
 type Mapping struct {
-	// Either Method or Action must be specified. If both are omitted, the mapping will not be used.
-	// +kubebuilder:validation:Enum=POST;GET;PUT;DELETE
+	// +kubebuilder:validation:Enum=POST;GET;PUT;DELETE;PATCH;HEAD;OPTIONS
 	// Method specifies the HTTP method for the request.
 	Method string `json:"method,omitempty"`
 
