@@ -132,7 +132,7 @@ func extractValueToPatch(logger logging.Logger, dataMap map[string]interface{}, 
 // If valueToPatch is non-nil, it updates the secret with the provided value.
 // If valueToPatch is nil, then the missingStrategy is used:
 //   - common.PreserveMissingField: does nothing
-//   - common.SetNullMissingField: sets the value to ""
+//   - common.SetEmptyMissingField: sets the value to ""
 //   - common.DeleteMissingField: deletes the key from the secret if it exists.
 func updateSecretData(secret *corev1.Secret, secretKey string, valueToPatch *string, missingStrategy common.MissingFieldStrategy) {
 	if secret.Data == nil {
@@ -143,7 +143,7 @@ func updateSecretData(secret *corev1.Secret, secretKey string, valueToPatch *str
 	} else {
 		switch missingStrategy {
 		case common.PreserveMissingField:
-		case common.SetNullMissingField:
+		case common.SetEmptyMissingField:
 			secret.Data[secretKey] = []byte("")
 		case common.DeleteMissingField:
 			delete(secret.Data, secretKey)
