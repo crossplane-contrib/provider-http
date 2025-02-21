@@ -76,13 +76,20 @@ func applySecretConfig(ctx context.Context, localKube client.Client, logger logg
 
 	if secretConfig.KeyMappings != nil {
 		for _, mapping := range secretConfig.KeyMappings {
-			err = updateSecretWithPatchedValue(ctx, localKube, logger, data, secret, mapping.SecretKey, mapping.ResponseJQ)
+			err = updateSecretWithPatchedValue(ctx, localKube, logger, data, secret, mapping)
 			if err != nil {
 				return errors.Wrap(err, errPatchToReferencedSecret)
 			}
 		}
 	} else {
-		err = updateSecretWithPatchedValue(ctx, localKube, logger, data, secret, secretConfig.SecretKey, secretConfig.ResponsePath)
+		// Handle deprecated secretConfig fields
+		mapping := common.KeyInjection{
+			SecretKey:            secretConfig.SecretKey,
+			ResponseJQ:           secretConfig.ResponsePath,
+			MissingFieldStrategy: common.DeleteMissingField,
+		}
+
+		err = updateSecretWithPatchedValue(ctx, localKube, logger, data, secret, mapping)
 		if err != nil {
 			return errors.Wrap(err, errPatchToReferencedSecret)
 		}
