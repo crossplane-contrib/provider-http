@@ -38,8 +38,8 @@ type MissingFieldStrategy string
 const (
 	// PreserveMissingField keeps the existing value in the secret when the field is missing from the response
 	PreserveMissingField MissingFieldStrategy = "preserve"
-	// SetNullMissingField sets the value to null/empty when the field is missing from the response
-	SetNullMissingField MissingFieldStrategy = "setNull"
+	// SetEmptyMissingField sets the value to the empty string when the field is missing from the response
+	SetEmptyMissingField MissingFieldStrategy = "setEmpty"
 	// DeleteMissingField removes the key from the secret when the field is missing from the response
 	DeleteMissingField MissingFieldStrategy = "delete"
 )
@@ -55,9 +55,9 @@ type KeyInjection struct {
 	// MissingFieldStrategy determines how to handle cases where the field is missing from the response.
 	// Possible values are:
 	// - "preserve": keeps the existing value in the secret
-	// - "setNull": sets the value to null/empty
+	// - "setEmpty": sets the value to the empty string
 	// - "delete": removes the key from the s
-	// +kubebuilder:validation:Enum=preserve;setNull;delete
+	// +kubebuilder:validation:Enum=preserve;setEmpty;delete
 	// +kubebuilder:default=delete
 	MissingFieldStrategy MissingFieldStrategy `json:"missingFieldStrategy,omitempty"`
 }
