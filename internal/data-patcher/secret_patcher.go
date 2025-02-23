@@ -151,15 +151,17 @@ func updateSecretData(secret *corev1.Secret, secretKey string, valueToPatch *str
 	}
 }
 
-// replaceSensitiveValues replaces occurrences of a sensitive value in the HTTP response body
-// and headers with a placeholder.
+// replaceSensitiveValues replaces occurrences of sensitive values in the HTTP response body
+// and headers with a placeholder, iff the value is a json string surrounded by double quotes.
 func replaceSensitiveValues(data *httpClient.HttpResponse, secret *corev1.Secret, secretKey string, valueToPatch *string) {
 	if valueToPatch == nil || *valueToPatch == "" {
 		return
 	}
 
 	placeholder := fmt.Sprintf("{{%s:%s:%s}}", secret.Name, secret.Namespace, secretKey)
-	data.Body = strings.ReplaceAll(data.Body, *valueToPatch, placeholder)
+	quotedValue := fmt.Sprintf("\"%s\"", *valueToPatch)
+	quotedPlaceholder := fmt.Sprintf("\"%s\"", placeholder)
+	data.Body = strings.ReplaceAll(data.Body, quotedValue, quotedPlaceholder)
 
 	for _, headersList := range data.Headers {
 		for i, header := range headersList {
