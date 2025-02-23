@@ -31,7 +31,13 @@ type customCheck struct {
 func (c *customCheck) check(ctx context.Context, cr *v1alpha2.Request, details httpClient.HttpDetails, logic string) (bool, error) {
 	// Convert response to a map and apply JQ logic
 	response := responseconverter.HttpResponseToV1alpha1Response(details.HttpResponse)
-	responseMap := requestgen.GenerateRequestObject(cr.Spec.ForProvider, response)
+
+	sensitiveResponse, err := datapatcher.PatchSecretsIntoResponse(ctx, c.localKube, response, c.logger)
+	if err != nil {
+		return false, err
+	}
+
+	sensitiveRequestContext := requestgen.GenerateRequestContext(cr.Spec.ForProvider, sensitiveResponse)
 
 	jqQuery := utils.NormalizeWhitespace(logic)
 	sensitiveJQQuery, err := datapatcher.PatchSecretsIntoString(ctx, c.localKube, jqQuery, c.logger)
@@ -39,12 +45,7 @@ func (c *customCheck) check(ctx context.Context, cr *v1alpha2.Request, details h
 		return false, err
 	}
 
-	sensitiveResponse, err := datapatcher.PatchSecretsIntoMap(ctx, c.localKube, responseMap, c.logger)
-	if err != nil {
-		return false, err
-	}
-
-	isExpected, err := jq.ParseBool(sensitiveJQQuery, sensitiveResponse)
+	isExpected, err := jq.ParseBool(sensitiveJQQuery, sensitiveRequestContext)
 
 	c.logger.Debug(fmt.Sprintf("Applying JQ filter %s, result is %v", jqQuery, isExpected))
 	if err != nil {
