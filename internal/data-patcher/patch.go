@@ -19,6 +19,25 @@ const (
 	errPatchDataToSecret       = "Warning, couldn't patch data from request to secret %s:%s, error: %s"
 )
 
+// PatchSecretsIntoResponse patches secrets into the provided response.
+func PatchSecretsIntoResponse(ctx context.Context, localKube client.Client, response v1alpha2.Response, logger logging.Logger) (v1alpha2.Response, error) {
+	patchedBody, err := PatchSecretsIntoString(ctx, localKube, response.Body, logger)
+	if err != nil {
+		return v1alpha2.Response{}, err
+	}
+
+	patchedHeaders, err := PatchSecretsIntoHeaders(ctx, localKube, response.Headers, logger)
+	if err != nil {
+		return v1alpha2.Response{}, err
+	}
+
+	return v1alpha2.Response{
+		StatusCode: response.StatusCode,
+		Body:       patchedBody,
+		Headers:    patchedHeaders,
+	}, nil
+}
+
 // PatchSecretsIntoString patches secrets into the provided string.
 func PatchSecretsIntoString(ctx context.Context, localKube client.Client, str string, logger logging.Logger) (string, error) {
 	return patchSecretsToValue(ctx, localKube, str, logger)
