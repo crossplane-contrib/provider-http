@@ -242,7 +242,7 @@ func TestReplaceSensitiveValues(t *testing.T) {
 		"ShouldHandleEmptyHeadersGracefully": {
 			args: args{
 				data: &httpClient.HttpResponse{
-					Body: "Sensitive value in the body.",
+					Body: `{"message": "Sensitive value in the body", "token": "value"}`,
 					Headers: map[string][]string{
 						"Authorization": {},
 					},
@@ -257,7 +257,7 @@ func TestReplaceSensitiveValues(t *testing.T) {
 				valueToPatch: ptr.To("value"),
 			},
 			want: want{
-				body: "Sensitive {{my-secret:default:sensitiveKey}} in the body.",
+				body: `{"message": "Sensitive value in the body", "token": "{{my-secret:default:sensitiveKey}}"}`,
 				headers: map[string][]string{
 					"Authorization": {},
 				},
@@ -282,10 +282,10 @@ func TestReplaceSensitiveValues(t *testing.T) {
 
 func TestUpdateSecretData(t *testing.T) {
 	type args struct {
-		secret          *corev1.Secret
-		secretKey       string
-		valueToPatch    *string
-		missingStrategy common.MissingFieldStrategy
+		secret               *corev1.Secret
+		secretKey            string
+		valueToPatch         *string
+		missingFieldStrategy common.MissingFieldStrategy
 	}
 
 	type want struct {
@@ -341,12 +341,50 @@ func TestUpdateSecretData(t *testing.T) {
 				},
 			},
 		},
+		"ShouldSetEmptyMissingFieldWhenFieldMissing": {
+			// Secret already contains key "key1" but the response did not return a value;
+			// missing field strategy "setEmpty" should override it to empty string.
+			args: args{
+				secret: &corev1.Secret{
+					Data: map[string][]byte{
+						"key1": []byte("existingValue"),
+					},
+				},
+				secretKey:            "key1",
+				valueToPatch:         nil,
+				missingFieldStrategy: common.SetEmptyMissingField,
+			},
+			want: want{
+				data: map[string][]byte{
+					"key1": []byte(""),
+				},
+			},
+		},
+		"ShouldPreserveExistingValueWhenFieldMissing": {
+			// Secret already contains key "key1" but the response did not return a value;
+			// missing field strategy "preserve" should leave the value unchanged.
+			args: args{
+				secret: &corev1.Secret{
+					Data: map[string][]byte{
+						"key1": []byte("existingValue"),
+					},
+				},
+				secretKey:            "key1",
+				valueToPatch:         nil,
+				missingFieldStrategy: common.PreserveMissingField,
+			},
+			want: want{
+				data: map[string][]byte{
+					"key1": []byte("existingValue"),
+				},
+			},
+		},
 	}
 
 	for name, tc := range cases {
+		tc := tc // Create local copies of loop variables
 		t.Run(name, func(t *testing.T) {
-			updateSecretData(tc.args.secret, tc.args.secretKey, tc.args.valueToPatch, tc.args.missingStrategy)
-
+			updateSecretData(tc.args.secret, tc.args.secretKey, tc.args.valueToPatch, tc.args.missingFieldStrategy)
 			if diff := cmp.Diff(tc.want.data, tc.args.secret.Data); diff != "" {
 				t.Errorf("updateSecretData(...): -want data, +got data: %s", diff)
 			}
