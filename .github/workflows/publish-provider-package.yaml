@@ -16,7 +16,7 @@ jobs:
   publish-provider-package:
     uses: crossplane-contrib/provider-workflows/.github/workflows/publish-provider-non-family.yml@main
     with:
-      repository: provider-kubernetes
+      repository: provider-http
       version: ${{ github.event.inputs.version }}
       go-version: ${{ github.event.inputs.go-version }}
       cleanup-disk: true
