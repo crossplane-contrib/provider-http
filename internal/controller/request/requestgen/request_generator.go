@@ -27,7 +27,12 @@ type RequestDetails struct {
 
 // GenerateRequestDetails generates request details.
 func GenerateRequestDetails(ctx context.Context, localKube client.Client, methodMapping v1alpha2.Mapping, forProvider v1alpha2.RequestParameters, response v1alpha2.Response, logger logging.Logger) (RequestDetails, error, bool) {
-	jqObject := GenerateRequestObject(forProvider, response)
+	patchedResponse, err := datapatcher.PatchSecretsIntoResponse(ctx, localKube, response, logger)
+	if err != nil {
+		return RequestDetails{}, err, false
+	}
+
+	jqObject := GenerateRequestContext(forProvider, patchedResponse)
 	url, err := generateURL(methodMapping.URL, jqObject)
 	if err != nil {
 		return RequestDetails{}, err, false
@@ -50,12 +55,12 @@ func GenerateRequestDetails(ctx context.Context, localKube client.Client, method
 	return RequestDetails{Body: bodyData, Url: url, Headers: headersData}, nil, true
 }
 
-// GenerateRequestObject creates a JSON-compatible map from the specified Request's ForProvider and Response fields.
+// GenerateRequestContext creates a JSON-compatible map from the specified Request's ForProvider and Response fields.
 // It merges the two maps, converts JSON strings to nested maps, and returns the resulting map.
-func GenerateRequestObject(forProvider v1alpha2.RequestParameters, response v1alpha2.Response) map[string]interface{} {
+func GenerateRequestContext(forProvider v1alpha2.RequestParameters, patchedResponse v1alpha2.Response) map[string]interface{} {
 	baseMap, _ := json_util.StructToMap(forProvider)
 	statusMap, _ := json_util.StructToMap(map[string]interface{}{
-		"response": response,
+		"response": patchedResponse,
 	})
 
 	maps.Copy(baseMap, statusMap)
