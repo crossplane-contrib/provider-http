@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/crossplane-contrib/provider-http/apis/common"
+	"github.com/crossplane-contrib/provider-http/apis/request/v1alpha2"
 	httpClient "github.com/crossplane-contrib/provider-http/internal/clients/http"
 	kubehandler "github.com/crossplane-contrib/provider-http/internal/kube-handler"
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
