@@ -134,12 +134,12 @@ func generateBody(ctx context.Context, localKube client.Client, mappingBody stri
 
 // generateHeaders applies JQ queries to generate headers.
 func generateHeaders(ctx context.Context, localKube client.Client, headers map[string][]string, jqObject map[string]interface{}, logger logging.Logger) (httpClient.Data, error) {
-	generatedHeaders, err := requestprocessing.ApplyJQOnMapStrings(headers, jqObject)
+	sensitiveHeaders, err := datapatcher.PatchSecretsIntoHeaders(ctx, localKube, headers, logger)
 	if err != nil {
 		return httpClient.Data{}, err
 	}
 
-	sensitiveHeaders, err := datapatcher.PatchSecretsIntoHeaders(ctx, localKube, generatedHeaders, logger)
+	generatedHeaders, err := requestprocessing.ApplyJQOnMapStrings(sensitiveHeaders, jqObject)
 	if err != nil {
 		return httpClient.Data{}, err
 	}
