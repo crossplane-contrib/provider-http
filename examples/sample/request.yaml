@@ -32,7 +32,9 @@ spec:
             age: .payload.body.age,
             password: .payload.body.password
           }
-        url: .payload.baseUrl
+        # A priorly known ID can be used in the URL. In such cases, a GET request is attempted prior to the first POST request.
+        # The resource is then considered valid for observation if this GET is successful.
+        url: (.payload.baseUrl + "/12435")
         headers:
           Content-Type:
             - application/json
