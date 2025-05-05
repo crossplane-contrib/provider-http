@@ -46,34 +46,21 @@ func FailedObserve() ObserveRequestDetails {
 
 // isUpToDate checks whether desired spec up to date with the observed state for a given request
 func (c *external) isUpToDate(ctx context.Context, cr *v1alpha2.Request) (ObserveRequestDetails, error) {
+	if !c.isObjectValidForObservation(cr) {
+		return FailedObserve(), errors.New(observe.ErrObjectNotFound)
+	}
+
 	mapping, err := requestmapping.GetMapping(&cr.Spec.ForProvider, v1alpha2.ActionObserve, c.logger)
 	if err != nil {
 		return FailedObserve(), err
 	}
 
-	objectNotCreated := !c.isObjectValidForObservation(cr)
-
-	// Evaluate the HTTP request template. If successfully templated, attempt to
-	// observe the resource.
 	requestDetails, err := requestgen.GenerateValidRequestDetails(ctx, cr, mapping, c.localKube, c.logger)
 	if err != nil {
-		if objectNotCreated {
-			// The initial request was not successfully templated. Cannot
-			// confirm existence of the resource, jumping to the default
-			// behavior of creating before observing.
-			err = errors.New(observe.ErrObjectNotFound)
-		}
 		return FailedObserve(), err
 	}
 
 	details, responseErr := c.http.SendRequest(ctx, mapping.Method, requestDetails.Url, requestDetails.Body, requestDetails.Headers, cr.Spec.ForProvider.InsecureSkipTLSVerify)
-	// The initial observation of an object requires a successful HTTP response
-	// to be considered existing.
-	if !utils.IsHTTPSuccess(details.HttpResponse.StatusCode) && objectNotCreated {
-		// Cannot confirm existence of the resource, jumping to the default
-		// behavior of creating before observing.
-		return FailedObserve(), errors.New(observe.ErrObjectNotFound)
-	}
 	if err := c.determineIfRemoved(ctx, cr, details, responseErr); err != nil {
 		return FailedObserve(), err
 	}
