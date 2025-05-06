@@ -1,7 +1,7 @@
 apiVersion: http.crossplane.io/v1alpha2
 kind: Request
 metadata:
-  name: manage-user
+  name: manage-previously-known-user
 spec:
   forProvider:
     # Injecting data from secrets is possible, simply use the following syntax: {{ name:namespace:key }} (supported for body and headers only)
@@ -44,7 +44,9 @@ spec:
       # Scenario 2: Action specified, method not specified (defaults to GET for OBSERVE)
       - action: OBSERVE
         # method: "GET"
-        url: (.payload.baseUrl + "/" + (.response.body.id|tostring))
+        # Some external APIs might use non-generated IDs for resoures.
+        # By using a previously known resource ID, a specific resource can be observed.
+        url: (.payload.baseUrl + "/" + (.payload.body.username|tostring))
 
       # Scenario 3: Method specified, action not specified (PUT implies UPDATE)
       - method: "PUT"
@@ -54,12 +56,13 @@ spec:
             email: .payload.body.email, 
             age: .payload.body.age
           }
-        url: (.payload.baseUrl + "/" + (.response.body.id|tostring))
+        # Continue any update using a previously known resource ID.
+        url: (.payload.baseUrl + "/" + (.payload.body.username|tostring))
 
       # Scenario 4: Action specified, method not specified (defaults to DELETE for REMOVE)
       - action: REMOVE
-        # method: "DELETE"
-        url: (.payload.baseUrl + "/" + (.response.body.id|tostring))
+        # method: "DELETE" using a previously known resource ID.
+        url: (.payload.baseUrl + "/" + (.response.body.username|tostring))
     
     # expectedResponseCheck is optional. If not specified or if the type is "DEFAULT", 
     # the resource is considered up to date if the GET response containes the PUT body.
