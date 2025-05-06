@@ -14,6 +14,7 @@ spec:
         - ("Bearer {{ auth:default:token }}")
     payload:
       baseUrl: http://flask-api.default.svc.cluster.local/v1/users
+      userId: 1234
       body: |
         {
           "username": "mock_user", 
@@ -44,7 +45,8 @@ spec:
       # Scenario 2: Action specified, method not specified (defaults to GET for OBSERVE)
       - action: OBSERVE
         # method: "GET"
-        url: (.payload.baseUrl + "/" + (.response.body.id|tostring))
+        # By using a previously known resource ID, a specific resource can be observed.
+        url: (.payload.baseUrl + "/" + (.payload.userId|tostring))
 
       # Scenario 3: Method specified, action not specified (PUT implies UPDATE)
       - method: "PUT"
