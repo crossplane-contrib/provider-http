@@ -3,11 +3,13 @@ package datapatcher
 import (
 	"testing"
 
+	"github.com/crossplane-contrib/provider-http/apis/common"
 	httpClient "github.com/crossplane-contrib/provider-http/internal/clients/http"
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
 	"github.com/google/go-cmp/cmp"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 )
 
 func TestIsSecretDataUpToDate(t *testing.T) {
@@ -175,7 +177,7 @@ func TestReplaceSensitiveValues(t *testing.T) {
 		data         *httpClient.HttpResponse
 		secret       *corev1.Secret
 		secretKey    string
-		valueToPatch string
+		valueToPatch *string
 	}
 
 	type want struct {
@@ -203,7 +205,7 @@ func TestReplaceSensitiveValues(t *testing.T) {
 					},
 				},
 				secretKey:    "sensitiveKey",
-				valueToPatch: "sensitive-value",
+				valueToPatch: ptr.To("sensitive-value"),
 			},
 			want: want{
 				body: "Sensitive value is here.",
@@ -228,7 +230,7 @@ func TestReplaceSensitiveValues(t *testing.T) {
 					},
 				},
 				secretKey:    "sensitiveKey",
-				valueToPatch: "",
+				valueToPatch: ptr.To(""),
 			},
 			want: want{
 				body: "Nothing to replace here.",
@@ -240,7 +242,7 @@ func TestReplaceSensitiveValues(t *testing.T) {
 		"ShouldHandleEmptyHeadersGracefully": {
 			args: args{
 				data: &httpClient.HttpResponse{
-					Body: "Sensitive value in the body.",
+					Body: `{"message": "Sensitive value in the body", "token": "value"}`,
 					Headers: map[string][]string{
 						"Authorization": {},
 					},
@@ -252,10 +254,10 @@ func TestReplaceSensitiveValues(t *testing.T) {
 					},
 				},
 				secretKey:    "sensitiveKey",
-				valueToPatch: "value",
+				valueToPatch: ptr.To("value"),
 			},
 			want: want{
-				body: "Sensitive {{my-secret:default:sensitiveKey}} in the body.",
+				body: `{"message": "Sensitive value in the body", "token": "{{my-secret:default:sensitiveKey}}"}`,
 				headers: map[string][]string{
 					"Authorization": {},
 				},
@@ -280,9 +282,10 @@ func TestReplaceSensitiveValues(t *testing.T) {
 
 func TestUpdateSecretData(t *testing.T) {
 	type args struct {
-		secret       *corev1.Secret
-		secretKey    string
-		valueToPatch string
+		secret               *corev1.Secret
+		secretKey            string
+		valueToPatch         *string
+		missingFieldStrategy common.MissingFieldStrategy
 	}
 
 	type want struct {
@@ -297,7 +300,7 @@ func TestUpdateSecretData(t *testing.T) {
 			args: args{
 				secret:       &corev1.Secret{},
 				secretKey:    "key1",
-				valueToPatch: "value1",
+				valueToPatch: ptr.To("value1"),
 			},
 			want: want{
 				data: map[string][]byte{
@@ -313,7 +316,7 @@ func TestUpdateSecretData(t *testing.T) {
 					},
 				},
 				secretKey:    "key1",
-				valueToPatch: "newValue",
+				valueToPatch: ptr.To("newValue"),
 			},
 			want: want{
 				data: map[string][]byte{
@@ -329,7 +332,7 @@ func TestUpdateSecretData(t *testing.T) {
 					},
 				},
 				secretKey:    "key2",
-				valueToPatch: "value2",
+				valueToPatch: ptr.To("value2"),
 			},
 			want: want{
 				data: map[string][]byte{
@@ -338,12 +341,50 @@ func TestUpdateSecretData(t *testing.T) {
 				},
 			},
 		},
+		"ShouldSetEmptyMissingFieldWhenFieldMissing": {
+			// Secret already contains key "key1" but the response did not return a value;
+			// missing field strategy "setEmpty" should override it to empty string.
+			args: args{
+				secret: &corev1.Secret{
+					Data: map[string][]byte{
+						"key1": []byte("existingValue"),
+					},
+				},
+				secretKey:            "key1",
+				valueToPatch:         nil,
+				missingFieldStrategy: common.SetEmptyMissingField,
+			},
+			want: want{
+				data: map[string][]byte{
+					"key1": []byte(""),
+				},
+			},
+		},
+		"ShouldPreserveExistingValueWhenFieldMissing": {
+			// Secret already contains key "key1" but the response did not return a value;
+			// missing field strategy "preserve" should leave the value unchanged.
+			args: args{
+				secret: &corev1.Secret{
+					Data: map[string][]byte{
+						"key1": []byte("existingValue"),
+					},
+				},
+				secretKey:            "key1",
+				valueToPatch:         nil,
+				missingFieldStrategy: common.PreserveMissingField,
+			},
+			want: want{
+				data: map[string][]byte{
+					"key1": []byte("existingValue"),
+				},
+			},
+		},
 	}
 
 	for name, tc := range cases {
+		tc := tc // Create local copies of loop variables
 		t.Run(name, func(t *testing.T) {
-			updateSecretData(tc.args.secret, tc.args.secretKey, tc.args.valueToPatch)
-
+			updateSecretData(tc.args.secret, tc.args.secretKey, tc.args.valueToPatch, tc.args.missingFieldStrategy)
 			if diff := cmp.Diff(tc.want.data, tc.args.secret.Data); diff != "" {
 				t.Errorf("updateSecretData(...): -want data, +got data: %s", diff)
 			}
@@ -358,7 +399,7 @@ func TestExtractValueToPatch(t *testing.T) {
 	}
 
 	type want struct {
-		result string
+		result *string
 		err    error
 	}
 
@@ -374,7 +415,7 @@ func TestExtractValueToPatch(t *testing.T) {
 				requestFieldPath: ".stringField",
 			},
 			want: want{
-				result: "testString",
+				result: ptr.To("testString"),
 				err:    nil,
 			},
 		},
@@ -386,7 +427,7 @@ func TestExtractValueToPatch(t *testing.T) {
 				requestFieldPath: ".booleanField",
 			},
 			want: want{
-				result: "true",
+				result: ptr.To("true"),
 				err:    nil,
 			},
 		},
@@ -398,7 +439,7 @@ func TestExtractValueToPatch(t *testing.T) {
 				requestFieldPath: ".numberField",
 			},
 			want: want{
-				result: "123.45",
+				result: ptr.To("123.45"),
 				err:    nil,
 			},
 		},
@@ -410,7 +451,7 @@ func TestExtractValueToPatch(t *testing.T) {
 				requestFieldPath: ".nonExistentField",
 			},
 			want: want{
-				result: "",
+				result: nil,
 				err:    nil,
 			},
 		},
@@ -422,7 +463,7 @@ func TestExtractValueToPatch(t *testing.T) {
 				requestFieldPath: ".arrayField",
 			},
 			want: want{
-				result: "",
+				result: nil,
 				err:    nil,
 			},
 		},
