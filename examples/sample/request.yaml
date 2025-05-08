@@ -45,7 +45,7 @@ spec:
       - action: OBSERVE
         # method: "GET"
         url: (.payload.baseUrl + "/" + (.response.body.id|tostring))
-        # If the ID of the exxternal resource is known in advance, ownership of the resource can be attempted:
+        # If the ID of the external resource is known in advance, ownership of the resource can be attempted:
         # url: (.payload.baseUrl + "/1234567890")
 
       # Scenario 3: Method specified, action not specified (PUT implies UPDATE)
