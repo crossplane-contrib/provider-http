@@ -60,6 +60,43 @@ func Test_isUpToDate(t *testing.T) {
 		args args
 		want want
 	}{
+		"ObjectIdKnownBeforeCreate": {
+			args: args{
+				http: &MockHttpClient{
+					MockSendRequest: func(ctx context.Context, method string, url string, body, headers httpClient.Data, skipTLSVerify bool) (resp httpClient.HttpDetails, err error) {
+						return httpClient.HttpDetails{
+							HttpResponse: httpClient.HttpResponse{
+								Body:       `{"username":"john_doe_new_username"}`,
+								StatusCode: 200,
+							},
+						}, nil
+					},
+				},
+				localKube: &test.MockClient{
+					MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
+				},
+				mg: httpRequest(func(r *v1alpha2.Request) {
+					r.Spec.ForProvider.Mappings = []v1alpha2.Mapping{
+						{
+							Method: "GET",
+							URL:    "(\"http://some.org/\" + \"1423\")",
+						},
+					}
+				}),
+			},
+			want: want{
+				err: nil,
+				result: ObserveRequestDetails{
+					Details: httpClient.HttpDetails{
+						HttpResponse: httpClient.HttpResponse{
+							Body:       `{"username":"john_doe_new_username"}`,
+							StatusCode: 200,
+						},
+					},
+					Synced: true,
+				},
+			},
+		},
 		"ObjectNotFoundEmptyStatus": {
 			args: args{
 				http: &MockHttpClient{
