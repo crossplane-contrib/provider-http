@@ -144,3 +144,26 @@ func IsJQQuery(query string) bool {
 	_, err := gojq.Parse(query)
 	return err == nil
 }
+
+// Exists checks if the given jq query returns a non-nil value from the object.
+// It returns true if the field exists, false otherwise.
+func Exists(jqQuery string, obj interface{}) (bool, error) {
+	query, err := gojq.Parse(jqQuery)
+	if err != nil {
+		return false, err
+	}
+
+	mutex.Lock()
+	iter := query.Run(obj)
+	result, ok := iter.Next()
+	mutex.Unlock()
+
+	if !ok || result == nil {
+		return false, nil
+	}
+
+	if errResult, isErr := result.(error); isErr {
+		return false, errResult
+	}
+	return true, nil
+}

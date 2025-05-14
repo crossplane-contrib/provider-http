@@ -447,7 +447,7 @@ func Test_generateRequestObject(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			got := GenerateRequestObject(tc.args.forProvider, tc.args.response)
+			got := GenerateRequestContext(tc.args.forProvider, tc.args.response)
 			if diff := cmp.Diff(tc.want.result, got); diff != "" {
 				t.Fatalf("generateRequestObject(...): -want result, +got result: %s", diff)
 			}
