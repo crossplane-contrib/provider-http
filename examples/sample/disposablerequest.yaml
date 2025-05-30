@@ -45,8 +45,10 @@ spec:
         keyMappings:
           - secretKey: notification-status
             responseJQ: .body.status
+            missingFieldStrategy: setEmpty
           - secretKey: notification-id
             responseJQ: .body.id
+            missingFieldStrategy: preserve
         # setOwnerReference determines if the secret should be deleted when the associated resource is deleted.
         setOwnerReference: true
  
