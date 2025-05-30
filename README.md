@@ -70,6 +70,13 @@ Run controller against the cluster:
 make run
 ```
 
+## Run tests
+
+```
+make test
+make e2e
+```
+
 ## Troubleshooting
 
 If you encounter any issues during installation or usage, refer to the [troubleshooting guide](https://docs.crossplane.io/knowledge-base/guides/troubleshoot/) for common problems and solutions.
