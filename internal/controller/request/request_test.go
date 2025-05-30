@@ -111,11 +111,13 @@ func Test_httpExternal_Create(t *testing.T) {
 		err error
 	}
 
-	cases := map[string]struct {
+	cases := []struct {
+		name string
 		args args
 		want want
 	}{
-		"NotRequestResource": {
+		{
+			name: "NotRequestResource",
 			args: args{
 				mg: notHttpRequest{},
 			},
@@ -123,7 +125,8 @@ func Test_httpExternal_Create(t *testing.T) {
 				err: errors.New(errNotRequest),
 			},
 		},
-		"RequestFailed": {
+		{
+			name: "RequestFailed",
 			args: args{
 				http: &MockHttpClient{
 					MockSendRequest: func(ctx context.Context, method string, url string, body httpClient.Data, headers httpClient.Data, skipTLSVerify bool) (resp httpClient.HttpDetails, err error) {
@@ -140,7 +143,8 @@ func Test_httpExternal_Create(t *testing.T) {
 				err: errors.Wrap(errBoom, errFailedToSendHttpRequest),
 			},
 		},
-		"Success": {
+		{
+			name: "Success",
 			args: args{
 				http: &MockHttpClient{
 					MockSendRequest: func(ctx context.Context, method string, url string, body httpClient.Data, headers httpClient.Data, skipTLSVerify bool) (resp httpClient.HttpDetails, err error) {
@@ -159,10 +163,10 @@ func Test_httpExternal_Create(t *testing.T) {
 			},
 		},
 	}
-	for name, tc := range cases {
+	for _, tc := range cases {
 		tc := tc // Create local copies of loop variables
 
-		t.Run(name, func(t *testing.T) {
+		t.Run(tc.name, func(t *testing.T) {
 			e := &external{
 				localKube: tc.args.localKube,
 				logger:    logging.NewNopLogger(),
@@ -186,11 +190,13 @@ func Test_httpExternal_Update(t *testing.T) {
 		err error
 	}
 
-	cases := map[string]struct {
+	cases := []struct {
+		name string
 		args args
 		want want
 	}{
-		"NotRequestResource": {
+		{
+			name: "NotRequestResource",
 			args: args{
 				mg: notHttpRequest{},
 			},
@@ -198,7 +204,8 @@ func Test_httpExternal_Update(t *testing.T) {
 				err: errors.New(errNotRequest),
 			},
 		},
-		"RequestFailed": {
+		{
+			name: "RequestFailed",
 			args: args{
 				http: &MockHttpClient{
 					MockSendRequest: func(ctx context.Context, method string, url string, body httpClient.Data, headers httpClient.Data, skipTLSVerify bool) (resp httpClient.HttpDetails, err error) {
@@ -215,7 +222,8 @@ func Test_httpExternal_Update(t *testing.T) {
 				err: errors.Wrap(errBoom, errFailedToSendHttpRequest),
 			},
 		},
-		"Success": {
+		{
+			name: "Success",
 			args: args{
 				http: &MockHttpClient{
 					MockSendRequest: func(ctx context.Context, method string, url string, body httpClient.Data, headers httpClient.Data, skipTLSVerify bool) (resp httpClient.HttpDetails, err error) {
@@ -234,10 +242,10 @@ func Test_httpExternal_Update(t *testing.T) {
 			},
 		},
 	}
-	for name, tc := range cases {
+	for _, tc := range cases {
 		tc := tc // Create local copies of loop variables
 
-		t.Run(name, func(t *testing.T) {
+		t.Run(tc.name, func(t *testing.T) {
 			e := &external{
 				localKube: tc.args.localKube,
 				logger:    logging.NewNopLogger(),
@@ -261,11 +269,13 @@ func Test_httpExternal_Delete(t *testing.T) {
 		err error
 	}
 
-	cases := map[string]struct {
+	cases := []struct {
+		name string
 		args args
 		want want
 	}{
-		"NotRequestResource": {
+		{
+			name: "NotRequestResource",
 			args: args{
 				mg: notHttpRequest{},
 			},
@@ -273,7 +283,8 @@ func Test_httpExternal_Delete(t *testing.T) {
 				err: errors.New(errNotRequest),
 			},
 		},
-		"RequestFailed": {
+		{
+			name: "RequestFailed",
 			args: args{
 				http: &MockHttpClient{
 					MockSendRequest: func(ctx context.Context, method string, url string, body httpClient.Data, headers httpClient.Data, skipTLSVerify bool) (resp httpClient.HttpDetails, err error) {
@@ -290,7 +301,8 @@ func Test_httpExternal_Delete(t *testing.T) {
 				err: errors.Wrap(errBoom, errFailedToSendHttpRequest),
 			},
 		},
-		"Success": {
+		{
+			name: "Success",
 			args: args{
 				http: &MockHttpClient{
 					MockSendRequest: func(ctx context.Context, method string, url string, body httpClient.Data, headers httpClient.Data, skipTLSVerify bool) (resp httpClient.HttpDetails, err error) {
@@ -309,10 +321,10 @@ func Test_httpExternal_Delete(t *testing.T) {
 			},
 		},
 	}
-	for name, tc := range cases {
+	for _, tc := range cases {
 		tc := tc // Create local copies of loop variables
 
-		t.Run(name, func(t *testing.T) {
+		t.Run(tc.name, func(t *testing.T) {
 			e := &external{
 				localKube: tc.args.localKube,
 				logger:    logging.NewNopLogger(),
