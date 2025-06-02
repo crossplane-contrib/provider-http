@@ -93,11 +93,13 @@ func Test_SetRequestStatus(t *testing.T) {
 		httpRequest   httpClient.HttpRequest
 		failuresIndex int32
 	}
-	cases := map[string]struct {
+	testCases := []struct {
+		name string
 		args args
 		want want
 	}{
-		"Success": {
+		{
+			name: "Success",
 			args: args{
 				cr: testCr,
 				localKube: &test.MockClient{
@@ -120,7 +122,8 @@ func Test_SetRequestStatus(t *testing.T) {
 				failuresIndex: 0,
 			},
 		},
-		"StatusCodeFailed": {
+		{
+			name: "StatusCodeFailed",
 			args: args{
 				cr: testCr,
 				localKube: &test.MockClient{
@@ -143,7 +146,8 @@ func Test_SetRequestStatus(t *testing.T) {
 				failuresIndex: 1,
 			},
 		},
-		"RequestFailed": {
+		{
+			name: "RequestFailed",
 			args: args{
 				cr: testCr,
 				localKube: &test.MockClient{
@@ -166,7 +170,8 @@ func Test_SetRequestStatus(t *testing.T) {
 				failuresIndex: 2, // Updated to match the actual value
 			},
 		},
-		"ResetFailures": {
+		{
+			name: "ResetFailures",
 			args: args{
 				cr: testCr,
 				localKube: &test.MockClient{
@@ -190,8 +195,8 @@ func Test_SetRequestStatus(t *testing.T) {
 			},
 		},
 	}
-	for name, tc := range cases {
-		t.Run(name, func(t *testing.T) {
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
 			r, _ := NewStatusHandler(context.Background(), tc.args.cr, tc.args.requestDetails, tc.args.err, tc.args.localKube, logging.NewNopLogger())
 			if tc.args.isSynced {
 				r.ResetFailures()
