@@ -32,6 +32,18 @@ type SecretInjectionConfig struct {
 	SetOwnerReference bool `json:"setOwnerReference,omitempty"`
 }
 
+// MissingFieldStrategy defines how to handle missing fields in the response
+type MissingFieldStrategy string
+
+const (
+	// PreserveMissingField keeps the existing value in the secret when the field is missing from the response
+	PreserveMissingField MissingFieldStrategy = "preserve"
+	// SetEmptyMissingField sets the value to the empty string when the field is missing from the response
+	SetEmptyMissingField MissingFieldStrategy = "setEmpty"
+	// DeleteMissingField removes the key from the secret when the field is missing from the response
+	DeleteMissingField MissingFieldStrategy = "delete"
+)
+
 // KeyInjection represents the configuration for injecting data into a specific key in a Kubernetes secret.
 type KeyInjection struct {
 	// SecretKey is the key within the Kubernetes secret where the data will be injected.
@@ -39,6 +51,15 @@ type KeyInjection struct {
 
 	// ResponseJQ is a jq filter expression representing the path in the response where the secret value will be extracted from.
 	ResponseJQ string `json:"responseJQ"`
+
+	// MissingFieldStrategy determines how to handle cases where the field is missing from the response.
+	// Possible values are:
+	// - "preserve": keeps the existing value in the secret
+	// - "setEmpty": sets the value to the empty string
+	// - "delete": removes the key from the s
+	// +kubebuilder:validation:Enum=preserve;setEmpty;delete
+	// +kubebuilder:default=delete
+	MissingFieldStrategy MissingFieldStrategy `json:"missingFieldStrategy,omitempty"`
 }
 
 // Metadata contains labels and annotations to apply to a Kubernetes secret.

@@ -106,8 +106,10 @@ spec:
         keyMappings:
           - secretKey: extracted-user-email
             responseJQ: .body.email
+            missingFieldStrategy: preserve
           - secretKey: extracted-header-data
             responseJQ: .headers."X-Secret-Header"[0]
+            missingFieldStrategy: setEmpty
         # setOwnerReference determines if the secret should be deleted when the associated resource is deleted.
         setOwnerReference: true
       
@@ -117,6 +119,7 @@ spec:
         keyMappings:
           - secretKey: extracted-user-password
             responseJQ: .body.password
+            missingFieldStrategy: delete
           - secretKey: extracted-user-age
             responseJQ: .body.age
 

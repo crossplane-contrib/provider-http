@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/crossplane-contrib/provider-http/apis/common"
+	"github.com/crossplane-contrib/provider-http/apis/request/v1alpha2"
 	httpClient "github.com/crossplane-contrib/provider-http/internal/clients/http"
 	kubehandler "github.com/crossplane-contrib/provider-http/internal/kube-handler"
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
@@ -18,6 +19,25 @@ const (
 	errPatchToReferencedSecret = "cannot patch to referenced secret"
 	errPatchDataToSecret       = "Warning, couldn't patch data from request to secret %s:%s, error: %s"
 )
+
+// PatchSecretsIntoResponse patches secrets into the provided response.
+func PatchSecretsIntoResponse(ctx context.Context, localKube client.Client, response v1alpha2.Response, logger logging.Logger) (v1alpha2.Response, error) {
+	patchedBody, err := PatchSecretsIntoString(ctx, localKube, response.Body, logger)
+	if err != nil {
+		return v1alpha2.Response{}, err
+	}
+
+	patchedHeaders, err := PatchSecretsIntoHeaders(ctx, localKube, response.Headers, logger)
+	if err != nil {
+		return v1alpha2.Response{}, err
+	}
+
+	return v1alpha2.Response{
+		StatusCode: response.StatusCode,
+		Body:       patchedBody,
+		Headers:    patchedHeaders,
+	}, nil
+}
 
 // PatchSecretsIntoString patches secrets into the provided string.
 func PatchSecretsIntoString(ctx context.Context, localKube client.Client, str string, logger logging.Logger) (string, error) {
@@ -76,13 +96,20 @@ func applySecretConfig(ctx context.Context, localKube client.Client, logger logg
 
 	if secretConfig.KeyMappings != nil {
 		for _, mapping := range secretConfig.KeyMappings {
-			err = updateSecretWithPatchedValue(ctx, localKube, logger, data, secret, mapping.SecretKey, mapping.ResponseJQ)
+			err = updateSecretWithPatchedValue(ctx, localKube, logger, data, secret, mapping)
 			if err != nil {
 				return errors.Wrap(err, errPatchToReferencedSecret)
 			}
 		}
 	} else {
-		err = updateSecretWithPatchedValue(ctx, localKube, logger, data, secret, secretConfig.SecretKey, secretConfig.ResponsePath)
+		// Handle deprecated secretConfig fields
+		mapping := common.KeyInjection{
+			SecretKey:            secretConfig.SecretKey,
+			ResponseJQ:           secretConfig.ResponsePath,
+			MissingFieldStrategy: common.DeleteMissingField,
+		}
+
+		err = updateSecretWithPatchedValue(ctx, localKube, logger, data, secret, mapping)
 		if err != nil {
 			return errors.Wrap(err, errPatchToReferencedSecret)
 		}

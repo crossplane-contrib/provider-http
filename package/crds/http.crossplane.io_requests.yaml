@@ -582,6 +582,19 @@ spec:
                               for injecting data into a specific key in a Kubernetes
                               secret.
                             properties:
+                              missingFieldStrategy:
+                                default: delete
+                                description: |-
+                                  MissingFieldStrategy determines how to handle cases where the field is missing from the response.
+                                  Possible values are:
+                                  - "preserve": keeps the existing value in the secret
+                                  - "setEmpty": sets the value to the empty string
+                                  - "delete": removes the key from the s
+                                enum:
+                                - preserve
+                                - setEmpty
+                                - delete
+                                type: string
                               responseJQ:
                                 description: ResponseJQ is a jq filter expression
                                   representing the path in the response where the
