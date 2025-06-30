@@ -16,11 +16,12 @@ type SetRequestStatusFunc func()
 
 // RequestResource is a struct that holds the resource, request context, http response, http request, and local client.
 type RequestResource struct {
-	Resource       client.Object
-	RequestContext context.Context
-	HttpResponse   httpClient.HttpResponse
-	HttpRequest    httpClient.HttpRequest
-	LocalClient    client.Client
+	Resource               client.Object
+	RequestContext         context.Context
+	AuthenticationResponse httpClient.HttpResponse
+	HttpResponse           httpClient.HttpResponse
+	HttpRequest            httpClient.HttpRequest
+	LocalClient            client.Client
 }
 
 func (rr *RequestResource) SetStatusCode() SetRequestStatusFunc {
@@ -48,6 +49,22 @@ func (rr *RequestResource) SetBody() SetRequestStatusFunc {
 		if resp, ok := rr.Resource.(ResponseSetter); ok {
 			if rr.HttpResponse.Body != "" {
 				resp.SetBody(rr.HttpResponse.Body)
+			}
+		}
+	}
+}
+
+func (rr *RequestResource) SetAuthenticationResponse() SetRequestStatusFunc {
+	return func() {
+		if resp, ok := rr.Resource.(AuthenticationResponseSetter); ok {
+			if rr.AuthenticationResponse.Body != "" {
+				resp.SetBody(rr.AuthenticationResponse.Body)
+			}
+			if len(rr.AuthenticationResponse.Headers) > 0 {
+				resp.SetHeaders(rr.AuthenticationResponse.Headers)
+			}
+			if rr.AuthenticationResponse.StatusCode != 0 {
+				resp.SetStatusCode(rr.AuthenticationResponse.StatusCode)
 			}
 		}
 	}
@@ -138,6 +155,12 @@ type LastReconcileTimeSetter interface {
 // RequestDetailsSetter is an interface that defines the method to set the request details of a resource.
 type RequestDetailsSetter interface {
 	SetRequestDetails(url, method, body string, headers map[string][]string)
+}
+
+type AuthenticationResponseSetter interface {
+	SetStatusCode(statusCode int)
+	SetHeaders(headers map[string][]string)
+	SetBody(body string)
 }
 
 // SetRequestResourceStatus sets the status of a resource.

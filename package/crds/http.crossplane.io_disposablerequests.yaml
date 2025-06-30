@@ -445,6 +445,59 @@ spec:
                 description: DisposableRequestParameters are the configurable fields
                   of a DisposableRequest.
                 properties:
+                  authenticationRequest:
+                    properties:
+                      body:
+                        type: string
+                        x-kubernetes-validations:
+                        - message: Field 'forProvider.body' is immutable
+                          rule: self == oldSelf
+                      expectedResponse:
+                        description: |-
+                          ExpectedResponse is a jq filter expression used to evaluate the HTTP response and determine if it matches the expected criteria.
+                          The expression should return a boolean; if true, the response is considered expected.
+                          Example: '.body.job_status == "success"'
+                        type: string
+                      headers:
+                        additionalProperties:
+                          items:
+                            type: string
+                          type: array
+                        type: object
+                        x-kubernetes-validations:
+                        - message: Field 'forProvider.headers' is immutable
+                          rule: self == oldSelf
+                      insecureSkipTLSVerify:
+                        description: InsecureSkipTLSVerify, when set to true, skips
+                          TLS certificate checks for the HTTP request
+                        type: boolean
+                      method:
+                        type: string
+                        x-kubernetes-validations:
+                        - message: Field 'forProvider.method' is immutable
+                          rule: self == oldSelf
+                      nextReconcile:
+                        description: NextReconcile specifies the duration after which
+                          the next reconcile should occur.
+                        type: string
+                      rollbackRetriesLimit:
+                        description: RollbackRetriesLimit is max number of attempts
+                          to retry HTTP request by sending again the request.
+                        format: int32
+                        type: integer
+                      url:
+                        type: string
+                        x-kubernetes-validations:
+                        - message: Field 'forProvider.url' is immutable
+                          rule: self == oldSelf
+                      waitTimeout:
+                        description: WaitTimeout specifies the maximum time duration
+                          for waiting.
+                        type: string
+                    required:
+                    - method
+                    - url
+                    type: object
                   body:
                     type: string
                     x-kubernetes-validations:
@@ -763,6 +816,37 @@ spec:
             description: A DisposableRequestStatus represents the observed state of
               a DisposableRequest.
             properties:
+              authenticationRequestDetails:
+                properties:
+                  body:
+                    type: string
+                  headers:
+                    additionalProperties:
+                      items:
+                        type: string
+                      type: array
+                    type: object
+                  method:
+                    type: string
+                  url:
+                    type: string
+                required:
+                - method
+                - url
+                type: object
+              authenticationResponse:
+                properties:
+                  body:
+                    type: string
+                  headers:
+                    additionalProperties:
+                      items:
+                        type: string
+                      type: array
+                    type: object
+                  statusCode:
+                    type: integer
+                type: object
               conditions:
                 description: Conditions of the resource.
                 items:

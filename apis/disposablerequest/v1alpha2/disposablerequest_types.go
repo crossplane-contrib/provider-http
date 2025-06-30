@@ -31,7 +31,8 @@ type DisposableRequestParameters struct {
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="Field 'forProvider.url' is immutable"
 	URL string `json:"url"`
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="Field 'forProvider.method' is immutable"
-	Method string `json:"method"`
+	Method                string                           `json:"method"`
+	AuthenticationRequest *AuthenticationRequestParameters `json:"authenticationRequest,omitempty"`
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="Field 'forProvider.headers' is immutable"
 	Headers map[string][]string `json:"headers,omitempty"`
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="Field 'forProvider.body' is immutable"
@@ -61,6 +62,29 @@ type DisposableRequestParameters struct {
 	SecretInjectionConfigs []common.SecretInjectionConfig `json:"secretInjectionConfigs,omitempty"`
 }
 
+type AuthenticationRequestParameters struct {
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="Field 'forProvider.url' is immutable"
+	URL string `json:"url"`
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="Field 'forProvider.method' is immutable"
+	Method string `json:"method"`
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="Field 'forProvider.headers' is immutable"
+	Headers map[string][]string `json:"headers,omitempty"`
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="Field 'forProvider.body' is immutable"
+	Body string `json:"body,omitempty"`
+	// WaitTimeout specifies the maximum time duration for waiting.
+	WaitTimeout *metav1.Duration `json:"waitTimeout,omitempty"`
+	// RollbackRetriesLimit is max number of attempts to retry HTTP request by sending again the request.
+	RollbackRetriesLimit *int32 `json:"rollbackRetriesLimit,omitempty"`
+	// InsecureSkipTLSVerify, when set to true, skips TLS certificate checks for the HTTP request
+	InsecureSkipTLSVerify bool `json:"insecureSkipTLSVerify,omitempty"`
+	// ExpectedResponse is a jq filter expression used to evaluate the HTTP response and determine if it matches the expected criteria.
+	// The expression should return a boolean; if true, the response is considered expected.
+	// Example: '.body.job_status == "success"'
+	ExpectedResponse string `json:"expectedResponse,omitempty"`
+	// NextReconcile specifies the duration after which the next reconcile should occur.
+	NextReconcile *metav1.Duration `json:"nextReconcile,omitempty"`
+}
+
 // A DisposableRequestSpec defines the desired state of a DisposableRequest.
 type DisposableRequestSpec struct {
 	xpv1.ResourceSpec `json:",inline"`
@@ -82,12 +106,14 @@ type Mapping struct {
 
 // A DisposableRequestStatus represents the observed state of a DisposableRequest.
 type DisposableRequestStatus struct {
-	xpv1.ResourceStatus `json:",inline"`
-	Response            Response `json:"response,omitempty"`
-	Failed              int32    `json:"failed,omitempty"`
-	Error               string   `json:"error,omitempty"`
-	Synced              bool     `json:"synced,omitempty"`
-	RequestDetails      Mapping  `json:"requestDetails,omitempty"`
+	xpv1.ResourceStatus          `json:",inline"`
+	Response                     Response `json:"response,omitempty"`
+	AuthenticationResponse       Response `json:"authenticationResponse,omitempty"`
+	Failed                       int32    `json:"failed,omitempty"`
+	Error                        string   `json:"error,omitempty"`
+	Synced                       bool     `json:"synced,omitempty"`
+	RequestDetails               Mapping  `json:"requestDetails,omitempty"`
+	AuthenticationRequestDetails Mapping  `json:"authenticationRequestDetails,omitempty"`
 
 	// LastReconcileTime records the last time the resource was reconciled.
 	LastReconcileTime metav1.Time `json:"lastReconcileTime,omitempty"`

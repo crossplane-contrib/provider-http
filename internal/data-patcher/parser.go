@@ -21,10 +21,12 @@ const (
 )
 
 const (
+	// example: '{{ secret-name:namespace:secret-key }}'
 	secretPattern = `\{\{\s*([^:{}\s]+):([^:{}\s]+):([^:{}\s]+)\s*\}\}`
 )
 
 var re = regexp.MustCompile(secretPattern)
+var jqRe = regexp.MustCompile(jqSecretPattern)
 
 // findPlaceholders finds all placeholders in the provided string.
 func findPlaceholders(value string) []string {

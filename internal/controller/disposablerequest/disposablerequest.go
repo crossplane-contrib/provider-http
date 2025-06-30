@@ -40,6 +40,7 @@ import (
 
 	"github.com/crossplane-contrib/provider-http/apis/disposablerequest/v1alpha2"
 	apisv1alpha1 "github.com/crossplane-contrib/provider-http/apis/v1alpha1"
+	"github.com/crossplane-contrib/provider-http/internal/clients/http"
 	httpClient "github.com/crossplane-contrib/provider-http/internal/clients/http"
 	"github.com/crossplane-contrib/provider-http/internal/utils"
 )
@@ -60,6 +61,7 @@ const (
 	errGetLatestVersion                  = "failed to get the latest version of the resource"
 	errResponseFormat                    = "Response does not match the expected format, retries limit "
 	errExtractCredentials                = "cannot extract credentials"
+	errAuthenticationRequestFailed       = "authentication request failed"
 )
 
 // Setup adds a controller that reconciles DisposableRequest managed resources.
@@ -182,8 +184,77 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	}, nil
 }
 
+func (c *external) performAuthRequest(ctx context.Context, cr *v1alpha2.DisposableRequest, resource *utils.RequestResource) (http.HttpResponse, error) {
+	authReq := cr.Spec.ForProvider.AuthenticationRequest
+
+	sensitiveAuthBody, err := datapatcher.PatchSecretsIntoString(ctx, c.localKube, authReq.Body, c.logger)
+	if err != nil {
+		return httpClient.HttpResponse{}, err
+	}
+
+	sensitiveAuthHeaders, err := datapatcher.PatchSecretsIntoHeaders(ctx, c.localKube, authReq.Headers, c.logger)
+	if err != nil {
+		return httpClient.HttpResponse{}, err
+	}
+
+	authBodyData := httpClient.Data{Encrypted: authReq.Body, Decrypted: sensitiveAuthBody}
+	authHeadersData := httpClient.Data{Encrypted: authReq.Headers, Decrypted: sensitiveAuthHeaders}
+	authResponse, err := c.http.SendRequest(ctx, authReq.Method, authReq.URL, authBodyData, authHeadersData, authReq.InsecureSkipTLSVerify)
+	// cover http client errors
+	if err != nil {
+		// Get the latest version of the resource before updating
+		if err := c.localKube.Get(ctx, types.NamespacedName{Name: cr.Name, Namespace: cr.Namespace}, cr); err != nil {
+			return http.HttpResponse{}, errors.Wrap(err, errGetLatestVersion)
+		}
+		// update resource with error that the authentication request failed
+		setErrFn := resource.SetError(errors.Wrap(err, errAuthenticationRequestFailed))
+		if settingError := utils.SetRequestResourceStatus(*resource, setErrFn, resource.SetLastReconcileTime()); settingError != nil {
+			return http.HttpResponse{}, errors.Wrap(settingError, utils.ErrFailedToSetStatus)
+		}
+	}
+	// cover non-success http responses
+	if utils.IsHTTPError(resource.HttpResponse.StatusCode) {
+		if settingError := utils.SetRequestResourceStatus(
+			*resource, resource.SetAuthenticationResponse(), resource.SetLastReconcileTime(), resource.SetError(errors.New(errAuthenticationRequestFailed))); settingError != nil {
+			return http.HttpResponse{}, errors.Wrap(settingError, utils.ErrFailedToSetStatus)
+		}
+
+		return http.HttpResponse{}, errors.Errorf(utils.ErrStatusCode, cr.Spec.ForProvider.AuthenticationRequest.Method, strconv.Itoa(resource.AuthenticationResponse.StatusCode))
+	}
+	// cover user-given expected response jq
+	isExpectedResponse, err := c.isResponseAsExpected(cr, authResponse.HttpResponse, cr.Spec.ForProvider.AuthenticationRequest.ExpectedResponse)
+	if err != nil {
+		return http.HttpResponse{}, errors.Wrap(err, "error while checking if authentication response is expected")
+	}
+	if !isExpectedResponse {
+		return authResponse.HttpResponse, errors.New("authentication response does not fulfill spec.forProvider.authenticationRequest.expectedResponse")
+	}
+
+	return authResponse.HttpResponse, nil
+}
+
 func (c *external) deployAction(ctx context.Context, cr *v1alpha2.DisposableRequest) error {
+	resource := &utils.RequestResource{
+		Resource:       cr,
+		RequestContext: ctx,
+		// HttpResponse:   details.HttpResponse,
+		LocalClient: c.localKube,
+		// HttpRequest:    details.HttpRequest,
+	}
+
+	if cr.Spec.ForProvider.AuthenticationRequest != nil {
+		authResponse, err := c.performAuthRequest(ctx, cr, resource)
+		if err != nil {
+			return err
+		}
+		resource.AuthenticationResponse = authResponse
+	}
+
 	sensitiveBody, err := datapatcher.PatchSecretsIntoString(ctx, c.localKube, cr.Spec.ForProvider.Body, c.logger)
+	if err != nil {
+		return err
+	}
+	sensitiveBody, err = datapatcher.PatchAuthIntoString(ctx, resource.AuthenticationResponse, sensitiveBody, c.logger)
 	if err != nil {
 		return err
 	}
@@ -192,19 +263,17 @@ func (c *external) deployAction(ctx context.Context, cr *v1alpha2.DisposableRequ
 	if err != nil {
 		return err
 	}
+	sensitiveHeaders, err = datapatcher.PatchAuthIntoHeaders(ctx, resource.AuthenticationResponse, sensitiveHeaders, c.logger)
+	if err != nil {
+		return err
+	}
 
 	bodyData := httpClient.Data{Encrypted: cr.Spec.ForProvider.Body, Decrypted: sensitiveBody}
 	headersData := httpClient.Data{Encrypted: cr.Spec.ForProvider.Headers, Decrypted: sensitiveHeaders}
 	details, err := c.http.SendRequest(ctx, cr.Spec.ForProvider.Method, cr.Spec.ForProvider.URL, bodyData, headersData, cr.Spec.ForProvider.InsecureSkipTLSVerify)
 
-	sensitiveResponse := details.HttpResponse
-	resource := &utils.RequestResource{
-		Resource:       cr,
-		RequestContext: ctx,
-		HttpResponse:   details.HttpResponse,
-		LocalClient:    c.localKube,
-		HttpRequest:    details.HttpRequest,
-	}
+	resource.HttpRequest = details.HttpRequest
+	resource.HttpResponse = details.HttpResponse
 
 	// Get the latest version of the resource before updating
 	if err := c.localKube.Get(ctx, types.NamespacedName{Name: cr.Name, Namespace: cr.Namespace}, cr); err != nil {
@@ -229,7 +298,7 @@ func (c *external) deployAction(ctx context.Context, cr *v1alpha2.DisposableRequ
 		return errors.Errorf(utils.ErrStatusCode, cr.Spec.ForProvider.Method, strconv.Itoa(resource.HttpResponse.StatusCode))
 	}
 
-	isExpectedResponse, err := c.isResponseAsExpected(cr, sensitiveResponse)
+	isExpectedResponse, err := c.isResponseAsExpected(cr, details.HttpResponse, cr.Spec.ForProvider.ExpectedResponse)
 	if err != nil {
 		return err
 	}
@@ -245,9 +314,9 @@ func (c *external) deployAction(ctx context.Context, cr *v1alpha2.DisposableRequ
 	return utils.SetRequestResourceStatus(*resource, resource.SetStatusCode(), resource.SetLastReconcileTime(), resource.SetHeaders(), resource.SetBody(), resource.SetSynced(), resource.SetRequestDetails())
 }
 
-func (c *external) isResponseAsExpected(cr *v1alpha2.DisposableRequest, res httpClient.HttpResponse) (bool, error) {
+func (c *external) isResponseAsExpected(cr *v1alpha2.DisposableRequest, res httpClient.HttpResponse, jqFilter string) (bool, error) {
 	// If no expected response is defined, consider it as expected.
-	if cr.Spec.ForProvider.ExpectedResponse == "" {
+	if jqFilter == "" {
 		return true, nil
 	}
 
@@ -262,7 +331,7 @@ func (c *external) isResponseAsExpected(cr *v1alpha2.DisposableRequest, res http
 
 	json_util.ConvertJSONStringsToMaps(&responseMap)
 
-	isExpected, err := jq.ParseBool(cr.Spec.ForProvider.ExpectedResponse, responseMap)
+	isExpected, err := jq.ParseBool(jqFilter, responseMap)
 	if err != nil {
 		return false, errors.Errorf(ErrExpectedFormat, err.Error())
 	}
