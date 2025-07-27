@@ -229,19 +229,35 @@ func isValidLabelValue(value string) bool {
 	if len(value) > 63 {
 		return false
 	}
-	// Check if value matches the Kubernetes label value pattern
+
+	return isValidLabelPattern(value)
+}
+
+// isValidLabelPattern validates that the value matches Kubernetes label value pattern
+func isValidLabelPattern(value string) bool {
 	for i, r := range value {
-		if i == 0 || i == len(value)-1 {
-			// First and last characters must be alphanumeric
-			if !((r >= 'A' && r <= 'Z') || (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9')) {
+		if isFirstOrLastChar(i, len(value)) {
+			if !isAlphanumeric(r) {
 				return false
 			}
-		} else {
-			// Middle characters can be alphanumeric, '-', '_', or '.'
-			if !((r >= 'A' && r <= 'Z') || (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '-' || r == '_' || r == '.') {
-				return false
-			}
+		} else if !isValidMiddleChar(r) {
+			return false
 		}
 	}
 	return true
+}
+
+// isFirstOrLastChar checks if the character position is first or last
+func isFirstOrLastChar(index, length int) bool {
+	return index == 0 || index == length-1
+}
+
+// isAlphanumeric checks if a rune is alphanumeric
+func isAlphanumeric(r rune) bool {
+	return (r >= 'A' && r <= 'Z') || (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9')
+}
+
+// isValidMiddleChar checks if a rune is valid for middle positions in a label value
+func isValidMiddleChar(r rune) bool {
+	return isAlphanumeric(r) || r == '-' || r == '_' || r == '.'
 }
