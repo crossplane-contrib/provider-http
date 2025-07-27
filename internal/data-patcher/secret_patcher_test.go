@@ -5,6 +5,7 @@ import (
 
 	"github.com/crossplane-contrib/provider-http/apis/common"
 	httpClient "github.com/crossplane-contrib/provider-http/internal/clients/http"
+	json_util "github.com/crossplane-contrib/provider-http/internal/json"
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
 	"github.com/google/go-cmp/cmp"
 	corev1 "k8s.io/api/core/v1"
@@ -130,6 +131,48 @@ func TestSyncMap(t *testing.T) {
 				changed: true,
 				expected: map[string]string{
 					"key1": "newValueFromDataMap",
+				},
+			},
+		},
+		"ShouldProcessJQQueryWithNumericValue": {
+			args: args{
+				existing: map[string]string{
+					"status": "unknown",
+				},
+				desired: map[string]string{
+					"status": ".body.status", // JQ query that returns a number
+				},
+				dataMap: map[string]interface{}{
+					"body": map[string]interface{}{
+						"status": float64(409), // Use float64 like JSON parsing would
+					},
+				},
+			},
+			want: want{
+				changed: true,
+				expected: map[string]string{
+					"status": "409", // Should be converted to string
+				},
+			},
+		},
+		"ShouldSkipInvalidLabelValues": {
+			args: args{
+				existing: map[string]string{},
+				desired: map[string]string{
+					"valid-key":   "valid-value",
+					"invalid-key": ".body.invalid", // JQ query that returns invalid label value
+				},
+				dataMap: map[string]interface{}{
+					"body": map[string]interface{}{
+						"invalid": "@invalid-label-value!",
+					},
+				},
+			},
+			want: want{
+				changed: true,
+				expected: map[string]string{
+					"valid-key": "valid-value",
+					// invalid-key should be skipped
 				},
 			},
 		},
@@ -443,6 +486,20 @@ func TestExtractValueToPatch(t *testing.T) {
 				err:    nil,
 			},
 		},
+		"ShouldExtractNestedNumericValueAsString": {
+			args: args{
+				dataMap: map[string]interface{}{
+					"body": map[string]interface{}{
+						"status": float64(409), // Use float64 instead of int
+					},
+				},
+				requestFieldPath: ".body.status",
+			},
+			want: want{
+				result: ptr.To("409"),
+				err:    nil,
+			},
+		},
 		"ShouldReturnEmptyStringIfFieldNotFound": {
 			args: args{
 				dataMap: map[string]interface{}{
@@ -533,5 +590,148 @@ func TestPrepareDataMap(t *testing.T) {
 				t.Errorf("prepareDataMap(...): expected err = %v, got %v", tc.want.err, err)
 			}
 		})
+	}
+}
+
+func TestIsValidLabelValue(t *testing.T) {
+	cases := map[string]struct {
+		value string
+		want  bool
+	}{
+		"EmptyString": {
+			value: "",
+			want:  true,
+		},
+		"ValidAlphanumeric": {
+			value: "409",
+			want:  true,
+		},
+		"ValidWithDash": {
+			value: "app-name",
+			want:  true,
+		},
+		"ValidWithUnderscore": {
+			value: "app_name",
+			want:  true,
+		},
+		"ValidWithDot": {
+			value: "app.name",
+			want:  true,
+		},
+		"ValidMixed": {
+			value: "app-1_test.2",
+			want:  true,
+		},
+		"InvalidStartsWithDash": {
+			value: "-invalid",
+			want:  false,
+		},
+		"InvalidEndsWithDash": {
+			value: "invalid-",
+			want:  false,
+		},
+		"InvalidSpecialChars": {
+			value: "app@name",
+			want:  false,
+		},
+		"InvalidTooLong": {
+			value: "this-is-a-very-long-label-value-that-exceeds-the-maximum-length-limit-of-63-characters-for-kubernetes-labels",
+			want:  false,
+		},
+		"ValidExactly63Chars": {
+			value: "this-is-exactly-63-characters-long-and-should-be-valid-12345",
+			want:  true,
+		},
+		"SingleChar": {
+			value: "a",
+			want:  true,
+		},
+		"SingleDigit": {
+			value: "1",
+			want:  true,
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			got := isValidLabelValue(tc.value)
+			if got != tc.want {
+				t.Errorf("isValidLabelValue(%q) = %v, want %v", tc.value, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestUpdateSecretLabelsAndAnnotationsEndToEnd(t *testing.T) {
+	// This test simulates the complete flow from HTTP response to secret metadata update
+	response := &httpClient.HttpResponse{
+		Body: `{"message": "created", "status": 201, "data": {"id": "test-123"}}`,
+		Headers: map[string][]string{
+			"Content-Type": {"application/json"},
+		},
+		StatusCode: 201,
+	}
+
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-secret",
+			Namespace: "default",
+		},
+		Data: map[string][]byte{},
+	}
+
+	labels := map[string]string{
+		"status-code": ".statusCode",   // Should get 201 from StatusCode (note: camelCase)
+		"app-status":  ".body.status",  // Should get 201 from body
+		"static-val":  "my-app",        // Static value
+		"msg-prefix":  ".body.message", // Should get "created"
+	}
+
+	annotations := map[string]string{
+		"response-id": ".body.data.id", // Should get "test-123"
+		"http-method": "POST",          // Static value for annotations
+	}
+
+	// Prepare data map like the real function does
+	dataMap, err := json_util.StructToMap(response)
+	if err != nil {
+		t.Fatalf("Failed to prepare data map: %v", err)
+	}
+	json_util.ConvertJSONStringsToMaps(&dataMap)
+
+	// Initialize secret maps
+	secret.Labels = make(map[string]string)
+	secret.Annotations = make(map[string]string)
+
+	// Test labels
+	labelsChanged := syncMap(logging.NewNopLogger(), &secret.Labels, labels, dataMap)
+	annotationsChanged := syncMap(logging.NewNopLogger(), &secret.Annotations, annotations, dataMap)
+
+	if !labelsChanged {
+		t.Error("Expected labels to be changed")
+	}
+	if !annotationsChanged {
+		t.Error("Expected annotations to be changed")
+	}
+
+	// Verify results
+	expectedLabels := map[string]string{
+		"status-code": "201",
+		"app-status":  "201",
+		"static-val":  "my-app",
+		"msg-prefix":  "created",
+	}
+
+	expectedAnnotations := map[string]string{
+		"response-id": "test-123",
+		"http-method": "POST",
+	}
+
+	if diff := cmp.Diff(expectedLabels, secret.Labels); diff != "" {
+		t.Errorf("Labels mismatch (-want +got):\n%s", diff)
+	}
+
+	if diff := cmp.Diff(expectedAnnotations, secret.Annotations); diff != "" {
+		t.Errorf("Annotations mismatch (-want +got):\n%s", diff)
 	}
 }
