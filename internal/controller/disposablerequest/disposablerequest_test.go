@@ -415,7 +415,7 @@ func Test_deployAction(t *testing.T) {
 			}
 
 			if gotErr != nil {
-				if diff := cmp.Diff(tc.args.cr.Status.Failed, tc.want.failuresIndex); diff != "" {
+				if diff := cmp.Diff(tc.want.failuresIndex, tc.args.cr.Status.Failed); diff != "" {
 					t.Fatalf("deployAction(...): -want Status.Failed, +got Status.Failed: %s", diff)
 				}
 			}

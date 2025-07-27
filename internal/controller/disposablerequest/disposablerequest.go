@@ -45,21 +45,23 @@ import (
 )
 
 const (
-	errNotDisposableRequest              = "managed resource is not a DisposableRequest custom resource"
-	errTrackPCUsage                      = "cannot track ProviderConfig usage"
-	errNewHttpClient                     = "cannot create new Http client"
-	errProviderNotRetrieved              = "provider could not be retrieved"
-	errFailedToSendHttpDisposableRequest = "failed to send http request"
-	errFailedUpdateStatusConditions      = "failed updating status conditions"
-	ErrExpectedFormat                    = "JQ filter should return a boolean, but returned error: %s"
-	errPatchFromReferencedSecret         = "cannot patch from referenced secret"
-	errGetReferencedSecret               = "cannot get referenced secret"
-	errCreateReferencedSecret            = "cannot create referenced secret"
-	errPatchDataToSecret                 = "Warning, couldn't patch data from request to secret %s:%s:%s, error: %s"
-	errConvertResToMap                   = "failed to convert response to map"
-	errGetLatestVersion                  = "failed to get the latest version of the resource"
-	errResponseFormat                    = "Response does not match the expected format, retries limit "
-	errExtractCredentials                = "cannot extract credentials"
+	errNotDisposableRequest                = "managed resource is not a DisposableRequest custom resource"
+	errTrackPCUsage                        = "cannot track ProviderConfig usage"
+	errNewHttpClient                       = "cannot create new Http client"
+	errProviderNotRetrieved                = "provider could not be retrieved"
+	errFailedToSendHttpDisposableRequest   = "failed to send http request"
+	errFailedUpdateStatusConditions        = "failed updating status conditions"
+	ErrExpectedFormat                      = "JQ filter should return a boolean, but returned error: %s"
+	errPatchFromReferencedSecret           = "cannot patch from referenced secret"
+	errGetReferencedSecret                 = "cannot get referenced secret"
+	errCreateReferencedSecret              = "cannot create referenced secret"
+	errPatchDataToSecret                   = "Warning, couldn't patch data from request to secret %s:%s:%s, error: %s"
+	errConvertResToMap                     = "failed to convert response to map"
+	errGetLatestVersion                    = "failed to get the latest version of the resource"
+	errResponseFormat                      = "Response does not match the expected format, retries limit "
+	errExtractCredentials                  = "cannot extract credentials"
+	errCheckExpectedResponse               = "failed to check if response is as expected"
+	errResponseDoesntMatchExpectedCriteria = "response does not match expected criteria"
 )
 
 // Setup adds a controller that reconciles DisposableRequest managed resources.
@@ -144,11 +146,15 @@ type external struct {
 	http      httpClient.Client
 }
 
+// Observe checks the state of the DisposableRequest resource and updates its status accordingly.
 func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
 	cr, ok := mg.(*v1alpha2.DisposableRequest)
 	if !ok {
 		return managed.ExternalObservation{}, errors.New(errNotDisposableRequest)
 	}
+
+	isUpToDate := !(utils.ShouldRetry(cr.Spec.ForProvider.RollbackRetriesLimit, cr.Status.Failed) && !utils.RetriesLimitReached(cr.Status.Failed, cr.Spec.ForProvider.RollbackRetriesLimit))
+	isAvailable := isUpToDate
 
 	if !cr.Status.Synced {
 		return managed.ExternalObservation{
@@ -156,17 +162,27 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		}, nil
 	}
 
-	// Get the latest version of the resource before updating
-	if err := c.localKube.Get(ctx, types.NamespacedName{Name: cr.Name, Namespace: cr.Namespace}, cr); err != nil {
-		return managed.ExternalObservation{}, errors.Wrap(err, errGetLatestVersion)
+	sensitiveBody, err := datapatcher.PatchSecretsIntoString(ctx, c.localKube, cr.Status.Response.Body, c.logger)
+	if err != nil {
+		return managed.ExternalObservation{}, errors.Wrap(err, errPatchFromReferencedSecret)
 	}
 
-	cr.Status.SetConditions(xpv1.Available())
-	if err := c.localKube.Status().Update(ctx, cr); err != nil {
-		return managed.ExternalObservation{}, errors.New(errFailedUpdateStatusConditions)
+	storedResponse := httpClient.HttpResponse{
+		StatusCode: cr.Status.Response.StatusCode,
+		Headers:    cr.Status.Response.Headers,
+		Body:       sensitiveBody,
 	}
 
-	isUpToDate := !(utils.ShouldRetry(cr.Spec.ForProvider.RollbackRetriesLimit, cr.Status.Failed) && !utils.RetriesLimitReached(cr.Status.Failed, cr.Spec.ForProvider.RollbackRetriesLimit))
+	isExpected, err := c.isResponseAsExpected(cr, storedResponse)
+	if err != nil {
+		isAvailable = false
+		c.logger.Debug("Setting error condition due to validation error", "error", err)
+		return managed.ExternalObservation{}, errors.Wrap(err, errCheckExpectedResponse)
+	} else if !isExpected {
+		isAvailable = false
+		c.logger.Debug("Response does not match expected criteria")
+		return managed.ExternalObservation{}, errors.New(errResponseDoesntMatchExpectedCriteria)
+	}
 
 	// If shouldLoopInfinitely is true, the resource should never be considered up-to-date
 	if cr.Spec.ForProvider.ShouldLoopInfinitely {
@@ -175,14 +191,37 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		}
 	}
 
+	if isAvailable {
+		if err := c.localKube.Get(ctx, types.NamespacedName{Name: cr.Name, Namespace: cr.Namespace}, cr); err != nil {
+			return managed.ExternalObservation{}, errors.Wrap(err, errGetLatestVersion)
+		}
+
+		cr.Status.SetConditions(xpv1.Available())
+		if err := c.localKube.Status().Update(ctx, cr); err != nil {
+			return managed.ExternalObservation{}, errors.New(errFailedUpdateStatusConditions)
+		}
+	}
+
 	return managed.ExternalObservation{
-		ResourceExists:    true,
+		ResourceExists:    isAvailable,
 		ResourceUpToDate:  isUpToDate,
 		ConnectionDetails: nil,
 	}, nil
 }
 
+// deployAction sends the HTTP request defined in the DisposableRequest resource and updates its status based on the response.
 func (c *external) deployAction(ctx context.Context, cr *v1alpha2.DisposableRequest) error {
+	if cr.Status.Synced {
+		c.logger.Debug("Resource is already synced, skipping deployment action")
+		return nil
+	}
+
+	// Check if retries limit has been reached
+	if utils.RollBackEnabled(cr.Spec.ForProvider.RollbackRetriesLimit) && utils.RetriesLimitReached(cr.Status.Failed, cr.Spec.ForProvider.RollbackRetriesLimit) {
+		c.logger.Debug("Retries limit reached, not retrying anymore")
+		return nil
+	}
+
 	sensitiveBody, err := datapatcher.PatchSecretsIntoString(ctx, c.localKube, cr.Spec.ForProvider.Body, c.logger)
 	if err != nil {
 		return err
@@ -196,6 +235,9 @@ func (c *external) deployAction(ctx context.Context, cr *v1alpha2.DisposableRequ
 	bodyData := httpClient.Data{Encrypted: cr.Spec.ForProvider.Body, Decrypted: sensitiveBody}
 	headersData := httpClient.Data{Encrypted: cr.Spec.ForProvider.Headers, Decrypted: sensitiveHeaders}
 	details, err := c.http.SendRequest(ctx, cr.Spec.ForProvider.Method, cr.Spec.ForProvider.URL, bodyData, headersData, cr.Spec.ForProvider.InsecureSkipTLSVerify)
+
+	// Store the HTTP request error before any other operations that might overwrite err
+	httpRequestErr := err
 
 	sensitiveResponse := details.HttpResponse
 	resource := &utils.RequestResource{
@@ -211,13 +253,13 @@ func (c *external) deployAction(ctx context.Context, cr *v1alpha2.DisposableRequ
 		return errors.Wrap(err, errGetLatestVersion)
 	}
 
-	if err != nil {
-		setErr := resource.SetError(err)
+	if httpRequestErr != nil {
+		setErr := resource.SetError(httpRequestErr)
 		datapatcher.ApplyResponseDataToSecrets(ctx, c.localKube, c.logger, &resource.HttpResponse, cr.Spec.ForProvider.SecretInjectionConfigs, cr)
 		if settingError := utils.SetRequestResourceStatus(*resource, setErr, resource.SetLastReconcileTime(), resource.SetRequestDetails()); settingError != nil {
 			return errors.Wrap(settingError, utils.ErrFailedToSetStatus)
 		}
-		return err
+		return httpRequestErr
 	}
 
 	if utils.IsHTTPError(resource.HttpResponse.StatusCode) {
@@ -251,7 +293,7 @@ func (c *external) isResponseAsExpected(cr *v1alpha2.DisposableRequest, res http
 		return true, nil
 	}
 
-	if cr.Status.Response.StatusCode == 0 {
+	if res.StatusCode == 0 {
 		return false, nil
 	}
 

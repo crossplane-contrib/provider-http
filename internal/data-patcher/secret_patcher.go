@@ -184,12 +184,24 @@ func syncMap(logger logging.Logger, existing *map[string]string, desired map[str
 
 	// Add or update keys
 	for key, value := range desired {
+		originalValue := value
 		if jq.IsJQQuery(value) {
+			logger.Debug(fmt.Sprintf("Processing JQ expression for key %s: %s", key, value))
 			newValue := extractValueToPatch(logger, dataMap, value)
 			if newValue != nil {
 				value = *newValue
+				logger.Debug(fmt.Sprintf("JQ expression evaluated to: %s", value))
+			} else {
+				logger.Debug(fmt.Sprintf("JQ expression returned nil, keeping original value: %s", originalValue))
 			}
 		}
+
+		// Validate that the value is suitable for Kubernetes labels
+		if !isValidLabelValue(value) {
+			logger.Info(fmt.Sprintf("Invalid label value for key %s: %s (original: %s). Skipping.", key, value, originalValue))
+			continue
+		}
+
 		if (*existing)[key] != value {
 			(*existing)[key] = value
 			changed = true
@@ -205,4 +217,31 @@ func syncMap(logger logging.Logger, existing *map[string]string, desired map[str
 	}
 
 	return changed
+}
+
+// isValidLabelValue checks if a value is valid for use as a Kubernetes label value.
+// According to Kubernetes specs, label values must be empty or consist of alphanumeric characters,
+// '-', '_' or '.', and must start and end with an alphanumeric character (regex: (([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?)
+func isValidLabelValue(value string) bool {
+	if value == "" {
+		return true
+	}
+	if len(value) > 63 {
+		return false
+	}
+	// Check if value matches the Kubernetes label value pattern
+	for i, r := range value {
+		if i == 0 || i == len(value)-1 {
+			// First and last characters must be alphanumeric
+			if !((r >= 'A' && r <= 'Z') || (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9')) {
+				return false
+			}
+		} else {
+			// Middle characters can be alphanumeric, '-', '_', or '.'
+			if !((r >= 'A' && r <= 'Z') || (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '-' || r == '_' || r == '.') {
+				return false
+			}
+		}
+	}
+	return true
 }

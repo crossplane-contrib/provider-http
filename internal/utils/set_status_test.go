@@ -210,6 +210,7 @@ func Test_DisposableRequest_SetRequestResourceStatus(t *testing.T) {
 	type want struct {
 		err      error
 		failures int32
+		synced   bool
 	}
 	cases := map[string]struct {
 		args args
@@ -228,6 +229,7 @@ func Test_DisposableRequest_SetRequestResourceStatus(t *testing.T) {
 			want: want{
 				failures: 0,
 				err:      nil,
+				synced:   true,
 			},
 		},
 		"SetError": {
@@ -243,6 +245,7 @@ func Test_DisposableRequest_SetRequestResourceStatus(t *testing.T) {
 			want: want{
 				failures: int32(1),
 				err:      nil,
+				synced:   false,
 			},
 		},
 	}
@@ -265,7 +268,7 @@ func Test_DisposableRequest_SetRequestResourceStatus(t *testing.T) {
 				t.Fatalf("SetRequestResourceStatus(...): -want response status code, +got response status code: %s", diff)
 			}
 
-			if diff := cmp.Diff(true, testDisposableCr.Status.Synced); diff != "" {
+			if diff := cmp.Diff(tc.want.synced, testDisposableCr.Status.Synced); diff != "" {
 				t.Fatalf("SetRequestResourceStatus(...): -want synced, +got synced: %s", diff)
 			}
 
