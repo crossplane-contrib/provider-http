@@ -30,7 +30,7 @@ func (d *DisposableRequest) SetLastReconcileTime() {
 
 func (d *DisposableRequest) SetError(err error) {
 	d.Status.Failed++
-	d.Status.Synced = true
+	d.Status.Synced = false
 	if err != nil {
 		d.Status.Error = err.Error()
 	}
