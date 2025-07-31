@@ -28,16 +28,17 @@ NPROCS ?= 1
 # parallel can lead to high CPU utilization. by default we reduce the parallelism
 # to half the number of CPU cores.
 GO_TEST_PARALLEL := $(shell echo $$(( $(NPROCS) / 2 )))
-
 GO_STATIC_PACKAGES = $(GO_PROJECT)/cmd/provider
+GO_LDFLAGS += -X $(GO_PROJECT)/internal/version.Version=$(VERSION)
 GO_SUBDIRS += cmd internal apis
 GO111MODULE = on
-GOLANGCILINT_VERSION = 1.55.2
+GOLANGCILINT_VERSION = 2.1.2
 -include build/makelib/golang.mk
 
 # ====================================================================================
 # Setup Kubernetes tools
 KIND_VERSION = v0.23.0
+KIND_NODE_IMAGE_TAG=v1.30.0
 UP_VERSION = v0.28.0
 UPTEST_VERSION = v0.11.1
 UP_CHANNEL = stable
@@ -65,7 +66,7 @@ IMAGES = provider-http
 fallthrough: submodules
 	@echo Initial setup complete. Running make again . . .
 	@make
-
+	
 # ====================================================================================
 # Setup XPKG
 XPKG_REG_ORGS ?= xpkg.upbound.io/crossplane-contrib
@@ -112,10 +113,10 @@ submodules:
 	@git submodule sync
 	@git submodule update --init --recursive
 
-# NOTE(hasheddan): we must ensure up is installed in tool cache prior to build
-# as including the k8s_tools machinery prior to the xpkg machinery sets UP to
+# NOTE: we must ensure up is installed in tool cache prior to build
+# as including the k8s_tools machinery prior to the xpkg machinery sets UP and CROSSPLANE_CLI to
 # point to tool cache.
-build.init: $(UP)
+build.init: $(UP) $(CROSSPLANE_CLI)
 
 # This is for running out-of-cluster locally, and is for convenience. Running
 # this make target will print out the command which was used. For more control,

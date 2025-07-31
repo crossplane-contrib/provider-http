@@ -1,3 +1,4 @@
 [submodule "build"]
 	path = build
-	url = https://github.com/crossplane/build
+	url = https://github.com/riccap/build
+	branch = 33-fix-xpkg-parameters
