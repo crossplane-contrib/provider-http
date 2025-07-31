@@ -399,7 +399,11 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 	return managed.ExternalUpdate{}, errors.Wrap(c.deployAction(ctx, cr), errFailedToSendHttpDisposableRequest)
 }
 
-func (c *external) Delete(_ context.Context, _ resource.Managed) error {
+func (c *external) Delete(_ context.Context, _ resource.Managed) (managed.ExternalDelete, error) {
+	return managed.ExternalDelete{}, nil
+}
+
+func (c *external) Disconnect(ctx context.Context) error {
 	return nil
 }
 
