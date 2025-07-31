@@ -66,7 +66,7 @@ IMAGES = provider-http
 fallthrough: submodules
 	@echo Initial setup complete. Running make again . . .
 	@make
-	
+
 # ====================================================================================
 # Setup XPKG
 XPKG_REG_ORGS ?= xpkg.upbound.io/crossplane-contrib
