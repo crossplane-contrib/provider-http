@@ -162,7 +162,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		}, nil
 	}
 
-	isExpected, err := c.validateStoredResponse(ctx, cr)
+	isExpected, storedResponse, err := c.validateStoredResponse(ctx, cr)
 	if err != nil {
 		return managed.ExternalObservation{}, err
 	}
@@ -178,6 +178,10 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		}
 	}
 
+	if len(cr.Spec.ForProvider.SecretInjectionConfigs) > 0 && cr.Status.Response.StatusCode != 0 {
+		c.applySecretInjectionsFromStoredResponse(ctx, cr, storedResponse)
+	}
+
 	return managed.ExternalObservation{
 		ResourceExists:    isAvailable,
 		ResourceUpToDate:  isUpToDate,
@@ -186,10 +190,10 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 }
 
 // validateStoredResponse validates the stored response against expected criteria
-func (c *external) validateStoredResponse(ctx context.Context, cr *v1alpha2.DisposableRequest) (bool, error) {
+func (c *external) validateStoredResponse(ctx context.Context, cr *v1alpha2.DisposableRequest) (bool, httpClient.HttpResponse, error) {
 	sensitiveBody, err := datapatcher.PatchSecretsIntoString(ctx, c.localKube, cr.Status.Response.Body, c.logger)
 	if err != nil {
-		return false, errors.Wrap(err, errPatchFromReferencedSecret)
+		return false, httpClient.HttpResponse{}, errors.Wrap(err, errPatchFromReferencedSecret)
 	}
 
 	storedResponse := httpClient.HttpResponse{
@@ -201,14 +205,14 @@ func (c *external) validateStoredResponse(ctx context.Context, cr *v1alpha2.Disp
 	isExpected, err := c.isResponseAsExpected(cr, storedResponse)
 	if err != nil {
 		c.logger.Debug("Setting error condition due to validation error", "error", err)
-		return false, errors.Wrap(err, errCheckExpectedResponse)
+		return false, httpClient.HttpResponse{}, errors.Wrap(err, errCheckExpectedResponse)
 	}
 	if !isExpected {
 		c.logger.Debug("Response does not match expected criteria")
-		return false, nil
+		return false, httpClient.HttpResponse{}, nil
 	}
 
-	return true, nil
+	return true, storedResponse, nil
 }
 
 // calculateUpToDateStatus determines if the resource should be considered up-to-date
@@ -261,6 +265,13 @@ func (c *external) deployAction(ctx context.Context, cr *v1alpha2.DisposableRequ
 	}
 
 	return c.handleHttpResponse(ctx, cr, details.HttpResponse, resource)
+}
+
+// applySecretInjectionsFromStoredResponse applies secret injection configurations using the stored response
+// This is used when the resource is already synced but secret injection configs may have been updated
+func (c *external) applySecretInjectionsFromStoredResponse(ctx context.Context, cr *v1alpha2.DisposableRequest, storedResponse httpClient.HttpResponse) {
+	c.logger.Debug("Applying secret injections from stored response")
+	datapatcher.ApplyResponseDataToSecrets(ctx, c.localKube, c.logger, &storedResponse, cr.Spec.ForProvider.SecretInjectionConfigs, cr)
 }
 
 // sendHttpRequest sends the HTTP request with sensitive data patched
