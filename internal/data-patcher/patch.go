@@ -76,13 +76,13 @@ func copyHeaders(headers map[string][]string) map[string][]string {
 }
 
 // patchResponseDataToSecret patches response data into a Kubernetes secret.
-func patchResponseDataToSecret(ctx context.Context, localKube client.Client, logger logging.Logger, data *httpClient.HttpResponse, owner metav1.Object, secretConfig common.SecretInjectionConfig) error {
+func patchResponseDataToSecret(ctx context.Context, localKube client.Client, logger logging.Logger, data, originalData *httpClient.HttpResponse, owner metav1.Object, secretConfig common.SecretInjectionConfig) error {
 	secret, err := kubehandler.GetOrCreateSecret(ctx, localKube, secretConfig.SecretRef.Name, secretConfig.SecretRef.Namespace, owner)
 	if err != nil {
 		return err
 	}
 
-	err = applySecretConfig(ctx, localKube, logger, data, secretConfig, secret)
+	err = applySecretConfig(ctx, localKube, logger, data, originalData, secretConfig, secret)
 	if err != nil {
 		return err
 	}
@@ -91,12 +91,12 @@ func patchResponseDataToSecret(ctx context.Context, localKube client.Client, log
 }
 
 // applySecretConfig applies the secret configuration to the secret.
-func applySecretConfig(ctx context.Context, localKube client.Client, logger logging.Logger, data *httpClient.HttpResponse, secretConfig common.SecretInjectionConfig, secret *v1.Secret) error {
+func applySecretConfig(ctx context.Context, localKube client.Client, logger logging.Logger, data *httpClient.HttpResponse, originalData *httpClient.HttpResponse, secretConfig common.SecretInjectionConfig, secret *v1.Secret) error {
 	var err error
 
 	if secretConfig.KeyMappings != nil {
 		for _, mapping := range secretConfig.KeyMappings {
-			err = updateSecretWithPatchedValue(ctx, localKube, logger, data, secret, mapping)
+			err = updateSecretWithPatchedValue(ctx, localKube, logger, data, originalData, secret, mapping)
 			if err != nil {
 				return errors.Wrap(err, errPatchToReferencedSecret)
 			}
@@ -109,7 +109,7 @@ func applySecretConfig(ctx context.Context, localKube client.Client, logger logg
 			MissingFieldStrategy: common.DeleteMissingField,
 		}
 
-		err = updateSecretWithPatchedValue(ctx, localKube, logger, data, secret, mapping)
+		err = updateSecretWithPatchedValue(ctx, localKube, logger, data, originalData, secret, mapping)
 		if err != nil {
 			return errors.Wrap(err, errPatchToReferencedSecret)
 		}
@@ -127,6 +127,14 @@ func applySecretConfig(ctx context.Context, localKube client.Client, logger logg
 // For each SecretInjectionConfig, it extracts a value from the HTTP response and patches it into the referenced Secret.
 // Ownership of the Secret is optionally set based on the configuration.
 func ApplyResponseDataToSecrets(ctx context.Context, localKube client.Client, logger logging.Logger, response *httpClient.HttpResponse, secretConfigs []common.SecretInjectionConfig, cr metav1.Object) {
+	// Create a copy of the original response to use for data extraction (JQ queries)
+	// This ensures that each secret injection config extracts from the original response data
+	originalResponse := &httpClient.HttpResponse{
+		Body:       response.Body,
+		Headers:    copyHeaders(response.Headers),
+		StatusCode: response.StatusCode,
+	}
+
 	for _, ref := range secretConfigs {
 		var owner metav1.Object = nil
 
@@ -134,7 +142,9 @@ func ApplyResponseDataToSecrets(ctx context.Context, localKube client.Client, lo
 			owner = cr
 		}
 
-		err := patchResponseDataToSecret(ctx, localKube, logger, response, owner, ref)
+		// Use the cumulative response for patching (gets updated with secret placeholders)
+		// and originalResponse for data extraction (remains unchanged)
+		err := patchResponseDataToSecret(ctx, localKube, logger, response, originalResponse, owner, ref)
 		if err != nil {
 			logger.Info(fmt.Sprintf(errPatchDataToSecret, ref.SecretRef.Name, ref.SecretRef.Namespace, err.Error()))
 		}
