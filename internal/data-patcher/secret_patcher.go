@@ -57,9 +57,9 @@ func updateSecretLabelsAndAnnotations(ctx context.Context, kubeClient client.Cli
 // updateSecretWithPatchedValue extracts a specified value from an HTTP response,
 // transforms it if necessary, and patches it into a Kubernetes Secret. Additionally,
 // it replaces the sensitive value in the HTTP response body and headers with a placeholder.
-func updateSecretWithPatchedValue(ctx context.Context, kubeClient client.Client, logger logging.Logger, data *httpClient.HttpResponse, secret *corev1.Secret, mapping common.KeyInjection) error {
+func updateSecretWithPatchedValue(ctx context.Context, kubeClient client.Client, logger logging.Logger, data, originalData *httpClient.HttpResponse, secret *corev1.Secret, mapping common.KeyInjection) error {
 	// Step 1: Parse and prepare data
-	dataMap, err := prepareDataMap(data)
+	dataMap, err := prepareDataMap(originalData)
 	if err != nil {
 		return err
 	}
