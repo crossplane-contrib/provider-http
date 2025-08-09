@@ -2,6 +2,7 @@ package datapatcher
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -89,6 +90,7 @@ func prepareDataMap(data *httpClient.HttpResponse) (map[string]interface{}, erro
 
 // extractValueToPatch extracts a value from a data map based on the given field path.
 // If the field is a boolean or number, it converts it to a string.
+// If the field is a map[string]interface{}, it converts it to a JSON string.
 // If the field is not found or cannot be parsed, it returns nil.
 func extractValueToPatch(logger logging.Logger, dataMap map[string]interface{}, requestFieldPath string) *string {
 	// Check if the field exists
@@ -124,7 +126,20 @@ func extractValueToPatch(logger logging.Logger, dataMap map[string]interface{}, 
 		logger.Debug(fmt.Sprintf("Failed to parse the field %s as a number: %s", requestFieldPath, err))
 	}
 
-	logger.Info(fmt.Sprintf("Failed to parse the field %s as a string, boolean, or number, treating it as missing field.", requestFieldPath))
+	// Attempt to parse the field as a map[string]interface{} and convert to JSON string
+	if mapResult, err := jq.ParseMapInterface(requestFieldPath, dataMap); err == nil {
+		jsonBytes, err := json.Marshal(mapResult)
+		if err != nil {
+			logger.Debug(fmt.Sprintf("Failed to convert map to JSON for field %s: %s", requestFieldPath, err))
+		} else {
+			jsonStr := string(jsonBytes)
+			return &jsonStr
+		}
+	} else {
+		logger.Debug(fmt.Sprintf("Failed to parse the field %s as a map: %s", requestFieldPath, err))
+	}
+
+	logger.Info(fmt.Sprintf("Failed to parse the field %s as a string, boolean, number, or map, treating it as missing field.", requestFieldPath))
 	return nil
 }
 
@@ -152,22 +167,36 @@ func updateSecretData(secret *corev1.Secret, secretKey string, valueToPatch *str
 }
 
 // replaceSensitiveValues replaces occurrences of sensitive values in the HTTP response body
-// and headers with a placeholder, iff the value is a json string surrounded by double quotes.
+// and headers with a placeholder. Handles both simple values (quoted strings) and JSON objects.
 func replaceSensitiveValues(data *httpClient.HttpResponse, secret *corev1.Secret, secretKey string, valueToPatch *string) {
 	if valueToPatch == nil || *valueToPatch == "" {
 		return
 	}
 
 	placeholder := fmt.Sprintf("{{%s:%s:%s}}", secret.Name, secret.Namespace, secretKey)
-	quotedValue := fmt.Sprintf("\"%s\"", *valueToPatch)
-	quotedPlaceholder := fmt.Sprintf("\"%s\"", placeholder)
-	data.Body = strings.ReplaceAll(data.Body, quotedValue, quotedPlaceholder)
 
+	// For JSON objects, replace the entire JSON object in the response
+	if isJSONObject(*valueToPatch) {
+		data.Body = strings.ReplaceAll(data.Body, *valueToPatch, fmt.Sprintf("\"%s\"", placeholder))
+	} else {
+		// For simple values, use the existing logic with quoted replacement
+		quotedValue := fmt.Sprintf("\"%s\"", *valueToPatch)
+		quotedPlaceholder := fmt.Sprintf("\"%s\"", placeholder)
+		data.Body = strings.ReplaceAll(data.Body, quotedValue, quotedPlaceholder)
+	}
+
+	// Replace in headers (use placeholder without quotes for headers)
 	for _, headersList := range data.Headers {
 		for i, header := range headersList {
 			headersList[i] = strings.ReplaceAll(header, *valueToPatch, placeholder)
 		}
 	}
+}
+
+// isJSONObject checks if a string is a valid JSON object (starts with '{' and ends with '}')
+func isJSONObject(s string) bool {
+	s = strings.TrimSpace(s)
+	return len(s) >= 2 && s[0] == '{' && s[len(s)-1] == '}'
 }
 
 // isSecretDataUpToDate checks if the specified key in the Secret already contains the given value.

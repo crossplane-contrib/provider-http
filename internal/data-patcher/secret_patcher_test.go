@@ -306,6 +306,56 @@ func TestReplaceSensitiveValues(t *testing.T) {
 				},
 			},
 		},
+		"ShouldReplaceJSONObjectInBody": {
+			args: args{
+				data: &httpClient.HttpResponse{
+					Body: `{"credentials": {"client_id":"test_client","client_secret":"test_secret"}, "other": "data"}`,
+					Headers: map[string][]string{
+						"Content-Type": {"application/json"},
+					},
+				},
+				secret: &corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "my-secret",
+						Namespace: "default",
+					},
+				},
+				secretKey:    "creds",
+				valueToPatch: ptr.To(`{"client_id":"test_client","client_secret":"test_secret"}`),
+			},
+			want: want{
+				body: `{"credentials": "{{my-secret:default:creds}}", "other": "data"}`,
+				headers: map[string][]string{
+					"Content-Type": {"application/json"},
+				},
+			},
+		},
+		"ShouldReplaceJSONObjectInHeaders": {
+			args: args{
+				data: &httpClient.HttpResponse{
+					Body: "Normal body content",
+					Headers: map[string][]string{
+						"X-Auth-Data":  {`{"token":"abc123","expires":3600}`},
+						"Content-Type": {"application/json"},
+					},
+				},
+				secret: &corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "auth-secret",
+						Namespace: "kube-system",
+					},
+				},
+				secretKey:    "auth",
+				valueToPatch: ptr.To(`{"token":"abc123","expires":3600}`),
+			},
+			want: want{
+				body: "Normal body content",
+				headers: map[string][]string{
+					"X-Auth-Data":  {"{{auth-secret:kube-system:auth}}"},
+					"Content-Type": {"application/json"},
+				},
+			},
+		},
 	}
 
 	for name, tc := range cases {
@@ -318,6 +368,34 @@ func TestReplaceSensitiveValues(t *testing.T) {
 
 			if diff := cmp.Diff(tc.want.headers, tc.args.data.Headers); diff != "" {
 				t.Errorf("Headers mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestIsJSONObject(t *testing.T) {
+	cases := map[string]struct {
+		input    string
+		expected bool
+	}{
+		"ValidJSONObject":           {`{"key":"value"}`, true},
+		"ValidJSONObjectWithSpaces": {`  {"key":"value"}  `, true},
+		"EmptyJSONObject":           {`{}`, true},
+		"ComplexJSONObject":         {`{"client_id":"test","client_secret":"secret"}`, true},
+		"JSONArray":                 {`["a","b","c"]`, false},
+		"SimpleString":              {`"just a string"`, false},
+		"PlainText":                 {`plain text`, false},
+		"EmptyString":               {``, false},
+		"OnlyOpeningBrace":          {`{`, false},
+		"OnlyClosingBrace":          {`}`, false},
+		"MismatchedBraces":          {`{"key":"value"]`, false},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			result := isJSONObject(tc.input)
+			if result != tc.expected {
+				t.Errorf("isJSONObject(%q) = %v, want %v", tc.input, result, tc.expected)
 			}
 		})
 	}
@@ -521,6 +599,40 @@ func TestExtractValueToPatch(t *testing.T) {
 			},
 			want: want{
 				result: nil,
+				err:    nil,
+			},
+		},
+		"ShouldExtractMapAsJSONString": {
+			args: args{
+				dataMap: map[string]interface{}{
+					"credentials": map[string]interface{}{
+						"client_id":     "test_client",
+						"client_secret": "test_secret",
+					},
+				},
+				requestFieldPath: ".credentials",
+			},
+			want: want{
+				result: ptr.To(`{"client_id":"test_client","client_secret":"test_secret"}`),
+				err:    nil,
+			},
+		},
+		"ShouldExtractNestedMapAsJSONString": {
+			args: args{
+				dataMap: map[string]interface{}{
+					"response": map[string]interface{}{
+						"body": map[string]interface{}{
+							"auth": map[string]interface{}{
+								"token":   "abc123",
+								"expires": 3600,
+							},
+						},
+					},
+				},
+				requestFieldPath: ".response.body.auth",
+			},
+			want: want{
+				result: ptr.To(`{"expires":3600,"token":"abc123"}`),
 				err:    nil,
 			},
 		},
