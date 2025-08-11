@@ -10,8 +10,8 @@ on:
 
 env:
   # Common versions
-  GO_VERSION: '1.22.3'
-  GOLANGCI_VERSION: 'v1.55.2'
+  GO_VERSION: '1.24.6'
+  GOLANGCI_VERSION: 'v1.64.8'
   DOCKER_BUILDX_VERSION: 'v0.8.2'
 
 jobs:
@@ -52,6 +52,7 @@ jobs:
         uses: golangci/golangci-lint-action@971e284b6050e8a5849b72094c50ab08da042db8 # v6.1.1
         with:
           version: ${{ env.GOLANGCI_VERSION }}
+          args: --timeout=5m
 
   check-diff:
     runs-on: ubuntu-latest
