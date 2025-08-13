@@ -220,7 +220,7 @@ func Test_CustomIsRemovedCheck(t *testing.T) {
 				responseErr: nil,
 			},
 			want: want{
-				err: errors.Errorf(errExpectedFormat, "isRemovedCheck", "failed to parse string: map[expectedResponseCheck:map[] isRemovedCheck:map[] mappings:<nil> payload:map[body:map[password:password]] response:map[body:map[password:wrong_password]]]"),
+				err: errors.Errorf(errExpectedFormat, "isRemovedCheck", "failed to parse given mapping -  jq error: missing query (try \".\")"),
 			},
 		},
 	}
