@@ -179,7 +179,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	}
 
 	if len(cr.Spec.ForProvider.SecretInjectionConfigs) > 0 && cr.Status.Response.StatusCode != 0 {
-		c.applySecretInjectionsFromStoredResponse(ctx, cr, storedResponse)
+		c.applySecretInjectionsFromStoredResponse(ctx, cr, storedResponse, isExpected)
 	}
 
 	return managed.ExternalObservation{
@@ -269,9 +269,14 @@ func (c *external) deployAction(ctx context.Context, cr *v1alpha2.DisposableRequ
 
 // applySecretInjectionsFromStoredResponse applies secret injection configurations using the stored response
 // This is used when the resource is already synced but secret injection configs may have been updated
-func (c *external) applySecretInjectionsFromStoredResponse(ctx context.Context, cr *v1alpha2.DisposableRequest, storedResponse httpClient.HttpResponse) {
-	c.logger.Debug("Applying secret injections from stored response")
-	datapatcher.ApplyResponseDataToSecrets(ctx, c.localKube, c.logger, &storedResponse, cr.Spec.ForProvider.SecretInjectionConfigs, cr)
+func (c *external) applySecretInjectionsFromStoredResponse(ctx context.Context, cr *v1alpha2.DisposableRequest, storedResponse httpClient.HttpResponse, isExpectedResponse bool) {
+	if isExpectedResponse {
+		c.logger.Debug("Applying secret injections from stored response")
+		datapatcher.ApplyResponseDataToSecrets(ctx, c.localKube, c.logger, &storedResponse, cr.Spec.ForProvider.SecretInjectionConfigs, cr)
+		return
+	}
+
+	c.logger.Debug("Skipping secret injections as response does not match expected criteria")
 }
 
 // sendHttpRequest sends the HTTP request with sensitive data patched
@@ -325,7 +330,7 @@ func (c *external) handleHttpResponse(ctx context.Context, cr *v1alpha2.Disposab
 // handleHttpRequestError handles cases where the HTTP request itself failed
 func (c *external) handleHttpRequestError(ctx context.Context, cr *v1alpha2.DisposableRequest, resource *utils.RequestResource, httpRequestErr error) error {
 	setErr := resource.SetError(httpRequestErr)
-	datapatcher.ApplyResponseDataToSecrets(ctx, c.localKube, c.logger, &resource.HttpResponse, cr.Spec.ForProvider.SecretInjectionConfigs, cr)
+	c.applySecretInjectionsFromStoredResponse(ctx, cr, resource.HttpResponse, false)
 	if settingError := utils.SetRequestResourceStatus(*resource, setErr, resource.SetLastReconcileTime(), resource.SetRequestDetails()); settingError != nil {
 		return errors.Wrap(settingError, utils.ErrFailedToSetStatus)
 	}
@@ -334,7 +339,7 @@ func (c *external) handleHttpRequestError(ctx context.Context, cr *v1alpha2.Disp
 
 // handleHttpErrorStatus handles HTTP error status codes
 func (c *external) handleHttpErrorStatus(ctx context.Context, cr *v1alpha2.DisposableRequest, resource *utils.RequestResource) error {
-	datapatcher.ApplyResponseDataToSecrets(ctx, c.localKube, c.logger, &resource.HttpResponse, cr.Spec.ForProvider.SecretInjectionConfigs, cr)
+	c.applySecretInjectionsFromStoredResponse(ctx, cr, resource.HttpResponse, false)
 	if settingError := utils.SetRequestResourceStatus(*resource, resource.SetStatusCode(), resource.SetLastReconcileTime(), resource.SetHeaders(), resource.SetBody(), resource.SetRequestDetails(), resource.SetError(nil)); settingError != nil {
 		return errors.Wrap(settingError, utils.ErrFailedToSetStatus)
 	}
@@ -350,7 +355,7 @@ func (c *external) handleResponseValidation(ctx context.Context, cr *v1alpha2.Di
 	}
 
 	if isExpectedResponse {
-		datapatcher.ApplyResponseDataToSecrets(ctx, c.localKube, c.logger, &resource.HttpResponse, cr.Spec.ForProvider.SecretInjectionConfigs, cr)
+		c.applySecretInjectionsFromStoredResponse(ctx, cr, resource.HttpResponse, true)
 		return utils.SetRequestResourceStatus(*resource, resource.SetStatusCode(), resource.SetLastReconcileTime(), resource.SetHeaders(), resource.SetBody(), resource.SetSynced(), resource.SetRequestDetails())
 	}
 
