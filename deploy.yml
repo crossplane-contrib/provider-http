@@ -4,7 +4,7 @@ kind: Provider
 metadata:
   name: http-provider
 spec:
-  package: xpkg.upbound.io/crossplane-contrib/provider-http:v1.0.10
+  package: xpkg.upbound.io/crossplane-contrib/provider-http:v1.0.11
   controllerConfigRef:
     name: debug-config
 
