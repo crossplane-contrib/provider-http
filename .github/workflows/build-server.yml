@@ -80,6 +80,7 @@ jobs:
           file: ./cluster/test/Dockerfile
           platforms: ${{ env.BUILD_PLATFORMS }}
           push: ${{ env.SHOULD_PUSH }}
+          load: ${{ env.SHOULD_PUSH == 'false' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
