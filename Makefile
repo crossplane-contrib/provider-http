@@ -96,7 +96,7 @@ UPTEST_EXAMPLE_LIST := $(shell find ./examples/sample -path '*.yaml' | paste -s 
 
 uptest: $(UPTEST) $(KUBECTL) $(KUTTL)
 	@$(INFO) running automated tests
-	@KUBECTL=$(KUBECTL) KUTTL=$(KUTTL) CROSSPLANE_NAMESPACE=$(CROSSPLANE_NAMESPACE) $(UPTEST) e2e "$(UPTEST_EXAMPLE_LIST)" --setup-script=cluster/test/setup.sh || $(FAIL)
+	@KUBECTL=$(KUBECTL) KUTTL=$(KUTTL) CROSSPLANE_NAMESPACE=$(CROSSPLANE_NAMESPACE) TEST_SERVER_IMAGE=$(TEST_SERVER_IMAGE) $(UPTEST) e2e "$(UPTEST_EXAMPLE_LIST)" --setup-script=cluster/test/setup.sh || $(FAIL)
 	@$(OK) running automated tests
 
 local-dev: controlplane.up
@@ -108,11 +108,43 @@ local-deploy: build controlplane.up local.xpkg.deploy.provider.$(PROJECT_NAME)
 
 e2e: local-deploy uptest
 
+# Prepare for local E2E testing by building test server if needed
+e2e.prepare:
+	@$(INFO) preparing for e2e tests
+	@echo "Current TEST_SERVER_IMAGE: $(TEST_SERVER_IMAGE)"
+	@if ! docker image inspect $(TEST_SERVER_IMAGE) >/dev/null 2>&1; then \
+		echo "Test server image not found locally. You have two options:"; \
+		echo "1. Build local test server: make test-server.build"; \
+		echo "2. Pull official image: docker pull ghcr.io/crossplane-contrib/provider-http-server:latest"; \
+		echo "3. Use crossplane-contrib image: export TEST_SERVER_IMAGE=ghcr.io/crossplane-contrib/provider-http-server:latest"; \
+		echo ""; \
+		echo "Attempting to pull crossplane-contrib image..."; \
+		docker pull ghcr.io/crossplane-contrib/provider-http-server:latest || echo "Failed to pull, you may need to build locally"; \
+	else \
+		echo "✅ Test server image $(TEST_SERVER_IMAGE) is available"; \
+	fi
+	@$(OK) preparing for e2e tests
+
+# Enhanced e2e target that prepares the environment
+e2e.local: e2e.prepare local-deploy uptest
+
 # ====================================================================================
 # Local Test Server Development
 
 # Test server configuration
-TEST_SERVER_IMAGE = ghcr.io/$(shell git remote get-url origin | sed 's/.*github.com[:/]\([^/]*\).*/\1/')/provider-http-server:latest
+# This logic determines which test server image to use:
+# 1. If TEST_SERVER_IMAGE is set as env var, use it (from CI)
+# 2. If running locally, try to use a locally built image first
+# 3. Fall back to crossplane-contrib official image
+TEST_SERVER_IMAGE ?= $(shell \
+	OWNER=$$(git remote get-url origin 2>/dev/null | sed 's/.*github.com[:/]\([^/]*\).*/\1/' 2>/dev/null || echo "crossplane-contrib"); \
+	LOCAL_IMAGE="ghcr.io/$$OWNER/provider-http-server:latest"; \
+	if docker image inspect $$LOCAL_IMAGE >/dev/null 2>&1; then \
+		echo $$LOCAL_IMAGE; \
+	else \
+		echo "ghcr.io/crossplane-contrib/provider-http-server:latest"; \
+	fi \
+)
 TEST_SERVER_CONTAINER = provider-http-test-server
 TEST_SERVER_PORT = 5001
 
@@ -170,8 +202,14 @@ test-server.help:
 	@echo "  test-server.clean    - Stop container and remove image"
 	@echo "  test-server.help     - Show this help"
 	@echo ""
+	@echo "E2E Testing Targets:"
+	@echo "  e2e                  - Run E2E tests (original target)"
+	@echo "  e2e.prepare          - Check/prepare test server image for E2E"
+	@echo "  e2e.local            - Prepare environment and run E2E tests"
+	@echo ""
 	@echo "Server runs on: http://localhost:$(TEST_SERVER_PORT)"
 	@echo "Authorization: Bearer my-secret-value"
+	@echo "Current TEST_SERVER_IMAGE: $(TEST_SERVER_IMAGE)"
 
 # Update the submodules, such as the common build scripts.
 submodules:

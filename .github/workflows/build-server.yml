@@ -9,111 +9,134 @@ on:
     branches: [ main ]
     paths:
       - 'cluster/test/**'
+  workflow_call:
+    outputs:
+      image-name:
+        description: "The built test server image name"
+        value: ${{ jobs.build-and-push.outputs.image-name }}
+      image-version:
+        description: "The built test server image version"
+        value: ${{ jobs.build-and-push.outputs.image-version }}
+      image-available:
+        description: "Whether the image is available"
+        value: ${{ jobs.build-and-push.outputs.image-available }}
 
 env:
   REGISTRY: ghcr.io
   # For PRs from forks, use the PR author's registry to avoid permission issues
   # For pushes to main branch, use the repository owner's registry
   IMAGE_NAME: ${{ github.event_name == 'pull_request' && github.actor || github.repository_owner }}/provider-http-server
+  # Set platform strategy based on context
+  BUILD_PLATFORMS: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository && 'linux/amd64' || 'linux/amd64,linux/arm64' }}
+  # Only push for main branch pushes and PRs from the same repository
+  SHOULD_PUSH: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
 
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+    outputs:
+      image-name: ${{ steps.image-info.outputs.image-name }}
+      image-version: ${{ steps.meta.outputs.version }}
+      image-available: ${{ steps.image-info.outputs.available }}
     permissions:
       contents: read
       packages: write
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-    - name: Log in to Container Registry
-      uses: docker/login-action@v3
-      with:
-        registry: ${{ env.REGISTRY }}
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Extract metadata
-      id: meta
-      uses: docker/metadata-action@v5
-      with:
-        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-        tags: |
-          type=ref,event=branch
-          type=ref,event=pr
-          type=sha,prefix=sha-
-          type=raw,value=latest,enable={{is_default_branch}}
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix=sha-
+            type=raw,value=latest,enable={{is_default_branch}}
 
-    - name: Build and push Docker image
-      uses: docker/build-push-action@v5
-      with:
-        context: ./cluster/test
-        # For PRs from forks: single platform + load for testing
-        # For pushes: multi-platform + push  
-        platforms: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository && 'linux/amd64' || 'linux/amd64,linux/arm64' }}
-        push: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
-        load: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
-        tags: ${{ steps.meta.outputs.tags }}
-        labels: ${{ steps.meta.outputs.labels }}
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
+      - name: Set image info
+        id: image-info
+        run: |
+          echo "image-name=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}" >> $GITHUB_OUTPUT
+          echo "available=true" >> $GITHUB_OUTPUT
 
-    - name: Test the server (local build)
-      if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository
-      run: |
-        echo "🔨 Container built successfully!"
-        echo "🧪 Testing server functionality..."
-        
-        # Run the container for testing (use first tag from metadata)
-        FIRST_TAG=$(echo '${{ steps.meta.outputs.tags }}' | head -n 1)
-        docker run -d --name test-server -p 5000:5000 $FIRST_TAG
-        
-        # Wait for server to start
-        sleep 10
-        
-        # Test the endpoints
-        echo "Testing login endpoint..."
-        curl -f -H "Authorization: Bearer my-secret-value" -X POST http://localhost:5000/v1/login
-        
-        echo "Testing notify endpoint..."
-        curl -f -H "Authorization: Bearer my-secret-value" -X POST http://localhost:5000/v1/notify
-        
-        echo "Testing user creation..."
-        curl -f -H "Authorization: Bearer my-secret-value" -H "Content-Type: application/json" -X POST -d '{"name":"test"}' http://localhost:5000/v1/users
-        
-        echo "✅ All tests passed!"
-        
-        # Clean up
-        docker stop test-server
-        docker rm test-server
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./cluster/test
+          file: ./cluster/test/Dockerfile
+          platforms: ${{ env.BUILD_PLATFORMS }}
+          push: ${{ env.SHOULD_PUSH }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
-    - name: Test the server (pushed image)
-      if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-      run: |
-        # Wait for container to be available
-        sleep 5
-        
-        # Run the container for testing
-        FIRST_TAG=$(echo '${{ steps.meta.outputs.tags }}' | head -n 1)
-        docker run -d --name test-server -p 5000:5000 $FIRST_TAG
-        
-        # Wait for server to start
-        sleep 10
-        
-        # Test the endpoints
-        echo "Testing login endpoint..."
-        curl -f -H "Authorization: Bearer my-secret-value" -X POST http://localhost:5000/v1/login
-        
-        echo "Testing notify endpoint..."
-        curl -f -H "Authorization: Bearer my-secret-value" -X POST http://localhost:5000/v1/notify
-        
-        echo "Testing user creation..."
-        curl -f -H "Authorization: Bearer my-secret-value" -H "Content-Type: application/json" -X POST -d '{"name":"test"}' http://localhost:5000/v1/users
-        
-        # Clean up
-        docker stop test-server
-        docker rm test-server
+      - name: Test the server (local build)
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository
+        run: |
+          echo "🔨 Container built successfully!"
+          echo "🧪 Testing server functionality..."
+          
+          # Run the container for testing (use first tag from metadata)
+          FIRST_TAG=$(echo '${{ steps.meta.outputs.tags }}' | head -n 1)
+          docker run -d --name test-server -p 5000:5000 $FIRST_TAG
+          
+          # Wait for server to start
+          sleep 10
+          
+          # Test the endpoints
+          echo "Testing login endpoint..."
+          curl -f -H "Authorization: Bearer my-secret-value" -X POST http://localhost:5000/v1/login
+          
+          echo "Testing notify endpoint..."
+          curl -f -H "Authorization: Bearer my-secret-value" -X POST http://localhost:5000/v1/notify
+          
+          echo "Testing user creation..."
+          curl -f -H "Authorization: Bearer my-secret-value" -H "Content-Type: application/json" -X POST -d '{"name":"test"}' http://localhost:5000/v1/users
+          
+          echo "✅ All tests passed!"
+          
+          # Clean up
+          docker stop test-server
+          docker rm test-server
+
+      - name: Test the server (pushed image)
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        run: |
+          # Wait for container to be available
+          sleep 5
+          
+          # Run the container for testing
+          FIRST_TAG=$(echo '${{ steps.meta.outputs.tags }}' | head -n 1)
+          docker run -d --name test-server -p 5000:5000 $FIRST_TAG
+          
+          # Wait for server to start
+          sleep 10
+          
+          # Test the endpoints
+          echo "Testing login endpoint..."
+          curl -f -H "Authorization: Bearer my-secret-value" -X POST http://localhost:5000/v1/login
+          
+          echo "Testing notify endpoint..."
+          curl -f -H "Authorization: Bearer my-secret-value" -X POST http://localhost:5000/v1/notify
+          
+          echo "Testing user creation..."
+          curl -f -H "Authorization: Bearer my-secret-value" -H "Content-Type: application/json" -X POST -d '{"name":"test"}' http://localhost:5000/v1/users
+          
+          # Clean up
+          docker stop test-server
+          docker rm test-server
