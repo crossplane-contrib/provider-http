@@ -107,6 +107,72 @@ local-deploy: build controlplane.up local.xpkg.deploy.provider.$(PROJECT_NAME)
 	@$(OK) running locally built provider
 
 e2e: local-deploy uptest
+
+# ====================================================================================
+# Local Test Server Development
+
+# Test server configuration
+TEST_SERVER_IMAGE = ghcr.io/crossplane-contrib/provider-http-server:latest
+TEST_SERVER_CONTAINER = provider-http-test-server
+TEST_SERVER_PORT = 5001
+
+.PHONY: test-server.build test-server.start test-server.stop test-server.restart test-server.logs test-server.status test-server.clean
+
+test-server.build:
+	@$(INFO) building test server image
+	@cd cluster/test && docker build -t $(TEST_SERVER_IMAGE) .
+	@$(OK) building test server image
+
+test-server.start: test-server.build
+	@$(INFO) starting test server container
+	@docker run -d --name $(TEST_SERVER_CONTAINER) -p $(TEST_SERVER_PORT):5000 $(TEST_SERVER_IMAGE) || \
+		(echo "Container may already exist. Use 'make test-server.restart' to restart it." && exit 1)
+	@echo "Test server starting at http://localhost:$(TEST_SERVER_PORT)"
+	@echo "Waiting for server to be ready..."
+	@sleep 3
+	@curl -f -H "Authorization: Bearer my-secret-value" -X POST http://localhost:$(TEST_SERVER_PORT)/v1/login > /dev/null && \
+		echo "✅ Test server is ready!" || echo "❌ Test server may not be ready yet"
+	@$(OK) starting test server container
+
+test-server.stop:
+	@$(INFO) stopping test server container
+	@docker stop $(TEST_SERVER_CONTAINER) 2>/dev/null || echo "Container not running"
+	@docker rm $(TEST_SERVER_CONTAINER) 2>/dev/null || echo "Container not found"
+	@$(OK) stopping test server container
+
+test-server.restart: test-server.stop test-server.start
+
+test-server.logs:
+	@echo "=== Test Server Logs ==="
+	@docker logs $(TEST_SERVER_CONTAINER) 2>/dev/null || echo "Container not found or not running"
+
+test-server.status:
+	@echo "=== Test Server Status ==="
+	@docker ps -f name=$(TEST_SERVER_CONTAINER) --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" || echo "Container not found"
+	@echo ""
+	@echo "Testing server health..."
+	@curl -f -H "Authorization: Bearer my-secret-value" -X POST http://localhost:$(TEST_SERVER_PORT)/v1/login 2>/dev/null && \
+		echo "✅ Server is healthy" || echo "❌ Server is not responding"
+
+test-server.clean: test-server.stop
+	@$(INFO) cleaning test server image
+	@docker rmi $(TEST_SERVER_IMAGE) 2>/dev/null || echo "Image not found"
+	@$(OK) cleaning test server image
+
+test-server.help:
+	@echo "Test Server Development Targets:"
+	@echo "  test-server.build    - Build the test server Docker image"
+	@echo "  test-server.start    - Start the test server container"
+	@echo "  test-server.stop     - Stop and remove the test server container"
+	@echo "  test-server.restart  - Restart the test server (stop + start)"
+	@echo "  test-server.logs     - Show test server logs"
+	@echo "  test-server.status   - Show container status and health"
+	@echo "  test-server.clean    - Stop container and remove image"
+	@echo "  test-server.help     - Show this help"
+	@echo ""
+	@echo "Server runs on: http://localhost:$(TEST_SERVER_PORT)"
+	@echo "Authorization: Bearer my-secret-value"
+
 # Update the submodules, such as the common build scripts.
 submodules:
 	@git submodule sync

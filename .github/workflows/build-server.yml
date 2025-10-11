@@ -1,0 +1,83 @@
+name: Build and Push Test Server
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'cluster/test/**'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'cluster/test/**'
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: crossplane-contrib/provider-http-server
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Log in to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=sha,prefix=sha-
+          type=raw,value=latest,enable={{is_default_branch}}
+
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: ./cluster/test
+        platforms: linux/amd64,linux/arm64
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+    - name: Test the server
+      run: |
+        # Wait for container to be available
+        sleep 5
+        
+        # Run the container for testing
+        docker run -d --name test-server -p 5000:5000 ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+        
+        # Wait for server to start
+        sleep 10
+        
+        # Test the endpoints
+        echo "Testing login endpoint..."
+        curl -f -H "Authorization: Bearer my-secret-value" http://localhost:5000/v1/login
+        
+        echo "Testing notify endpoint..."
+        curl -f -H "Authorization: Bearer my-secret-value" -X POST http://localhost:5000/v1/notify
+        
+        echo "Testing user creation..."
+        curl -f -H "Authorization: Bearer my-secret-value" -H "Content-Type: application/json" -X POST -d '{"name":"test"}' http://localhost:5000/v1/users
+        
+        # Clean up
+        docker stop test-server
+        docker rm test-server
