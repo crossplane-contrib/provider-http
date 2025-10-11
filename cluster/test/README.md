@@ -61,4 +61,8 @@ docker run -p 5000:5000 test-server
 
 The server is automatically built and deployed to GitHub Container Registry when changes are pushed to the `cluster/test/` directory.
 
-Image: `ghcr.io/crossplane-contrib/provider-http-server:latest`
+**Images:**
+- Main repo: `ghcr.io/crossplane-contrib/provider-http-server:latest`
+- Forks: `ghcr.io/{your-username}/provider-http-server:latest`
+
+The CI/CD pipeline automatically uses the correct registry based on the repository owner.
