@@ -112,7 +112,7 @@ e2e: local-deploy uptest
 # Local Test Server Development
 
 # Test server configuration
-TEST_SERVER_IMAGE = ghcr.io/crossplane-contrib/provider-http-server:latest
+TEST_SERVER_IMAGE = ghcr.io/$(shell git remote get-url origin | sed 's/.*github.com[:/]\([^/]*\).*/\1/')/provider-http-server:latest
 TEST_SERVER_CONTAINER = provider-http-test-server
 TEST_SERVER_PORT = 5001
 

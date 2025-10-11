@@ -12,7 +12,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: crossplane-contrib/provider-http-server
+  IMAGE_NAME: ${{ github.repository_owner }}/provider-http-server
 
 jobs:
   build-and-push:

@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
 set -aeuo pipefail
 
+# Default to crossplane-contrib, but allow override via environment variable
+TEST_SERVER_IMAGE=${TEST_SERVER_IMAGE:-"ghcr.io/crossplane-contrib/provider-http-server:latest"}
+
 echo "Running setup.sh"
+echo "Using test server image: ${TEST_SERVER_IMAGE}"
 echo "Creating the provider config with cluster admin permissions in cluster..."
 SA=$(${KUBECTL} -n crossplane-system get sa -o name | grep provider-http | sed -e 's|serviceaccount\/|crossplane-system:|g')
 ${KUBECTL} create clusterrolebinding provider-http-admin-binding --clusterrole cluster-admin --serviceaccount="${SA}" --dry-run=client -o yaml | ${KUBECTL} apply -f -
@@ -36,7 +40,7 @@ spec:
     spec:
       containers:
       - name: server
-        image: ghcr.io/crossplane-contrib/provider-http-server:latest
+        image: ${TEST_SERVER_IMAGE}
         ports:
         - containerPort: 5000
 ---

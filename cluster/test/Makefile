@@ -1,6 +1,6 @@
 # Variables
 BINARY_NAME=server
-DOCKER_IMAGE=ghcr.io/crossplane-contrib/provider-http-server
+DOCKER_IMAGE=ghcr.io/$(shell git remote get-url origin | sed 's/.*github.com[:/]\([^/]*\).*/\1/')/provider-http-server
 VERSION?=latest
 PLATFORMS=linux/amd64,linux/arm64
 
