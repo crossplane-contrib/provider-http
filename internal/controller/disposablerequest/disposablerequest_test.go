@@ -287,13 +287,10 @@ func Test_deployAction(t *testing.T) {
 		failuresIndex int32
 		statusCode    int
 	}
-	type shouldCheckStatus struct {
-		condition bool
-	}
 	cases := map[string]struct {
-		args args
-		want want
-		shouldCheckStatus
+		args      args
+		want      want
+		condition bool
 	}{
 		"SuccessUpdateStatusRequestFailure": {
 			args: args{
@@ -357,9 +354,7 @@ func Test_deployAction(t *testing.T) {
 				failuresIndex: 1,
 				statusCode:    400,
 			},
-			shouldCheckStatus: shouldCheckStatus{
-				condition: true,
-			},
+			condition: true,
 		},
 		"SuccessUpdateStatusSuccessfulRequest": {
 			args: args{
@@ -394,9 +389,7 @@ func Test_deployAction(t *testing.T) {
 				err:        nil,
 				statusCode: 200,
 			},
-			shouldCheckStatus: shouldCheckStatus{
-				condition: true,
-			},
+			condition: true,
 		},
 	}
 	for name, tc := range cases {
@@ -420,7 +413,7 @@ func Test_deployAction(t *testing.T) {
 				}
 			}
 
-			if tc.shouldCheckStatus.condition {
+			if tc.condition {
 				if diff := cmp.Diff(tc.args.cr.Spec.ForProvider.Body, tc.args.cr.Status.Response.Body); diff != "" {
 					t.Fatalf("deployAction(...): -want Status.Response.Body, +got Status.Response.Body: %s", diff)
 				}
