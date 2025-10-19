@@ -11,7 +11,7 @@ import (
 	"github.com/crossplane-contrib/provider-http/internal/controller/request/requestgen"
 	"github.com/crossplane-contrib/provider-http/internal/controller/request/responseconverter"
 	"github.com/crossplane-contrib/provider-http/internal/utils"
-	"github.com/crossplane/crossplane-runtime/pkg/logging"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/logging"
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
