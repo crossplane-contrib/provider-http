@@ -10,3 +10,7 @@ cover.out
 .DS_Store
 .devcontainer
 kubeconfig
+
+# Test server binaries
+cluster/test/server
+cluster/test/testserver

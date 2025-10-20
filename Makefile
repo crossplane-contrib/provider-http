@@ -94,7 +94,7 @@ UPTEST_EXAMPLE_LIST := $(shell find ./examples/sample -path '*.yaml' | paste -s 
 
 uptest: $(UPTEST) $(KUBECTL) $(KUTTL)
 	@$(INFO) running automated tests
-	@KUBECTL=$(KUBECTL) KUTTL=$(KUTTL) CROSSPLANE_NAMESPACE=$(CROSSPLANE_NAMESPACE) $(UPTEST) e2e "$(UPTEST_EXAMPLE_LIST)" --setup-script=cluster/test/setup.sh || $(FAIL)
+	@KUBECTL=$(KUBECTL) KUTTL=$(KUTTL) CROSSPLANE_NAMESPACE=$(CROSSPLANE_NAMESPACE) TEST_SERVER_IMAGE=$(TEST_SERVER_IMAGE) $(UPTEST) e2e "$(UPTEST_EXAMPLE_LIST)" --setup-script=cluster/test/setup.sh || $(FAIL)
 	@$(OK) running automated tests
 
 local-dev: controlplane.up
@@ -105,6 +105,110 @@ local-deploy: build controlplane.up local.xpkg.deploy.provider.$(PROJECT_NAME)
 	@$(OK) running locally built provider
 
 e2e: local-deploy uptest
+
+# Prepare for local E2E testing by building test server if needed
+e2e.prepare:
+	@$(INFO) preparing for e2e tests
+	@echo "Current TEST_SERVER_IMAGE: $(TEST_SERVER_IMAGE)"
+	@if ! docker image inspect $(TEST_SERVER_IMAGE) >/dev/null 2>&1; then \
+		echo "Test server image not found locally. You have two options:"; \
+		echo "1. Build local test server: make test-server.build"; \
+		echo "2. Pull official image: docker pull ghcr.io/crossplane-contrib/provider-http-server:latest"; \
+		echo "3. Use crossplane-contrib image: export TEST_SERVER_IMAGE=ghcr.io/crossplane-contrib/provider-http-server:latest"; \
+		echo ""; \
+		echo "Attempting to pull crossplane-contrib image..."; \
+		docker pull ghcr.io/crossplane-contrib/provider-http-server:latest || echo "Failed to pull, you may need to build locally"; \
+	else \
+		echo "✅ Test server image $(TEST_SERVER_IMAGE) is available"; \
+	fi
+	@$(OK) preparing for e2e tests
+
+# Enhanced e2e target that prepares the environment
+e2e.local: e2e.prepare local-deploy uptest
+
+# ====================================================================================
+# Local Test Server Development
+
+# Test server configuration
+# This logic determines which test server image to use:
+# 1. If TEST_SERVER_IMAGE is set as env var, use it (from CI)
+# 2. If running locally, try to use a locally built image first
+# 3. Fall back to crossplane-contrib official image
+TEST_SERVER_IMAGE ?= $(shell \
+	OWNER=$$(git remote get-url origin 2>/dev/null | sed 's/.*github.com[:/]\([^/]*\).*/\1/' 2>/dev/null || echo "crossplane-contrib"); \
+	LOCAL_IMAGE="ghcr.io/$$OWNER/provider-http-server:latest"; \
+	if docker image inspect $$LOCAL_IMAGE >/dev/null 2>&1; then \
+		echo $$LOCAL_IMAGE; \
+	else \
+		echo "ghcr.io/crossplane-contrib/provider-http-server:latest"; \
+	fi \
+)
+TEST_SERVER_CONTAINER = provider-http-test-server
+TEST_SERVER_PORT = 5001
+
+.PHONY: test-server.build test-server.start test-server.stop test-server.restart test-server.logs test-server.status test-server.clean
+
+test-server.build:
+	@$(INFO) building test server image
+	@cd cluster/test && docker build -t $(TEST_SERVER_IMAGE) .
+	@$(OK) building test server image
+
+test-server.start: test-server.build
+	@$(INFO) starting test server container
+	@docker run -d --name $(TEST_SERVER_CONTAINER) -p $(TEST_SERVER_PORT):5000 $(TEST_SERVER_IMAGE) || \
+		(echo "Container may already exist. Use 'make test-server.restart' to restart it." && exit 1)
+	@echo "Test server starting at http://localhost:$(TEST_SERVER_PORT)"
+	@echo "Waiting for server to be ready..."
+	@sleep 3
+	@curl -f -H "Authorization: Bearer my-secret-value" -X POST http://localhost:$(TEST_SERVER_PORT)/v1/login > /dev/null && \
+		echo "✅ Test server is ready!" || echo "❌ Test server may not be ready yet"
+	@$(OK) starting test server container
+
+test-server.stop:
+	@$(INFO) stopping test server container
+	@docker stop $(TEST_SERVER_CONTAINER) 2>/dev/null || echo "Container not running"
+	@docker rm $(TEST_SERVER_CONTAINER) 2>/dev/null || echo "Container not found"
+	@$(OK) stopping test server container
+
+test-server.restart: test-server.stop test-server.start
+
+test-server.logs:
+	@echo "=== Test Server Logs ==="
+	@docker logs $(TEST_SERVER_CONTAINER) 2>/dev/null || echo "Container not found or not running"
+
+test-server.status:
+	@echo "=== Test Server Status ==="
+	@docker ps -f name=$(TEST_SERVER_CONTAINER) --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" || echo "Container not found"
+	@echo ""
+	@echo "Testing server health..."
+	@curl -f -H "Authorization: Bearer my-secret-value" -X POST http://localhost:$(TEST_SERVER_PORT)/v1/login 2>/dev/null && \
+		echo "✅ Server is healthy" || echo "❌ Server is not responding"
+
+test-server.clean: test-server.stop
+	@$(INFO) cleaning test server image
+	@docker rmi $(TEST_SERVER_IMAGE) 2>/dev/null || echo "Image not found"
+	@$(OK) cleaning test server image
+
+test-server.help:
+	@echo "Test Server Development Targets:"
+	@echo "  test-server.build    - Build the test server Docker image"
+	@echo "  test-server.start    - Start the test server container"
+	@echo "  test-server.stop     - Stop and remove the test server container"
+	@echo "  test-server.restart  - Restart the test server (stop + start)"
+	@echo "  test-server.logs     - Show test server logs"
+	@echo "  test-server.status   - Show container status and health"
+	@echo "  test-server.clean    - Stop container and remove image"
+	@echo "  test-server.help     - Show this help"
+	@echo ""
+	@echo "E2E Testing Targets:"
+	@echo "  e2e                  - Run E2E tests (original target)"
+	@echo "  e2e.prepare          - Check/prepare test server image for E2E"
+	@echo "  e2e.local            - Prepare environment and run E2E tests"
+	@echo ""
+	@echo "Server runs on: http://localhost:$(TEST_SERVER_PORT)"
+	@echo "Authorization: Bearer my-secret-value"
+	@echo "Current TEST_SERVER_IMAGE: $(TEST_SERVER_IMAGE)"
+
 # Update the submodules, such as the common build scripts.
 submodules:
 	@git submodule sync
