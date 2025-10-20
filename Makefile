@@ -30,19 +30,17 @@ NPROCS ?= 1
 GO_TEST_PARALLEL := $(shell echo $$(( $(NPROCS) / 2 )))
 
 GO_STATIC_PACKAGES = $(GO_PROJECT)/cmd/provider
+GO_LDFLAGS += -X $(GO_PROJECT)/internal/version.Version=$(VERSION)
 GO_SUBDIRS += cmd internal apis
 GO111MODULE = on
-GOLANGCILINT_VERSION = 1.64.8
+GOLANGCILINT_VERSION = 2.1.2
 -include build/makelib/golang.mk
 
 # ====================================================================================
 # Setup Kubernetes tools
-KIND_VERSION = v0.23.0
-UP_VERSION = v0.28.0
-UPTEST_VERSION = v0.11.1
-UP_CHANNEL = stable
 USE_HELM3 = true
-CROSSPLANE_VERSION = 1.14.6
+CROSSPLANE_VERSION = 2.0.2
+CROSSPLANE_CLI_VERSION = v2.0.2
 
 -include build/makelib/k8s_tools.mk
 
@@ -113,9 +111,9 @@ submodules:
 	@git submodule update --init --recursive
 
 # NOTE(hasheddan): we must ensure up is installed in tool cache prior to build
-# as including the k8s_tools machinery prior to the xpkg machinery sets UP to
-# point to tool cache.
-build.init: $(UP)
+# as including the k8s_tools machinery prior to the xpkg machinery sets
+# CROSSPLANE_CLI to point to tool cache.
+build.init: $(CROSSPLANE_CLI)
 
 # This is for running out-of-cluster locally, and is for convenience. Running
 # this make target will print out the command which was used. For more control,
