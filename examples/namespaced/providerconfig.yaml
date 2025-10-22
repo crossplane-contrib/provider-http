@@ -1,8 +1,0 @@
-apiVersion: http.m.crossplane.io/v1alpha2
-kind: ProviderConfig
-metadata:
-  name: http-conf-namespaced
-  namespace: default
-spec:
-  credentials:
-    source: None

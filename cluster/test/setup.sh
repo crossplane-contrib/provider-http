@@ -16,6 +16,56 @@ spec:
     source: None
 EOF
 
+# Check if we're running Crossplane v2 and create namespaced provider configurations
+if [ -z "${CROSSPLANE_VERSION:-}" ]; then
+    echo "ERROR: CROSSPLANE_VERSION environment variable must be set"
+    exit 1
+fi
+MAJOR_VERSION=$(echo "$CROSSPLANE_VERSION" | cut -d. -f1)
+
+if [ "$MAJOR_VERSION" = "2" ]; then
+    echo "Detected Crossplane v2, creating namespaced provider configurations..."
+    
+    # Create namespaced ProviderConfig
+    cat <<EOF | ${KUBECTL} apply -f -
+apiVersion: http.m.crossplane.io/v1alpha2
+kind: ProviderConfig
+metadata:
+  name: http-conf-namespaced
+  namespace: default
+spec:
+  credentials:
+    source: None
+EOF
+
+    # Create ClusterProviderConfig for cross-namespace access
+    cat <<EOF | ${KUBECTL} apply -f -
+apiVersion: http.m.crossplane.io/v1alpha2
+kind: ClusterProviderConfig
+metadata:
+  name: http-conf-cluster
+spec:
+  credentials:
+    source: None
+EOF
+    
+    # Create additional secrets needed for namespaced examples
+    cat <<EOF | ${KUBECTL} apply -f -
+kind: Secret
+apiVersion: v1
+metadata:
+  name: basic-auth
+  namespace: default
+type: Opaque
+data:
+  token: bXktc2VjcmV0LXZhbHVl
+EOF
+    
+    echo "Namespaced provider configurations created successfully"
+else
+    echo "Detected Crossplane v1, skipping namespaced configurations"
+fi
+
 cat <<EOF | ${KUBECTL} apply -f -
 apiVersion: apps/v1
 kind: Deployment

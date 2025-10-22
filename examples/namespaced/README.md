@@ -47,28 +47,47 @@ metadata:
 
 ## Examples Included
 
-### Provider Configurations
-1. **providerconfig.yaml** - Namespace-scoped provider configuration
-2. **clusterproviderconfig.yaml** - Cluster-scoped provider configuration for cross-namespace access
+These examples demonstrate namespaced HTTP resources. Provider configurations are automatically created during e2e testing.
 
 ### Request Examples
-3. **request.yaml** - Namespaced HTTP request with full CRUD operations using namespaced ProviderConfig
-4. **request-with-clusterproviderconfig.yaml** - Namespaced HTTP request using ClusterProviderConfig for cross-namespace access
+1. **request.yaml** - Namespaced HTTP request with full CRUD operations using namespaced ProviderConfig
+2. **request-with-clusterproviderconfig.yaml** - Namespaced HTTP request using ClusterProviderConfig for cross-namespace access
 
 ### DisposableRequest Examples  
-5. **disposablerequest.yaml** - Namespaced one-time HTTP request using namespaced ProviderConfig
-6. **disposablerequest-jwt.yaml** - Namespaced JWT token acquisition example
-7. **disposablerequest-with-clusterproviderconfig.yaml** - Namespaced one-time HTTP request using ClusterProviderConfig
+3. **disposablerequest.yaml** - Namespaced one-time HTTP request using namespaced ProviderConfig
+4. **disposablerequest-jwt.yaml** - Namespaced JWT token acquisition example
+5. **disposablerequest-with-clusterproviderconfig.yaml** - Namespaced one-time HTTP request using ClusterProviderConfig
 
 ## Usage
 
-1. Apply the provider configuration:
+### For Testing/Development
+These examples are designed to work with the e2e test framework. The required provider configurations and secrets are automatically created by the test setup.
+
+### For Production Use
+1. Create the required provider configurations:
    ```bash
-   # For namespace-scoped resources
-   kubectl apply -f providerconfig.yaml
+   # Namespace-scoped ProviderConfig
+   kubectl apply -f - <<EOF
+   apiVersion: http.m.crossplane.io/v1alpha2
+   kind: ProviderConfig
+   metadata:
+     name: http-conf-namespaced
+     namespace: default
+   spec:
+     credentials:
+       source: None
+   EOF
    
-   # For cluster-scoped cross-namespace access
-   kubectl apply -f clusterproviderconfig.yaml
+   # ClusterProviderConfig for cross-namespace access
+   kubectl apply -f - <<EOF
+   apiVersion: http.m.crossplane.io/v1alpha2
+   kind: ClusterProviderConfig
+   metadata:
+     name: http-conf-cluster
+   spec:
+     credentials:
+       source: None
+   EOF
    ```
 
 2. Apply the resource examples:
