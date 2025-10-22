@@ -1,0 +1,128 @@
+apiVersion: http.m.crossplane.io/v1alpha2
+kind: Request
+metadata:
+  name: manage-user-namespaced
+  namespace: default
+spec:
+  forProvider:
+    # Injecting data from secrets is possible, simply use the following syntax: {{ name:namespace:key }} (supported for body and headers only)
+    insecureSkipTLSVerify: true
+    waitTimeout: 5m
+    headers:
+      Content-Type:
+        - application/json
+      Authorization:
+        - "Bearer {{ auth:default:token }}"
+    payload:
+      baseUrl: http://flask-api.default.svc.cluster.local/v1/users
+      body: |
+        {
+          "username": "namespaced_user", 
+          "password": "secretdata {{ user-password:default:password }}",
+          "email": "namespaced_user@example.com", 
+          "age": 25
+        }
+    mappings:
+      # Scenario 1: Action specified, method not specified (defaults to POST for CREATE)
+      - action: CREATE
+        # method: "POST" 
+        body: |
+          {
+            username: .payload.body.username, 
+            email: .payload.body.email, 
+            age: .payload.body.age,
+            password: .payload.body.password
+          }
+        url: .payload.baseUrl
+        headers:
+          Content-Type:
+            - application/json
+          Authorization:
+            - "Bearer {{ auth:default:token }}"
+          Extra-Header-For-Post:
+            - extra-value
+
+      # Scenario 2: Action specified, method not specified (defaults to GET for OBSERVE)
+      - action: OBSERVE
+        # method: "GET"
+        url: .payload.baseUrl + "/" + (.response.body.id | tostring)
+        # If the ID of the external resource is known in advance, ownership of the resource can be attempted:
+        # url: (.payload.baseUrl + "/1234567890")
+
+      # Scenario 3: Method specified, action not specified (PUT implies UPDATE)
+      - method: "PUT"
+        # action: UPDATE
+        body: |
+          {
+            email: .payload.body.email, 
+            age: .payload.body.age
+          }
+        url: .payload.baseUrl + "/" + (.response.body.id | tostring)
+
+      # Scenario 4: Action specified, method not specified (defaults to DELETE for REMOVE)
+      - action: REMOVE
+        # method: "DELETE"
+        url: .payload.baseUrl + "/" + (.response.body.id | tostring)
+    
+    # expectedResponseCheck is optional. If not specified or if the type is "DEFAULT", 
+    # the resource is considered up to date if the GET response containes the PUT body.
+    # If specified, the JQ logic determines if the resource is up to date:
+    # - If the JQ query is false, a PUT request is sent to update the resource.
+    # - If true, the resource is considered up to date.
+    expectedResponseCheck:
+      type: CUSTOM
+      logic: |
+        if .response.body.password == .payload.body.password
+         and .response.body.age == 25
+         and .response.headers."Content-Type" == ["application/json"]
+         and .response.headers."X-Secret-Header"[0] == "{{ response-secret:default:extracted-header-data }}"
+         then true 
+         else false 
+         end
+
+    # isRemovedCheck is optional. If not specified or if the type is "DEFAULT", 
+    # the resource is considered removed if the OBSERVE response after REMOVE has 404 status code.
+    # If specified, the JQ logic determines if the resource is removed:
+    # - If the JQ query is false, a REMOVE request is sent to remove the resource.
+    # - If true, the resource is considered up to date.
+    isRemovedCheck:
+      type: CUSTOM
+      logic: |
+        if .response.statusCode == 404
+          and .response.body.error == "User not found"
+          then true 
+          else false 
+          end
+
+    # Secrets receiving patches from response data
+    secretInjectionConfigs: 
+      - secretRef:
+          name: response-secret-namespaced
+          namespace: default
+        metadata:
+          labels:
+            managed-by: provider-http-namespaced
+          annotations:
+            username: .body.username
+        keyMappings:
+          - secretKey: extracted-user-email
+            responseJQ: .body.email
+            missingFieldStrategy: preserve
+          - secretKey: extracted-header-data
+            responseJQ: .headers."X-Secret-Header"[0]
+            missingFieldStrategy: setEmpty
+        # setOwnerReference determines if the secret should be deleted when the associated resource is deleted.
+        setOwnerReference: true
+      
+      - secretRef:
+          name: response-user-password-namespaced
+          namespace: default
+        keyMappings:
+          - secretKey: extracted-user-password
+            responseJQ: .body.password
+            missingFieldStrategy: delete
+          - secretKey: extracted-user-age
+            responseJQ: .body.age
+
+  providerConfigRef:
+    name: http-conf-namespaced

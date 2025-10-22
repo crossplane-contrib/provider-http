@@ -22,18 +22,29 @@ import (
 	"github.com/crossplane/crossplane-runtime/v2/pkg/controller"
 	ctrl "sigs.k8s.io/controller-runtime"
 
-	"github.com/crossplane-contrib/provider-http/internal/controller/config"
-	disposablerequest "github.com/crossplane-contrib/provider-http/internal/controller/disposablerequest"
-	request "github.com/crossplane-contrib/provider-http/internal/controller/request"
+	"github.com/crossplane-contrib/provider-http/internal/controller/cluster"
+	"github.com/crossplane-contrib/provider-http/internal/controller/namespaced"
 )
 
-// Setup creates all http controllers with the supplied logger and adds them to
+// Setup creates all http controllers (both cluster and namespaced) with the supplied logger and adds them to
 // the supplied manager.
 func Setup(mgr ctrl.Manager, o controller.Options, timeout time.Duration) error {
 	for _, setup := range []func(ctrl.Manager, controller.Options, time.Duration) error{
-		config.Setup,
-		disposablerequest.Setup,
-		request.Setup,
+		cluster.Setup,
+		namespaced.Setup,
+	} {
+		if err := setup(mgr, o, timeout); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// SetupGated creates all http controllers with SafeStart capability (controllers start as their CRDs appear)
+func SetupGated(mgr ctrl.Manager, o controller.Options, timeout time.Duration) error {
+	for _, setup := range []func(ctrl.Manager, controller.Options, time.Duration) error{
+		cluster.SetupGated,
+		namespaced.SetupGated,
 	} {
 		if err := setup(mgr, o, timeout); err != nil {
 			return err

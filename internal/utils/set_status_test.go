@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	v1alpha1_disposable "github.com/crossplane-contrib/provider-http/apis/disposablerequest/v1alpha2"
-	v1alpha1_request "github.com/crossplane-contrib/provider-http/apis/request/v1alpha2"
+	v1alpha1_disposable "github.com/crossplane-contrib/provider-http/apis/cluster/disposablerequest/v1alpha2"
+	v1alpha1_request "github.com/crossplane-contrib/provider-http/apis/cluster/request/v1alpha2"
 	httpClient "github.com/crossplane-contrib/provider-http/internal/clients/http"
 	"github.com/pkg/errors"
 

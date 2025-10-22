@@ -1,0 +1,36 @@
+apiVersion: http.m.crossplane.io/v1alpha2
+kind: DisposableRequest
+metadata:
+  name: obtain-jwt-token-namespaced
+  namespace: default
+spec:
+  deletionPolicy: Orphan
+  forProvider:
+    insecureSkipTLSVerify: true
+
+    # Injecting data from secrets is possible, simply use the following syntax: {{ name:namespace:key }} (supported for body and headers only)
+    headers:
+      Authorization:
+        - "Basic {{ basic-auth:default:token }}"
+    url: http://flask-api.default.svc.cluster.local/v1/login
+    method: POST
+    
+    # Indicates whether the reconciliation should loop indefinitely. If `rollbackRetriesLimit` is set and the request returns an error, it will stop reconciliation once the limit is reached.
+    shouldLoopInfinitely: true
+    # Specifies the duration after which the next reconcile should occur.
+    nextReconcile: 72h # 3 days
+
+    # waitTimeout: 5m
+
+    # Secrets receiving patches from response data
+    secretInjectionConfigs: 
+      - secretRef:
+          name: obtained-token-namespaced
+          namespace: default
+        secretKey: token
+        responsePath: .body.token
+        # setOwnerReference determines if the secret should be deleted when the associated resource is deleted.
+        # When injecting multiple keys into the same secret, ensure this field is set consistently for all keys.        
+        setOwnerReference: true
+  providerConfigRef:
+    name: http-conf-namespaced

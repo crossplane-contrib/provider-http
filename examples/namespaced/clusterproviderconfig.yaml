@@ -1,0 +1,7 @@
+apiVersion: http.m.crossplane.io/v1alpha2
+kind: ClusterProviderConfig
+metadata:
+  name: http-conf-cluster
+spec:
+  credentials:
+    source: None

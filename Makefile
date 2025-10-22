@@ -39,8 +39,8 @@ GOLANGCILINT_VERSION = 2.1.2
 # ====================================================================================
 # Setup Kubernetes tools
 USE_HELM3 = true
-CROSSPLANE_VERSION = 2.0.2
-CROSSPLANE_CLI_VERSION = v2.0.2
+CROSSPLANE_VERSION ?= 2.0.2
+CROSSPLANE_CLI_VERSION ?= v2.0.2
 
 -include build/makelib/k8s_tools.mk
 

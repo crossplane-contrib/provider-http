@@ -20,17 +20,25 @@ package apis
 import (
 	"k8s.io/apimachinery/pkg/runtime"
 
-	disposablerequestv1alpha2 "github.com/crossplane-contrib/provider-http/apis/disposablerequest/v1alpha2"
-	requestv1alpha2 "github.com/crossplane-contrib/provider-http/apis/request/v1alpha2"
-	httpv1alpha1 "github.com/crossplane-contrib/provider-http/apis/v1alpha1"
+	clusterdisposablerequestv1alpha2 "github.com/crossplane-contrib/provider-http/apis/cluster/disposablerequest/v1alpha2"
+	clusterrequestv1alpha2 "github.com/crossplane-contrib/provider-http/apis/cluster/request/v1alpha2"
+	httpv1alpha1 "github.com/crossplane-contrib/provider-http/apis/cluster/v1alpha1"
+	namespaceddisposablerequestv1alpha2 "github.com/crossplane-contrib/provider-http/apis/namespaced/disposablerequest/v1alpha2"
+	namespacedrequestv1alpha2 "github.com/crossplane-contrib/provider-http/apis/namespaced/request/v1alpha2"
+	namespacedv1alpha2 "github.com/crossplane-contrib/provider-http/apis/namespaced/v1alpha2"
 )
 
 func init() {
 	// Register the types with the Scheme so the components can map objects to GroupVersionKinds and back
 	AddToSchemes = append(AddToSchemes,
+		// Cluster-scoped APIs
 		httpv1alpha1.SchemeBuilder.AddToScheme,
-		disposablerequestv1alpha2.SchemeBuilder.AddToScheme,
-		requestv1alpha2.SchemeBuilder.AddToScheme,
+		clusterdisposablerequestv1alpha2.SchemeBuilder.AddToScheme,
+		clusterrequestv1alpha2.SchemeBuilder.AddToScheme,
+		// Namespaced APIs
+		namespacedv1alpha2.SchemeBuilder.AddToScheme,
+		namespaceddisposablerequestv1alpha2.SchemeBuilder.AddToScheme,
+		namespacedrequestv1alpha2.SchemeBuilder.AddToScheme,
 	)
 }
 

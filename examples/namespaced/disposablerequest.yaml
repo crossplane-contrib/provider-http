@@ -1,0 +1,58 @@
+apiVersion: http.m.crossplane.io/v1alpha2
+kind: DisposableRequest
+metadata:
+  name: send-notification-namespaced
+  namespace: default
+spec:
+  deletionPolicy: Orphan
+  forProvider:
+    # Injecting data from secrets is possible, simply use the following syntax: {{ name:namespace:key }} (supported for body and headers only)
+    url:  http://flask-api.default.svc.cluster.local/v1/notify
+    method: POST
+    body: |
+      {
+        "recipient": "namespaced-user@example.com",
+        "subject": "Namespaced Alert",
+        "message": "Your action is required immediately from namespaced resource."
+      }
+    headers:
+      Content-Type:
+        - application/json
+      Authorization:
+        - "Bearer {{ auth:default:token }}"
+    insecureSkipTLSVerify: true
+
+    # The 'expectedResponse' field is optional. If used, also set 'rollbackRetriesLimit', which determines the number of HTTP requests to be sent until the jq query returns true.
+    expectedResponse: '.body.status == "sent"'
+    rollbackRetriesLimit: 5
+    waitTimeout: 5m
+
+    # Indicates whether the reconciliation should loop indefinitely. If `rollbackRetriesLimit` is set and the request returns an error, it will stop reconciliation once the limit is reached.
+    # shouldLoopInfinitely: true
+
+    # Specifies the duration after which the next reconcile should occur.
+    # nextReconcile: 3m 
+
+    # Secrets receiving patches from response data
+    secretInjectionConfigs: 
+      - secretRef:
+          name: notification-response-namespaced
+          namespace: default
+        metadata:
+          labels:
+            status: .body.status
+            managed-by: provider-http-namespaced
+          annotations:
+            key: value
+        keyMappings:
+          - secretKey: notification-status
+            responseJQ: .body.status
+            missingFieldStrategy: setEmpty
+          - secretKey: notification-id
+            responseJQ: .body.id
+            missingFieldStrategy: preserve
+        # setOwnerReference determines if the secret should be deleted when the associated resource is deleted.
+        setOwnerReference: true
+ 
+  providerConfigRef:
+    name: http-conf-namespaced

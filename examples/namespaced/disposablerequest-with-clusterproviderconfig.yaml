@@ -1,0 +1,61 @@
+apiVersion: http.m.crossplane.io/v1alpha2
+kind: DisposableRequest
+metadata:
+  name: send-notification-with-cluster-config
+  namespace: default
+spec:
+  deletionPolicy: Orphan
+  forProvider:
+    # This example demonstrates using ClusterProviderConfig with namespaced DisposableRequest
+    # ClusterProviderConfig allows cross-namespace access to secrets and configurations
+    url: http://flask-api.default.svc.cluster.local/v1/notify
+    method: POST
+    body: |
+      {
+        "recipient": "admin@example.com",
+        "subject": "Cluster Config Alert",
+        "message": "Hello from Crossplane namespaced resource with cluster config!",
+        "user": "{{ admin-user:crossplane-system:username }}"
+      }
+    headers:
+      Content-Type:
+        - application/json
+      Authorization:
+        - "Bearer {{ admin-token:crossplane-system:token }}"
+    insecureSkipTLSVerify: true
+
+    # The 'expectedResponse' field is optional. If used, also set 'rollbackRetriesLimit', which determines the number of HTTP requests to be sent until the jq query returns true.
+    expectedResponse: '.body.status == "sent"'
+    rollbackRetriesLimit: 5
+    waitTimeout: 5m
+
+    # Indicates whether the reconciliation should loop indefinitely. If `rollbackRetriesLimit` is set and the request returns an error, it will stop reconciliation once the limit is reached.
+    # shouldLoopInfinitely: true
+
+    # Specifies the duration after which the next reconcile should occur.
+    # nextReconcile: 3m
+
+    # Using ClusterProviderConfig allows accessing secrets from crossplane-system namespace
+    secretInjectionConfigs:
+      - secretRef:
+          name: notification-response-cluster
+          namespace: crossplane-system  # Cross-namespace access via ClusterProviderConfig
+        metadata:
+          labels:
+            status: .body.status
+            managed-by: provider-http-cluster-config
+          annotations:
+            key: value
+        keyMappings:
+          - secretKey: notification-status
+            responseJQ: .body.status
+            missingFieldStrategy: setEmpty
+          - secretKey: notification-id
+            responseJQ: .body.id
+            missingFieldStrategy: preserve
+        # setOwnerReference determines if the secret should be deleted when the associated resource is deleted.
+        setOwnerReference: true
+ 
+  # Using ClusterProviderConfig for cross-namespace access
+  providerConfigRef:
+    name: http-conf-cluster

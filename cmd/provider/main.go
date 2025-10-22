@@ -21,6 +21,8 @@ import (
 	"path/filepath"
 	"time"
 
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 
 	kingpin "gopkg.in/alecthomas/kingpin.v2"
@@ -30,8 +32,10 @@ import (
 
 	"github.com/crossplane/crossplane-runtime/v2/pkg/controller"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/feature"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/gate"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/logging"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/ratelimiter"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/customresourcesgate"
 
 	"github.com/crossplane-contrib/provider-http/apis"
 	template "github.com/crossplane-contrib/provider-http/internal/controller"
@@ -78,14 +82,21 @@ func main() {
 	kingpin.FatalIfError(err, "Cannot create controller manager")
 	kingpin.FatalIfError(apis.AddToScheme(mgr.GetScheme()), "Cannot add Http APIs to scheme")
 
+	// Add CRD types to scheme for SafeStart capability
+	kingpin.FatalIfError(apiextensionsv1.AddToScheme(mgr.GetScheme()), "Cannot add CRD APIs to scheme")
+
 	o := controller.Options{
 		Logger:                  log,
 		MaxConcurrentReconciles: *maxReconcileRate,
 		PollInterval:            *pollInterval,
 		GlobalRateLimiter:       ratelimiter.NewGlobal(*maxReconcileRate),
 		Features:                &feature.Flags{},
+		Gate:                    new(gate.Gate[schema.GroupVersionKind]),
 	}
 
-	kingpin.FatalIfError(template.Setup(mgr, o, *timeout), "Cannot setup Template controllers")
+	// Setup SafeStart CRD gate controller
+	kingpin.FatalIfError(customresourcesgate.Setup(mgr, o), "Cannot setup CRD gate controller")
+
+	kingpin.FatalIfError(template.SetupGated(mgr, o, *timeout), "Cannot setup Template controllers")
 	kingpin.FatalIfError(mgr.Start(ctrl.SetupSignalHandler()), "Cannot start controller manager")
 }
