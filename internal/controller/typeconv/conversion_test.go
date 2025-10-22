@@ -28,6 +28,10 @@ import (
 	"github.com/crossplane-contrib/provider-http/apis/common"
 	namespaceddisposablev1alpha2 "github.com/crossplane-contrib/provider-http/apis/namespaced/disposablerequest/v1alpha2"
 	namespacedv1alpha2 "github.com/crossplane-contrib/provider-http/apis/namespaced/request/v1alpha2"
+
+	commonxp "github.com/crossplane/crossplane-runtime/v2/apis/common"
+	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	xpv2 "github.com/crossplane/crossplane-runtime/v2/apis/common/v2"
 )
 
 func TestConvertNamespacedToClusterRequestParameters(t *testing.T) {
@@ -49,6 +53,7 @@ func TestConvertNamespacedToClusterRequestParameters(t *testing.T) {
 				Mappings: []namespacedv1alpha2.Mapping{
 					{
 						Method: "POST",
+						Action: "CREATE",
 						URL:    "http://example.com",
 						Body:   "test body",
 					},
@@ -63,6 +68,7 @@ func TestConvertNamespacedToClusterRequestParameters(t *testing.T) {
 				Mappings: []clusterv1alpha2.Mapping{
 					{
 						Method: "POST",
+						Action: "CREATE",
 						URL:    "http://example.com",
 						Body:   "test body",
 					},
@@ -122,6 +128,88 @@ func TestConvertNamespacedToClusterMappings(t *testing.T) {
 					Headers: map[string][]string{
 						"Authorization": {"Bearer token"},
 					},
+				},
+			},
+		},
+		{
+			name: "mapping with action field",
+			src: []namespacedv1alpha2.Mapping{
+				{
+					Method: "POST",
+					Action: "CREATE",
+					URL:    "http://api.example.com/users",
+					Body:   `{"name": "test"}`,
+					Headers: map[string][]string{
+						"Content-Type": {"application/json"},
+					},
+				},
+				{
+					Action: "OBSERVE",
+					URL:    "http://api.example.com/users/123",
+				},
+			},
+			want: []clusterv1alpha2.Mapping{
+				{
+					Method: "POST",
+					Action: "CREATE",
+					URL:    "http://api.example.com/users",
+					Body:   `{"name": "test"}`,
+					Headers: map[string][]string{
+						"Content-Type": {"application/json"},
+					},
+				},
+				{
+					Action: "OBSERVE",
+					URL:    "http://api.example.com/users/123",
+				},
+			},
+		},
+		{
+			name: "multiple mappings with different actions",
+			src: []namespacedv1alpha2.Mapping{
+				{
+					Action: "CREATE",
+					Method: "POST",
+					URL:    "http://api.example.com/resources",
+					Body:   `{"data": "create"}`,
+				},
+				{
+					Action: "OBSERVE",
+					URL:    "http://api.example.com/resources/{{.id}}",
+				},
+				{
+					Action: "UPDATE",
+					Method: "PUT",
+					URL:    "http://api.example.com/resources/{{.id}}",
+					Body:   `{"data": "update"}`,
+				},
+				{
+					Action: "REMOVE",
+					Method: "DELETE",
+					URL:    "http://api.example.com/resources/{{.id}}",
+				},
+			},
+			want: []clusterv1alpha2.Mapping{
+				{
+					Action: "CREATE",
+					Method: "POST",
+					URL:    "http://api.example.com/resources",
+					Body:   `{"data": "create"}`,
+				},
+				{
+					Action: "OBSERVE",
+					URL:    "http://api.example.com/resources/{{.id}}",
+				},
+				{
+					Action: "UPDATE",
+					Method: "PUT",
+					URL:    "http://api.example.com/resources/{{.id}}",
+					Body:   `{"data": "update"}`,
+				},
+				{
+					Action: "REMOVE",
+					Method: "DELETE",
+					URL:    "http://api.example.com/resources/{{.id}}",
 				},
 			},
 		},
@@ -321,6 +409,7 @@ func TestConvertNamespacedToClusterMappingStatus(t *testing.T) {
 			name: "complete mapping",
 			src: namespacedv1alpha2.Mapping{
 				Method: "PUT",
+				Action: "UPDATE",
 				URL:    "https://api.test.com/update",
 				Body:   `{"update": true}`,
 				Headers: map[string][]string{
@@ -329,11 +418,23 @@ func TestConvertNamespacedToClusterMappingStatus(t *testing.T) {
 			},
 			want: clusterv1alpha2.Mapping{
 				Method: "PUT",
+				Action: "UPDATE",
 				URL:    "https://api.test.com/update",
 				Body:   `{"update": true}`,
 				Headers: map[string][]string{
 					"Authorization": {"Bearer xyz"},
 				},
+			},
+		},
+		{
+			name: "mapping with action only",
+			src: namespacedv1alpha2.Mapping{
+				Action: "OBSERVE",
+				URL:    "https://api.test.com/resource/{{.id}}",
+			},
+			want: clusterv1alpha2.Mapping{
+				Action: "OBSERVE",
+				URL:    "https://api.test.com/resource/{{.id}}",
 			},
 		},
 	}
@@ -685,6 +786,135 @@ func TestConvertNamespacedToClusterDisposableRequest(t *testing.T) {
 			got := ConvertNamespacedToClusterDisposableRequest(tt.src)
 			if diff := cmp.Diff(tt.want, got); diff != "" {
 				t.Errorf("ConvertNamespacedToClusterDisposableRequest() mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestConvertManagedResourceSpecToResourceSpec(t *testing.T) {
+	tests := []struct {
+		name string
+		src  xpv2.ManagedResourceSpec
+		want xpv1.ResourceSpec
+	}{
+		{
+			name: "empty spec",
+			src:  xpv2.ManagedResourceSpec{},
+			want: xpv1.ResourceSpec{},
+		},
+		{
+			name: "spec with basic fields",
+			src: xpv2.ManagedResourceSpec{
+				WriteConnectionSecretToReference: &commonxp.LocalSecretReference{
+					Name: "my-secret",
+				},
+				ProviderConfigReference: &commonxp.ProviderConfigReference{
+					Name: "my-provider-config",
+					Kind: "ProviderConfig",
+				},
+				ManagementPolicies: []commonxp.ManagementAction{commonxp.ManagementActionAll},
+			},
+			want: xpv1.ResourceSpec{
+				WriteConnectionSecretToReference: &xpv1.SecretReference{
+					Name: "my-secret",
+				},
+				ProviderConfigReference: &xpv1.Reference{
+					Name: "my-provider-config",
+				},
+				ManagementPolicies: []commonxp.ManagementAction{commonxp.ManagementActionAll},
+			},
+		},
+		{
+			name: "spec with nil references",
+			src: xpv2.ManagedResourceSpec{
+				ManagementPolicies: []commonxp.ManagementAction{commonxp.ManagementActionObserve, commonxp.ManagementActionCreate},
+			},
+			want: xpv1.ResourceSpec{
+				ManagementPolicies: []commonxp.ManagementAction{commonxp.ManagementActionObserve, commonxp.ManagementActionCreate},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := ConvertManagedResourceSpecToResourceSpec(tt.src)
+			if diff := cmp.Diff(tt.want, got); diff != "" {
+				t.Errorf("ConvertManagedResourceSpecToResourceSpec() mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestConvertLocalSecretToSecretReference(t *testing.T) {
+	tests := []struct {
+		name string
+		src  *commonxp.LocalSecretReference
+		want *xpv1.SecretReference
+	}{
+		{
+			name: "nil input",
+			src:  nil,
+			want: nil,
+		},
+		{
+			name: "basic conversion",
+			src: &commonxp.LocalSecretReference{
+				Name: "my-connection-secret",
+			},
+			want: &xpv1.SecretReference{
+				Name: "my-connection-secret",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := ConvertLocalSecretToSecretReference(tt.src)
+			if diff := cmp.Diff(tt.want, got); diff != "" {
+				t.Errorf("ConvertLocalSecretToSecretReference() mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestConvertProviderConfigReferenceToReference(t *testing.T) {
+	tests := []struct {
+		name string
+		src  *commonxp.ProviderConfigReference
+		want *xpv1.Reference
+	}{
+		{
+			name: "nil input",
+			src:  nil,
+			want: nil,
+		},
+		{
+			name: "basic conversion",
+			src: &commonxp.ProviderConfigReference{
+				Name: "my-provider-config",
+				Kind: "ProviderConfig",
+			},
+			want: &xpv1.Reference{
+				Name: "my-provider-config",
+			},
+		},
+		{
+			name: "cluster provider config",
+			src: &commonxp.ProviderConfigReference{
+				Name: "my-cluster-config",
+				Kind: "ClusterProviderConfig",
+			},
+			want: &xpv1.Reference{
+				Name: "my-cluster-config",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := ConvertProviderConfigReferenceToReference(tt.src)
+			if diff := cmp.Diff(tt.want, got); diff != "" {
+				t.Errorf("ConvertProviderConfigReferenceToReference() mismatch (-want +got):\n%s", diff)
 			}
 		})
 	}

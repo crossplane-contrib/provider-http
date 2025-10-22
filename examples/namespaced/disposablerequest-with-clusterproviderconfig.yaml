@@ -4,7 +4,6 @@ metadata:
   name: send-notification-with-cluster-config
   namespace: default
 spec:
-  deletionPolicy: Orphan
   forProvider:
     # This example demonstrates using ClusterProviderConfig with namespaced DisposableRequest
     # ClusterProviderConfig allows cross-namespace access to secrets and configurations
@@ -53,9 +52,11 @@ spec:
           - secretKey: notification-id
             responseJQ: .body.id
             missingFieldStrategy: preserve
-        # setOwnerReference determines if the secret should be deleted when the associated resource is deleted.
-        setOwnerReference: true
+        # setOwnerReference must be false for cross-namespace secrets due to Kubernetes restrictions
+        # Cross-namespace owner references are disallowed by Kubernetes
+        setOwnerReference: false
  
   # Using ClusterProviderConfig for cross-namespace access
   providerConfigRef:
     name: http-conf-cluster
+    kind: ClusterProviderConfig

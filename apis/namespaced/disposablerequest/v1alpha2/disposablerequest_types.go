@@ -24,6 +24,7 @@ import (
 
 	"github.com/crossplane-contrib/provider-http/apis/common"
 	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	xpv2 "github.com/crossplane/crossplane-runtime/v2/apis/common/v2"
 )
 
 // DisposableRequestParameters are the configurable fields of a DisposableRequest.
@@ -63,8 +64,8 @@ type DisposableRequestParameters struct {
 
 // A DisposableRequestSpec defines the desired state of a DisposableRequest.
 type DisposableRequestSpec struct {
-	xpv1.ResourceSpec `json:",inline"`
-	ForProvider       DisposableRequestParameters `json:"forProvider"`
+	xpv2.ManagedResourceSpec `json:",inline"`
+	ForProvider              DisposableRequestParameters `json:"forProvider"`
 }
 
 type Response struct {

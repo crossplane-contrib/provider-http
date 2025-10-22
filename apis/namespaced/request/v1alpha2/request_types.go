@@ -24,6 +24,7 @@ import (
 
 	"github.com/crossplane-contrib/provider-http/apis/common"
 	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	xpv2 "github.com/crossplane/crossplane-runtime/v2/apis/common/v2"
 )
 
 const (
@@ -105,8 +106,8 @@ type Payload struct {
 
 // A RequestSpec defines the desired state of a Request.
 type RequestSpec struct {
-	xpv1.ResourceSpec `json:",inline"`
-	ForProvider       RequestParameters `json:"forProvider"`
+	xpv2.ManagedResourceSpec `json:",inline"`
+	ForProvider              RequestParameters `json:"forProvider"`
 }
 
 // RequestObservation are the observable fields of a Request.

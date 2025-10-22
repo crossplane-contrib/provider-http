@@ -60,6 +60,71 @@ type: Opaque
 data:
   token: bXktc2VjcmV0LXZhbHVl
 EOF
+
+    # Create user-password secret in default namespace for namespaced examples
+    cat <<EOF | ${KUBECTL} apply -f -
+kind: Secret
+apiVersion: v1
+metadata:
+  name: user-password
+  namespace: default
+type: Opaque
+data:
+  password: bXktc2VjcmV0LXZhbHVl
+EOF
+
+    # Create auth secret in crossplane-system namespace for clusterproviderconfig examples
+    cat <<EOF | ${KUBECTL} apply -f -
+kind: Secret
+apiVersion: v1
+metadata:
+  name: auth
+  namespace: crossplane-system
+type: Opaque
+data:
+  token: bXktc2VjcmV0LXZhbHVl
+EOF
+
+    # Create admin-user secret in crossplane-system namespace for clusterproviderconfig examples
+    cat <<EOF | ${KUBECTL} apply -f -
+kind: Secret
+apiVersion: v1
+metadata:
+  name: admin-user
+  namespace: crossplane-system
+type: Opaque
+data:
+  username: YWRtaW4=
+EOF
+
+    # Create admin-token secret in crossplane-system namespace for clusterproviderconfig examples
+    # Using same token value as auth:default to ensure compatibility with flask-api
+    cat <<EOF | ${KUBECTL} apply -f -
+kind: Secret
+apiVersion: v1
+metadata:
+  name: admin-token
+  namespace: crossplane-system
+type: Opaque
+data:
+  token: bXktc2VjcmV0LXZhbHVl
+EOF
+
+    echo "Waiting for secrets to be available..."
+    # Wait for all secrets to be available before proceeding
+    for secret in "user-password:default" "auth:crossplane-system" "admin-user:crossplane-system" "admin-token:crossplane-system"; do
+        name=$(echo $secret | cut -d: -f1)
+        namespace=$(echo $secret | cut -d: -f2)
+        echo "Waiting for secret $name in namespace $namespace..."
+        while ! ${KUBECTL} get secret $name -n $namespace >/dev/null 2>&1; do
+            sleep 1
+        done
+        echo "Secret $name in namespace $namespace is available"
+    done
+    
+    # Additional wait to ensure provider has processed the secrets
+    echo "Waiting 10 seconds for provider to process secrets..."
+    sleep 10
     
     echo "Namespaced provider configurations created successfully"
 else
@@ -75,7 +140,7 @@ metadata:
   labels:
     app: flask-api
 spec:
-  replicas: 3
+  replicas: 1
   selector:
     matchLabels:
       app: flask-api

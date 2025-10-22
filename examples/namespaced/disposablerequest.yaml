@@ -4,7 +4,6 @@ metadata:
   name: send-notification-namespaced
   namespace: default
 spec:
-  deletionPolicy: Orphan
   forProvider:
     # Injecting data from secrets is possible, simply use the following syntax: {{ name:namespace:key }} (supported for body and headers only)
     url:  http://flask-api.default.svc.cluster.local/v1/notify
@@ -56,3 +55,4 @@ spec:
  
   providerConfigRef:
     name: http-conf-namespaced
+    kind: ProviderConfig

@@ -22,6 +22,10 @@ import (
 	clusterv1alpha2 "github.com/crossplane-contrib/provider-http/apis/cluster/request/v1alpha2"
 	namespaceddisposablev1alpha2 "github.com/crossplane-contrib/provider-http/apis/namespaced/disposablerequest/v1alpha2"
 	namespacedv1alpha2 "github.com/crossplane-contrib/provider-http/apis/namespaced/request/v1alpha2"
+
+	"github.com/crossplane/crossplane-runtime/v2/apis/common"
+	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	xpv2 "github.com/crossplane/crossplane-runtime/v2/apis/common/v2"
 )
 
 // ConvertNamespacedToClusterRequestParameters converts namespaced RequestParameters to cluster RequestParameters
@@ -52,6 +56,7 @@ func ConvertNamespacedToClusterMappings(src []namespacedv1alpha2.Mapping) []clus
 	for i, mapping := range src {
 		result[i] = clusterv1alpha2.Mapping{
 			Method:  mapping.Method,
+			Action:  mapping.Action,
 			Body:    mapping.Body,
 			URL:     mapping.URL,
 			Headers: mapping.Headers,
@@ -86,7 +91,7 @@ func ConvertNamespacedToClusterRequest(src *namespacedv1alpha2.Request) *cluster
 		TypeMeta:   src.TypeMeta,
 		ObjectMeta: src.ObjectMeta,
 		Spec: clusterv1alpha2.RequestSpec{
-			ResourceSpec: src.Spec.ResourceSpec,
+			ResourceSpec: ConvertManagedResourceSpecToResourceSpec(src.Spec.ManagedResourceSpec),
 			ForProvider:  *ConvertNamespacedToClusterRequestParameters(&src.Spec.ForProvider),
 		},
 		Status: ConvertNamespacedToClusterRequestStatus(src.Status),
@@ -118,6 +123,7 @@ func ConvertNamespacedToClusterResponse(src namespacedv1alpha2.Response) cluster
 func ConvertNamespacedToClusterMappingStatus(src namespacedv1alpha2.Mapping) clusterv1alpha2.Mapping {
 	return clusterv1alpha2.Mapping{
 		Method:  src.Method,
+		Action:  src.Action,
 		Body:    src.Body,
 		URL:     src.URL,
 		Headers: src.Headers,
@@ -174,7 +180,7 @@ func ConvertNamespacedToClusterDisposableRequest(src *namespaceddisposablev1alph
 		TypeMeta:   src.TypeMeta,
 		ObjectMeta: src.ObjectMeta,
 		Spec: clusterdisposablev1alpha2.DisposableRequestSpec{
-			ResourceSpec: src.Spec.ResourceSpec,
+			ResourceSpec: ConvertManagedResourceSpecToResourceSpec(src.Spec.ManagedResourceSpec),
 			ForProvider:  *ConvertNamespacedToClusterDisposableRequestParameters(&src.Spec.ForProvider),
 		},
 		Status: ConvertNamespacedToClusterDisposableRequestStatus(src.Status),
@@ -235,4 +241,34 @@ func ToClusterRequest(src *namespacedv1alpha2.Request) (*clusterv1alpha2.Request
 // ToClusterRequestActionObserve returns the cluster action constant for OBSERVE
 func ToClusterRequestActionObserve() string {
 	return clusterv1alpha2.ActionObserve
+}
+
+// ConvertManagedResourceSpecToResourceSpec converts v2 ManagedResourceSpec to v1 ResourceSpec
+func ConvertManagedResourceSpecToResourceSpec(src xpv2.ManagedResourceSpec) xpv1.ResourceSpec {
+	return xpv1.ResourceSpec{
+		WriteConnectionSecretToReference: ConvertLocalSecretToSecretReference(src.WriteConnectionSecretToReference),
+		ProviderConfigReference:          ConvertProviderConfigReferenceToReference(src.ProviderConfigReference),
+		ManagementPolicies:               src.ManagementPolicies,
+	}
+}
+
+// ConvertLocalSecretToSecretReference converts common.LocalSecretReference to v1.SecretReference
+func ConvertLocalSecretToSecretReference(src *common.LocalSecretReference) *xpv1.SecretReference {
+	if src == nil {
+		return nil
+	}
+	return &xpv1.SecretReference{
+		Name: src.Name,
+		// LocalSecretReference doesn't have Namespace - it's local to the managed resource's namespace
+	}
+}
+
+// ConvertProviderConfigReferenceToReference converts common.ProviderConfigReference to v1.Reference
+func ConvertProviderConfigReferenceToReference(src *common.ProviderConfigReference) *xpv1.Reference {
+	if src == nil {
+		return nil
+	}
+	return &xpv1.Reference{
+		Name: src.Name,
+	}
 }

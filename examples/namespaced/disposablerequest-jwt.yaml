@@ -4,7 +4,6 @@ metadata:
   name: obtain-jwt-token-namespaced
   namespace: default
 spec:
-  deletionPolicy: Orphan
   forProvider:
     insecureSkipTLSVerify: true
 
@@ -34,3 +33,4 @@ spec:
         setOwnerReference: true
   providerConfigRef:
     name: http-conf-namespaced
+    kind: ProviderConfig

@@ -126,3 +126,4 @@ spec:
 
   providerConfigRef:
     name: http-conf-namespaced
+    kind: ProviderConfig

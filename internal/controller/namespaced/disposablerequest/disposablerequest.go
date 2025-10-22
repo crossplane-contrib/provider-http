@@ -62,6 +62,10 @@ const (
 	errExtractCredentials                  = "cannot extract credentials"
 	errCheckExpectedResponse               = "failed to check if response is as expected"
 	errResponseDoesntMatchExpectedCriteria = "response does not match expected criteria"
+
+	errGetPC    = "cannot get ProviderConfig"
+	errGetCPC   = "cannot get ClusterProviderConfig"
+	errGetCreds = "cannot get credentials"
 )
 
 // Setup adds a controller that reconciles namespaced DisposableRequest managed resources.
@@ -106,30 +110,42 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 
 	// Set default providerConfigRef if not specified
 	if cr.GetProviderConfigReference() == nil {
-		cr.SetProviderConfigReference(&xpv1.Reference{
+		cr.SetProviderConfigReference(&xpv1.ProviderConfigReference{
 			Name: "default",
+			Kind: "ClusterProviderConfig",
 		})
 		l.Debug("No providerConfigRef specified, defaulting to 'default'")
 	}
 
-	// Get the namespaced ProviderConfig
-	pc := &apisv1alpha2.ProviderConfig{}
-	n := types.NamespacedName{Name: cr.GetProviderConfigReference().Name, Namespace: cr.Namespace}
-	if err := c.kube.Get(ctx, n, pc); err != nil {
-		return nil, errors.Wrap(err, errProviderNotRetrieved)
-	}
+	var cd apisv1alpha2.ProviderCredentials
 
-	creds := ""
-	if pc.Spec.Credentials.Source == xpv1.CredentialsSourceSecret {
-		data, err := resource.CommonCredentialExtractor(ctx, pc.Spec.Credentials.Source, c.kube, pc.Spec.Credentials.CommonCredentialSelectors)
-		if err != nil {
-			return nil, errors.Wrap(err, errExtractCredentials)
+	// Switch to ModernManaged resource to get ProviderConfigRef
+	m := mg.(resource.ModernManaged)
+	ref := m.GetProviderConfigReference()
+
+	switch ref.Kind {
+	case "ProviderConfig":
+		pc := &apisv1alpha2.ProviderConfig{}
+		if err := c.kube.Get(ctx, types.NamespacedName{Name: ref.Name, Namespace: m.GetNamespace()}, pc); err != nil {
+			return nil, errors.Wrap(err, errGetPC)
 		}
-
-		creds = string(data)
+		cd = pc.Spec.Credentials
+	case "ClusterProviderConfig":
+		cpc := &apisv1alpha2.ClusterProviderConfig{}
+		if err := c.kube.Get(ctx, types.NamespacedName{Name: ref.Name}, cpc); err != nil {
+			return nil, errors.Wrap(err, errGetCPC)
+		}
+		cd = cpc.Spec.Credentials
+	default:
+		return nil, errors.Errorf("unsupported provider config kind: %s", ref.Kind)
 	}
 
-	h, err := c.newHttpClientFn(l, utils.WaitTimeout(cr.Spec.ForProvider.WaitTimeout), creds)
+	data, err := resource.CommonCredentialExtractor(ctx, cd.Source, c.kube, cd.CommonCredentialSelectors)
+	if err != nil {
+		return nil, errors.Wrap(err, errExtractCredentials)
+	}
+
+	h, err := c.newHttpClientFn(l, utils.WaitTimeout(cr.Spec.ForProvider.WaitTimeout), string(data))
 	if err != nil {
 		return nil, errors.Wrap(err, errNewHttpClient)
 	}
@@ -152,6 +168,14 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	cr, ok := mg.(*v1alpha2.DisposableRequest)
 	if !ok {
 		return managed.ExternalObservation{}, errors.New(errNotNamespacedDisposableRequest)
+	}
+
+	// Skip secret injection processing if the resource is being deleted
+	if cr.GetDeletionTimestamp() != nil {
+		c.logger.Debug("DisposableRequest is being deleted, skipping observation and secret injection")
+		return managed.ExternalObservation{
+			ResourceExists: false,
+		}, nil
 	}
 
 	isUpToDate := !(utils.ShouldRetry(cr.Spec.ForProvider.RollbackRetriesLimit, cr.Status.Failed) && !utils.RetriesLimitReached(cr.Status.Failed, cr.Spec.ForProvider.RollbackRetriesLimit))

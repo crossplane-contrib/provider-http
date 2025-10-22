@@ -69,7 +69,7 @@ spec:
         if .response.body.password == .payload.body.password
          and .response.body.age == 35
          and .response.headers."Content-Type" == ["application/json"]
-         and .response.headers."X-Secret-Header"[0] == "{{ response-secret:crossplane-system:extracted-header-data }}"
+         and .response.headers."X-Secret-Header"[0] == "{{ response-secret-cluster:crossplane-system:extracted-header-data }}"
          then true 
          else false 
          end
@@ -116,3 +116,4 @@ spec:
   # This allows cross-namespace access for secrets and configurations
   providerConfigRef:
     name: http-conf-cluster
+    kind: ClusterProviderConfig
