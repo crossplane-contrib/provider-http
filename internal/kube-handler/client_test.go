@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/crossplane/crossplane-runtime/pkg/test"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/test"
 	"github.com/google/go-cmp/cmp"
 	errorspkg "github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
