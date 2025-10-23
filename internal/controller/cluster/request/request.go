@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/crossplane/crossplane-runtime/v2/pkg/logging"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -149,6 +150,13 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.New(errNotRequest)
 	}
 
+	if meta.WasDeleted(mg) {
+		c.logger.Debug("Request is being deleted, skipping observation and secret injection")
+		return managed.ExternalObservation{
+			ResourceExists: false,
+		}, nil
+	}
+
 	observeRequestDetails, err := c.isUpToDate(ctx, cr)
 	if err != nil && err.Error() == observe.ErrObjectNotFound {
 		return managed.ExternalObservation{
@@ -202,7 +210,13 @@ func (c *external) deployAction(ctx context.Context, cr *v1alpha2.Request, actio
 	}
 
 	details, err := c.http.SendRequest(ctx, mapping.Method, requestDetails.Url, requestDetails.Body, requestDetails.Headers, cr.Spec.ForProvider.InsecureSkipTLSVerify)
-	datapatcher.ApplyResponseDataToSecrets(ctx, c.localKube, c.logger, &details.HttpResponse, cr.Spec.ForProvider.SecretInjectionConfigs, cr)
+
+	// Skip secret injection during deletion to avoid cross-namespace owner reference issues
+	if !meta.WasDeleted(cr) {
+		datapatcher.ApplyResponseDataToSecrets(ctx, c.localKube, c.logger, &details.HttpResponse, cr.Spec.ForProvider.SecretInjectionConfigs, cr)
+	} else {
+		c.logger.Debug("Request is being deleted, skipping secret injection")
+	}
 
 	statusHandler, err := statushandler.NewStatusHandler(ctx, cr, details, err, c.localKube, c.logger)
 	if err != nil {

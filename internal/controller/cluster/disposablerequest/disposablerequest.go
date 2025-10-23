@@ -25,6 +25,7 @@ import (
 	datapatcher "github.com/crossplane-contrib/provider-http/internal/data-patcher"
 	"github.com/crossplane-contrib/provider-http/internal/jq"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/logging"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -147,10 +148,19 @@ type external struct {
 }
 
 // Observe checks the state of the DisposableRequest resource and updates its status accordingly.
+//
+//gocyclo:ignore
 func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
 	cr, ok := mg.(*v1alpha2.DisposableRequest)
 	if !ok {
 		return managed.ExternalObservation{}, errors.New(errNotDisposableRequest)
+	}
+
+	if meta.WasDeleted(mg) {
+		c.logger.Debug("DisposableRequest is being deleted, skipping observation and secret injection")
+		return managed.ExternalObservation{
+			ResourceExists: false,
+		}, nil
 	}
 
 	isUpToDate := !(utils.ShouldRetry(cr.Spec.ForProvider.RollbackRetriesLimit, cr.Status.Failed) && !utils.RetriesLimitReached(cr.Status.Failed, cr.Spec.ForProvider.RollbackRetriesLimit))
@@ -270,6 +280,12 @@ func (c *external) deployAction(ctx context.Context, cr *v1alpha2.DisposableRequ
 // applySecretInjectionsFromStoredResponse applies secret injection configurations using the stored response
 // This is used when the resource is already synced but secret injection configs may have been updated
 func (c *external) applySecretInjectionsFromStoredResponse(ctx context.Context, cr *v1alpha2.DisposableRequest, storedResponse httpClient.HttpResponse, isExpectedResponse bool) {
+	// Skip secret injection during deletion to avoid cross-namespace owner reference issues
+	if meta.WasDeleted(cr) {
+		c.logger.Debug("DisposableRequest is being deleted, skipping secret injection")
+		return
+	}
+
 	if isExpectedResponse {
 		c.logger.Debug("Applying secret injections from stored response")
 		datapatcher.ApplyResponseDataToSecrets(ctx, c.localKube, c.logger, &storedResponse, cr.Spec.ForProvider.SecretInjectionConfigs, cr)

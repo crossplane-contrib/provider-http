@@ -32,6 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/crossplane/crossplane-runtime/v2/pkg/logging"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/test"
 )
@@ -430,6 +431,132 @@ func Test_deployAction(t *testing.T) {
 					t.Fatalf("deployAction(...): -want Status.LastReconcileTime to not be nil, +got nil")
 				}
 			}
+		})
+	}
+}
+
+func disposableRequestWithDeletion() *v1alpha2.DisposableRequest {
+	now := v1.Now()
+	return &v1alpha2.DisposableRequest{
+		ObjectMeta: v1.ObjectMeta{
+			Name:              "test-disposable",
+			Namespace:         "default",
+			DeletionTimestamp: &now,
+		},
+		Spec: v1alpha2.DisposableRequestSpec{
+			ForProvider: v1alpha2.DisposableRequestParameters{
+				URL:    "http://example.com/test",
+				Method: "POST",
+				Body:   `{"test": true}`,
+			},
+		},
+	}
+}
+
+func TestObserve_DeletionMonitoring(t *testing.T) {
+	type args struct {
+		http      httpClient.Client
+		localKube client.Client
+		mg        resource.Managed
+	}
+	type want struct {
+		obs managed.ExternalObservation
+		err error
+	}
+
+	cases := []struct {
+		name string
+		args args
+		want want
+	}{
+		{
+			name: "ResourceBeingDeleted",
+			args: args{
+				mg: disposableRequestWithDeletion(),
+			},
+			want: want{
+				obs: managed.ExternalObservation{
+					ResourceExists: false,
+				},
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			e := &external{
+				logger:    logging.NewNopLogger(),
+				localKube: tc.args.localKube,
+				http:      tc.args.http,
+			}
+
+			got, err := e.Observe(context.Background(), tc.args.mg)
+			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
+				t.Errorf("Observe(...): -want error, +got error: %s", diff)
+			}
+			if diff := cmp.Diff(tc.want.obs, got); diff != "" {
+				t.Errorf("Observe(...): -want, +got: %s", diff)
+			}
+		})
+	}
+}
+
+func TestApplySecretInjectionsFromStoredResponse_SkipDuringDeletion(t *testing.T) {
+	type args struct {
+		cr                 *v1alpha2.DisposableRequest
+		storedResponse     httpClient.HttpResponse
+		isExpectedResponse bool
+	}
+
+	cases := []struct {
+		name string
+		args args
+	}{
+		{
+			name: "SkipSecretInjectionForDeletingResource",
+			args: args{
+				cr: disposableRequestWithDeletion(),
+				storedResponse: httpClient.HttpResponse{
+					StatusCode: 200,
+					Body:       `{"result": "success"}`,
+				},
+				isExpectedResponse: true,
+			},
+		},
+		{
+			name: "NormalSecretInjectionForNonDeletingResource",
+			args: args{
+				cr: &v1alpha2.DisposableRequest{
+					ObjectMeta: v1.ObjectMeta{
+						Name:      "test-disposable",
+						Namespace: "default",
+					},
+					Spec: v1alpha2.DisposableRequestSpec{
+						ForProvider: v1alpha2.DisposableRequestParameters{
+							URL:    "http://example.com/test",
+							Method: "POST",
+							Body:   `{"test": true}`,
+						},
+					},
+				},
+				storedResponse: httpClient.HttpResponse{
+					StatusCode: 200,
+					Body:       `{"result": "success"}`,
+				},
+				isExpectedResponse: true,
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			e := &external{
+				logger:    logging.NewNopLogger(),
+				localKube: &test.MockClient{},
+			}
+
+			// This test verifies that the method doesn't panic and handles deletion gracefully
+			e.applySecretInjectionsFromStoredResponse(context.Background(), tc.args.cr, tc.args.storedResponse, tc.args.isExpectedResponse)
 		})
 	}
 }
