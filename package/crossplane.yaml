@@ -20,3 +20,6 @@ metadata:
       join our community discussions on [slack.crossplane.io](https://slack.crossplane.io). 
       Feel free to create issues or contribute to the development at [crossplane-contrib/provider-http](https://github.com/crossplane-contrib/provider-http).
 
+spec:
+  capabilities:
+  - safe-start

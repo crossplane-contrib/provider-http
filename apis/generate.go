@@ -1,6 +1,3 @@
-//go:build generate
-// +build generate
-
 /*
 Copyright 2020 The Crossplane Authors.
 
@@ -30,9 +27,3 @@ limitations under the License.
 //go:generate go run -tags generate github.com/crossplane/crossplane-tools/cmd/angryjet generate-methodsets --header-file=../hack/boilerplate.go.txt ./...
 
 package apis
-
-import (
-	_ "sigs.k8s.io/controller-tools/cmd/controller-gen" //nolint:typecheck
-
-	_ "github.com/crossplane/crossplane-tools/cmd/angryjet" //nolint:typecheck
-)
