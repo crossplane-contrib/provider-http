@@ -25,6 +25,7 @@ import (
 	datapatcher "github.com/crossplane-contrib/provider-http/internal/data-patcher"
 	"github.com/crossplane-contrib/provider-http/internal/jq"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/logging"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -164,14 +165,15 @@ type external struct {
 }
 
 // Observe checks the state of the DisposableRequest resource and updates its status accordingly.
+//
+//gocyclo:ignore
 func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
 	cr, ok := mg.(*v1alpha2.DisposableRequest)
 	if !ok {
 		return managed.ExternalObservation{}, errors.New(errNotNamespacedDisposableRequest)
 	}
 
-	// Skip secret injection processing if the resource is being deleted
-	if cr.GetDeletionTimestamp() != nil {
+	if meta.WasDeleted(mg) {
 		c.logger.Debug("DisposableRequest is being deleted, skipping observation and secret injection")
 		return managed.ExternalObservation{
 			ResourceExists: false,

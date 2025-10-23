@@ -4,6 +4,10 @@ go 1.24.0
 
 toolchain go1.24.6
 
+tool sigs.k8s.io/controller-tools/cmd/controller-gen
+
+tool github.com/crossplane/crossplane-tools/cmd/angryjet
+
 require (
 	github.com/crossplane/crossplane-runtime/v2 v2.0.0
 	github.com/google/go-cmp v0.7.0
@@ -16,7 +20,10 @@ require (
 
 require (
 	dario.cat/mergo v1.0.1 // indirect
+	github.com/alecthomas/kingpin/v2 v2.4.0 // indirect
 	github.com/blang/semver/v4 v4.0.0 // indirect
+	github.com/crossplane/crossplane-tools v0.0.0-20251017183449-dd4517244339 // indirect
+	github.com/dave/jennifer v1.7.1 // indirect
 	github.com/evanphx/json-patch v5.9.11+incompatible // indirect
 	github.com/fxamacker/cbor/v2 v2.9.0 // indirect
 	github.com/google/btree v1.1.3 // indirect
@@ -24,6 +31,7 @@ require (
 	github.com/itchyny/timefmt-go v0.1.6 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
+	github.com/xhit/go-str2duration/v2 v2.1.0 // indirect
 	go.opentelemetry.io/otel v1.33.0 // indirect
 	go.opentelemetry.io/otel/trace v1.33.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.2 // indirect

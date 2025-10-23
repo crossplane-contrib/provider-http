@@ -77,7 +77,6 @@ func namespacedDisposableRequestWithDeletion() *v1alpha2.DisposableRequest {
 	})
 }
 
-
 func TestObserve(t *testing.T) {
 	type args struct {
 		http      httpClient.Client
