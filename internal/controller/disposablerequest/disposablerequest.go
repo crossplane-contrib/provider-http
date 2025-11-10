@@ -24,6 +24,7 @@ import (
 
 	datapatcher "github.com/crossplane-contrib/provider-http/internal/data-patcher"
 	"github.com/crossplane-contrib/provider-http/internal/jq"
+	"github.com/crossplane/crossplane-runtime/pkg/feature"
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/types"
@@ -69,8 +70,7 @@ func Setup(mgr ctrl.Manager, o controller.Options, timeout time.Duration) error 
 	name := managed.ControllerName(v1alpha2.DisposableRequestGroupKind)
 	cps := []managed.ConnectionPublisher{managed.NewAPISecretPublisher(mgr.GetClient(), mgr.GetScheme())}
 
-	r := managed.NewReconciler(mgr,
-		resource.ManagedKind(v1alpha2.DisposableRequestGroupVersionKind),
+	reconcilerOptions := []managed.ReconcilerOption{
 		managed.WithExternalConnecter(&connector{
 			logger:          o.Logger,
 			kube:            mgr.GetClient(),
@@ -82,7 +82,17 @@ func Setup(mgr ctrl.Manager, o controller.Options, timeout time.Duration) error 
 		WithCustomPollIntervalHook(),
 		managed.WithTimeout(timeout),
 		managed.WithRecorder(event.NewAPIRecorder(mgr.GetEventRecorderFor(name))),
-		managed.WithConnectionPublishers(cps...))
+		managed.WithConnectionPublishers(cps...),
+	}
+
+	if o.Features.Enabled(feature.EnableBetaManagementPolicies) {
+		reconcilerOptions = append(reconcilerOptions, managed.WithManagementPolicies())
+	}
+
+	r := managed.NewReconciler(mgr,
+		resource.ManagedKind(v1alpha2.DisposableRequestGroupVersionKind),
+		reconcilerOptions...,
+	)
 
 	return ctrl.NewControllerManagedBy(mgr).
 		Named(name).
