@@ -102,14 +102,19 @@ uptest: $(UPTEST) $(KUBECTL) $(KUTTL)
 local-dev: controlplane.up
 local-deploy: build controlplane.up local.xpkg.deploy.provider.$(PROJECT_NAME)
 	@$(INFO) running locally built provider
-	@$(KUBECTL) wait provider.pkg $(PROJECT_NAME) --for condition=Installed --timeout 5m
+	@$(KUBECTL) wait provider.pkg $(PROJECT_NAME) --for condition=Healthy --timeout 5m
 	@$(KUBECTL) -n $(CROSSPLANE_NAMESPACE) wait --for=condition=Available deployment --all --timeout=5m
 	@$(OK) running locally built provider
 
-# Prepare for E2E testing - always rebuild test server
-e2e.prepare: test-server.build
+# Prepare for E2E testing - always rebuild test server and load into kind
+e2e.prepare: test-server.build $(KIND)
 	@$(INFO) preparing for e2e tests
 	@echo "✅ Test server image $(TEST_SERVER_IMAGE) is ready"
+	@if kubectl config current-context | grep -q "kind-"; then \
+		CLUSTER_NAME=$$(kubectl config current-context | sed 's/kind-//'); \
+		echo "Loading test server image into kind cluster: $$CLUSTER_NAME"; \
+		$(KIND) load docker-image $(TEST_SERVER_IMAGE) --name $$CLUSTER_NAME || echo "Warning: Failed to load image"; \
+	fi
 	@$(OK) preparing for e2e tests
 
 # Main E2E target - builds test server, deploys provider, runs tests
