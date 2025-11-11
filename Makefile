@@ -94,17 +94,112 @@ UPTEST_EXAMPLE_LIST := $(shell find ./examples/sample -path '*.yaml' | paste -s 
 
 uptest: $(UPTEST) $(KUBECTL) $(KUTTL)
 	@$(INFO) running automated tests
-	@KUBECTL=$(KUBECTL) KUTTL=$(KUTTL) CROSSPLANE_NAMESPACE=$(CROSSPLANE_NAMESPACE) $(UPTEST) e2e "$(UPTEST_EXAMPLE_LIST)" --setup-script=cluster/test/setup.sh || $(FAIL)
+	@KUBECTL=$(KUBECTL) KUTTL=$(KUTTL) CROSSPLANE_NAMESPACE=$(CROSSPLANE_NAMESPACE) TEST_SERVER_IMAGE=$(TEST_SERVER_IMAGE) $(UPTEST) e2e "$(UPTEST_EXAMPLE_LIST)" --setup-script=cluster/test/setup.sh || $(FAIL)
 	@$(OK) running automated tests
 
 local-dev: controlplane.up
 local-deploy: build controlplane.up local.xpkg.deploy.provider.$(PROJECT_NAME)
 	@$(INFO) running locally built provider
+	@if kubectl config current-context | grep -q "kind-"; then \
+		CLUSTER_NAME=$$(kubectl config current-context | sed 's/kind-//'); \
+		echo "Loading test server image into kind cluster: $$CLUSTER_NAME"; \
+		$(KIND) load docker-image $(TEST_SERVER_IMAGE) --name $$CLUSTER_NAME || echo "Warning: Failed to load test-server image"; \
+	fi
 	@$(KUBECTL) wait provider.pkg $(PROJECT_NAME) --for condition=Healthy --timeout 5m
 	@$(KUBECTL) -n $(CROSSPLANE_NAMESPACE) wait --for=condition=Available deployment --all --timeout=5m
 	@$(OK) running locally built provider
 
-e2e: local-deploy uptest
+# Prepare for E2E testing - always rebuild test server
+e2e.prepare: test-server.build
+	@$(INFO) preparing for e2e tests
+	@echo "✅ Test server image $(TEST_SERVER_IMAGE) is ready"
+	@$(OK) preparing for e2e tests
+
+# Main E2E target - builds test server, deploys provider, runs tests
+e2e: e2e.prepare local-deploy uptest
+
+# ====================================================================================
+# Local Test Server Development
+
+# Test server configuration
+# CI can override this via environment variable
+# For local development, this is built by test-server.build target
+TEST_SERVER_IMAGE ?= provider-http-test-server:latest
+TEST_SERVER_CONTAINER = provider-http-test-server
+TEST_SERVER_PORT = 5001
+
+.PHONY: test-server.build test-server.rebuild test-server.start test-server.stop test-server.restart test-server.logs test-server.status test-server.clean
+
+# BUILD_ARGS can be set to add docker build flags (e.g., BUILD_ARGS="--load" for buildx)
+BUILD_ARGS ?=
+
+test-server.build:
+	@$(INFO) building test server image
+	@cd cluster/test && docker build $(BUILD_ARGS) -t $(TEST_SERVER_IMAGE) .
+	@$(OK) building test server image
+
+# Force rebuild test server image (bypass cache)
+test-server.rebuild:
+	@$(INFO) rebuilding test server image (no cache)
+	@cd cluster/test && docker build $(BUILD_ARGS) --no-cache -t $(TEST_SERVER_IMAGE) .
+	@$(OK) rebuilding test server image
+
+test-server.start: test-server.build
+	@$(INFO) starting test server container
+	@docker run -d --name $(TEST_SERVER_CONTAINER) -p $(TEST_SERVER_PORT):5000 $(TEST_SERVER_IMAGE) || \
+		(echo "Container may already exist. Use 'make test-server.restart' to restart it." && exit 1)
+	@echo "Test server starting at http://localhost:$(TEST_SERVER_PORT)"
+	@echo "Waiting for server to be ready..."
+	@sleep 3
+	@curl -f -H "Authorization: Bearer my-secret-value" -X POST http://localhost:$(TEST_SERVER_PORT)/v1/login > /dev/null && \
+		echo "✅ Test server is ready!" || echo "❌ Test server may not be ready yet"
+	@$(OK) starting test server container
+
+test-server.stop:
+	@$(INFO) stopping test server container
+	@docker stop $(TEST_SERVER_CONTAINER) 2>/dev/null || echo "Container not running"
+	@docker rm $(TEST_SERVER_CONTAINER) 2>/dev/null || echo "Container not found"
+	@$(OK) stopping test server container
+
+test-server.restart: test-server.stop test-server.start
+
+test-server.logs:
+	@echo "=== Test Server Logs ==="
+	@docker logs $(TEST_SERVER_CONTAINER) 2>/dev/null || echo "Container not found or not running"
+
+test-server.status:
+	@echo "=== Test Server Status ==="
+	@docker ps -f name=$(TEST_SERVER_CONTAINER) --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" || echo "Container not found"
+	@echo ""
+	@echo "Testing server health..."
+	@curl -f -H "Authorization: Bearer my-secret-value" -X POST http://localhost:$(TEST_SERVER_PORT)/v1/login 2>/dev/null && \
+		echo "✅ Server is healthy" || echo "❌ Server is not responding"
+
+test-server.clean: test-server.stop
+	@$(INFO) cleaning test server image
+	@docker rmi $(TEST_SERVER_IMAGE) 2>/dev/null || echo "Image not found"
+	@$(OK) cleaning test server image
+
+test-server.help:
+	@echo "Test Server Development Targets:"
+	@echo "  test-server.build    - Build the test server Docker image"
+	@echo "  test-server.start    - Start the test server container"
+	@echo "  test-server.stop     - Stop and remove the test server container"
+	@echo "  test-server.restart  - Restart the test server (stop + start)"
+	@echo "  test-server.logs     - Show test server logs"
+	@echo "  test-server.status   - Show container status and health"
+	@echo "  test-server.clean    - Stop container and remove image"
+	@echo "  test-server.help     - Show this help"
+	@echo ""
+	@echo "E2E Testing Targets:"
+	@echo "  e2e                  - Run E2E tests (original target)"
+	@echo "  e2e.prepare          - Check/prepare test server image for E2E"
+	@echo "  e2e.local            - Prepare environment and run E2E tests"
+	@echo ""
+	@echo "Server runs on: http://localhost:$(TEST_SERVER_PORT)"
+	@echo "Authorization: Bearer my-secret-value"
+	@echo "Current TEST_SERVER_IMAGE: $(TEST_SERVER_IMAGE)"
+
 # Update the submodules, such as the common build scripts.
 submodules:
 	@git submodule sync

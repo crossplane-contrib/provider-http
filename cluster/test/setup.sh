@@ -1,7 +1,12 @@
 #!/usr/bin/env bash
 set -aeuo pipefail
 
+# Default to local image if not overridden
+TEST_SERVER_IMAGE=${TEST_SERVER_IMAGE:-"provider-http-test-server:latest"}
+
 echo "Running setup.sh"
+echo "Using test server image: ${TEST_SERVER_IMAGE}"
+
 echo "Creating the provider config with cluster admin permissions in cluster..."
 SA=$(${KUBECTL} -n crossplane-system get sa -o name | grep provider-http | sed -e 's|serviceaccount\/|crossplane-system:|g')
 ${KUBECTL} create clusterrolebinding provider-http-admin-binding --clusterrole cluster-admin --serviceaccount="${SA}" --dry-run=client -o yaml | ${KUBECTL} apply -f -
@@ -20,34 +25,35 @@ cat <<EOF | ${KUBECTL} apply -f -
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: flask-api
+  name: test-server
   namespace: default
   labels:
-    app: flask-api
+    app: test-server
 spec:
   replicas: 3
   selector:
     matchLabels:
-      app: flask-api
+      app: test-server
   template:
     metadata:
       labels:
-        app: flask-api
+        app: test-server
     spec:
       containers:
-      - name: flask-api
-        image: arielsepton/flask-api:v1.0.0
+      - name: server
+        image: ${TEST_SERVER_IMAGE}
+        imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 5000
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: flask-api
+  name: test-server
   namespace: default
 spec:
   selector:
-    app: flask-api
+    app: test-server
   ports:
   - protocol: TCP
     port: 80
