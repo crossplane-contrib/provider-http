@@ -1,9 +1,6 @@
 #!/usr/bin/env bash
 set -aeuo pipefail
 
-#!/usr/bin/env bash
-set -e
-
 # Default to local image if not overridden
 TEST_SERVER_IMAGE=${TEST_SERVER_IMAGE:-"provider-http-test-server:latest"}
 
