@@ -102,31 +102,18 @@ uptest: $(UPTEST) $(KUBECTL) $(KUTTL)
 local-dev: controlplane.up
 local-deploy: build controlplane.up local.xpkg.deploy.provider.$(PROJECT_NAME)
 	@$(INFO) running locally built provider
-	@$(KUBECTL) wait provider.pkg $(PROJECT_NAME) --for condition=Healthy --timeout 5m
+	@$(KUBECTL) wait provider.pkg $(PROJECT_NAME) --for condition=Installed --timeout 5m
 	@$(KUBECTL) -n $(CROSSPLANE_NAMESPACE) wait --for=condition=Available deployment --all --timeout=5m
 	@$(OK) running locally built provider
 
-e2e: local-deploy uptest
-
-# Prepare for local E2E testing by building test server if needed
-e2e.prepare:
+# Prepare for E2E testing - always rebuild test server
+e2e.prepare: test-server.build
 	@$(INFO) preparing for e2e tests
-	@echo "Current TEST_SERVER_IMAGE: $(TEST_SERVER_IMAGE)"
-	@if ! docker image inspect $(TEST_SERVER_IMAGE) >/dev/null 2>&1; then \
-		echo "Test server image not found locally. You have two options:"; \
-		echo "1. Build local test server: make test-server.build"; \
-		echo "2. Pull official image: docker pull ghcr.io/crossplane-contrib/provider-http-server:latest"; \
-		echo "3. Use crossplane-contrib image: export TEST_SERVER_IMAGE=ghcr.io/crossplane-contrib/provider-http-server:latest"; \
-		echo ""; \
-		echo "Attempting to pull crossplane-contrib image..."; \
-		docker pull ghcr.io/crossplane-contrib/provider-http-server:latest || echo "Failed to pull, you may need to build locally"; \
-	else \
-		echo "✅ Test server image $(TEST_SERVER_IMAGE) is available"; \
-	fi
+	@echo "✅ Test server image $(TEST_SERVER_IMAGE) is ready"
 	@$(OK) preparing for e2e tests
 
-# Enhanced e2e target that prepares the environment
-e2e.local: e2e.prepare local-deploy uptest
+# Main E2E target - builds test server, deploys provider, runs tests
+e2e: e2e.prepare local-deploy uptest
 
 # ====================================================================================
 # Local Test Server Development
@@ -148,12 +135,18 @@ TEST_SERVER_IMAGE ?= $(shell \
 TEST_SERVER_CONTAINER = provider-http-test-server
 TEST_SERVER_PORT = 5001
 
-.PHONY: test-server.build test-server.start test-server.stop test-server.restart test-server.logs test-server.status test-server.clean
+.PHONY: test-server.build test-server.rebuild test-server.start test-server.stop test-server.restart test-server.logs test-server.status test-server.clean
 
 test-server.build:
 	@$(INFO) building test server image
 	@cd cluster/test && docker build -t $(TEST_SERVER_IMAGE) .
 	@$(OK) building test server image
+
+# Force rebuild test server image (bypass cache)
+test-server.rebuild:
+	@$(INFO) rebuilding test server image (no cache)
+	@cd cluster/test && docker build --no-cache -t $(TEST_SERVER_IMAGE) .
+	@$(OK) rebuilding test server image
 
 test-server.start: test-server.build
 	@$(INFO) starting test server container

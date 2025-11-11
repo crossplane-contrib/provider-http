@@ -59,10 +59,14 @@ docker run -p 5000:5000 test-server
 
 ## Deployment
 
-The server is automatically built and deployed to GitHub Container Registry when changes are pushed to the `cluster/test/` directory.
+The server is used for E2E testing in both local development and CI environments.
+
+### E2E Testing
+
+```bash
+make e2e
+```
 
 **Images:**
 - Main repo: `ghcr.io/crossplane-contrib/provider-http-server:latest`
 - Forks: `ghcr.io/{your-username}/provider-http-server:latest`
-
-The CI/CD pipeline automatically uses the correct registry based on the repository owner.
