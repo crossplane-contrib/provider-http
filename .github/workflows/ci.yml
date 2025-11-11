@@ -11,8 +11,8 @@ on:
 env:
   # Common versions
   GO_VERSION: '1.24.6'
-  GOLANGCI_VERSION: 'v1.64.8'
-  DOCKER_BUILDX_VERSION: 'v0.8.2'
+  GOLANGCI_VERSION: 'v2.1.2'
+  DOCKER_BUILDX_VERSION: 'v0.23.0'
 
 jobs:
   detect-noop:
@@ -27,42 +27,6 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           paths_ignore: '["**.md", "**.png", "**.jpg"]'
           do_not_skip: '["workflow_dispatch", "schedule", "push"]'
-
-  detect-test-server-changes:
-    runs-on: ubuntu-latest
-    outputs:
-      test-server-changed: ${{ steps.changes.outputs.test-server }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - name: Check for test server changes
-        id: changes
-        run: |
-          if [ "${{ github.event_name }}" = "push" ]; then
-            # For push events, check if test server files changed in the last commit
-            if git diff --name-only HEAD~1 HEAD | grep -q "^cluster/test/"; then
-              echo "test-server=true" >> $GITHUB_OUTPUT
-            else
-              echo "test-server=false" >> $GITHUB_OUTPUT
-            fi
-          elif [ "${{ github.event_name }}" = "pull_request" ]; then
-            # For PRs, check if test server files changed compared to base branch
-            if git diff --name-only origin/${{ github.base_ref }}...HEAD | grep -q "^cluster/test/"; then
-              echo "test-server=true" >> $GITHUB_OUTPUT
-            else
-              echo "test-server=false" >> $GITHUB_OUTPUT
-            fi
-          else
-            # For other events, assume test server might have changed
-            echo "test-server=true" >> $GITHUB_OUTPUT
-          fi
-
-  build-test-server:
-    uses: ./.github/workflows/build-server.yml
-    needs: [detect-noop, detect-test-server-changes]
-    if: needs.detect-noop.outputs.noop != 'true' && needs.detect-test-server-changes.outputs.test-server-changed == 'true'
 
 
   lint:
@@ -145,8 +109,8 @@ jobs:
 
   e2e-tests:
     runs-on: ubuntu-latest
-    needs: [detect-noop, detect-test-server-changes, build-test-server]
-    if: needs.detect-noop.outputs.noop != 'true' && always() && !cancelled() && !failure()
+    needs: detect-noop
+    if: needs.detect-noop.outputs.noop != 'true'
 
     steps:
       - name: Setup QEMU
@@ -176,26 +140,9 @@ jobs:
       - name: Vendor Dependencies
         run: make vendor vendor.check
 
-      - name: Determine test server image
-        id: test-server-image
-        run: |
-          if [ "${{ needs.detect-test-server-changes.outputs.test-server-changed }}" = "true" ] && [ "${{ needs.build-test-server.result }}" = "success" ]; then
-            # Use the built image from the build-test-server job
-            IMAGE="${{ needs.build-test-server.outputs.image-name }}:${{ needs.build-test-server.outputs.image-version }}"
-            echo "Using newly built test server image: $IMAGE"
-            echo "image=$IMAGE" >> $GITHUB_OUTPUT
-          else
-            # Use the default crossplane-contrib image
-            IMAGE="ghcr.io/crossplane-contrib/provider-http-server:latest"
-            echo "Using default crossplane-contrib test server image: $IMAGE"
-            echo "image=$IMAGE" >> $GITHUB_OUTPUT
-          fi
-
       - name: Run the end to end tests
         run: make e2e
         env:
           # We're using docker buildx, which doesn't actually load the images it
           # builds by default. Specifying --load does so.
           BUILD_ARGS: "--load"
-          # Use the test server image determined above
-          TEST_SERVER_IMAGE: ${{ steps.test-server-image.outputs.image }}

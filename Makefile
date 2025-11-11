@@ -137,15 +137,18 @@ TEST_SERVER_PORT = 5001
 
 .PHONY: test-server.build test-server.rebuild test-server.start test-server.stop test-server.restart test-server.logs test-server.status test-server.clean
 
+# BUILD_ARGS can be set to add docker build flags (e.g., BUILD_ARGS="--load" for buildx)
+BUILD_ARGS ?=
+
 test-server.build:
 	@$(INFO) building test server image
-	@cd cluster/test && docker build -t $(TEST_SERVER_IMAGE) .
+	@cd cluster/test && docker build $(BUILD_ARGS) -t $(TEST_SERVER_IMAGE) .
 	@$(OK) building test server image
 
 # Force rebuild test server image (bypass cache)
 test-server.rebuild:
 	@$(INFO) rebuilding test server image (no cache)
-	@cd cluster/test && docker build --no-cache -t $(TEST_SERVER_IMAGE) .
+	@cd cluster/test && docker build $(BUILD_ARGS) --no-cache -t $(TEST_SERVER_IMAGE) .
 	@$(OK) rebuilding test server image
 
 test-server.start: test-server.build
