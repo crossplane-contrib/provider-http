@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
 set -aeuo pipefail
 
-# Default to crossplane-contrib, but allow override via environment variable
-TEST_SERVER_IMAGE=${TEST_SERVER_IMAGE:-"ghcr.io/crossplane-contrib/provider-http-server:latest"}
+#!/usr/bin/env bash
+set -e
+
+# Default to local image if not overridden
+TEST_SERVER_IMAGE=${TEST_SERVER_IMAGE:-"provider-http-test-server:latest"}
 
 echo "Running setup.sh"
 echo "Using test server image: ${TEST_SERVER_IMAGE}"

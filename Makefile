@@ -124,19 +124,9 @@ e2e: e2e.prepare local-deploy uptest
 # Local Test Server Development
 
 # Test server configuration
-# This logic determines which test server image to use:
-# 1. If TEST_SERVER_IMAGE is set as env var, use it (from CI)
-# 2. If running locally, try to use a locally built image first
-# 3. Fall back to crossplane-contrib official image
-TEST_SERVER_IMAGE ?= $(shell \
-	OWNER=$$(git remote get-url origin 2>/dev/null | sed 's/.*github.com[:/]\([^/]*\).*/\1/' 2>/dev/null || echo "crossplane-contrib"); \
-	LOCAL_IMAGE="ghcr.io/$$OWNER/provider-http-server:latest"; \
-	if docker image inspect $$LOCAL_IMAGE >/dev/null 2>&1; then \
-		echo $$LOCAL_IMAGE; \
-	else \
-		echo "ghcr.io/crossplane-contrib/provider-http-server:latest"; \
-	fi \
-)
+# CI can override this via environment variable
+# For local development, this is built by test-server.build target
+TEST_SERVER_IMAGE ?= provider-http-test-server:latest
 TEST_SERVER_CONTAINER = provider-http-test-server
 TEST_SERVER_PORT = 5001
 
