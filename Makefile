@@ -96,7 +96,7 @@ UPTEST_EXAMPLE_LIST := $(shell find ./examples/sample -path '*.yaml' | paste -s 
 
 uptest: $(UPTEST) $(KUBECTL) $(KUTTL)
 	@$(INFO) running automated tests
-	@KUBECTL=$(KUBECTL) KUTTL=$(KUTTL) KIND=$(KIND) CROSSPLANE_NAMESPACE=$(CROSSPLANE_NAMESPACE) TEST_SERVER_IMAGE=$(TEST_SERVER_IMAGE) $(UPTEST) e2e "$(UPTEST_EXAMPLE_LIST)" --setup-script=cluster/test/setup.sh || $(FAIL)
+	@KUBECTL=$(KUBECTL) KUTTL=$(KUTTL) CROSSPLANE_NAMESPACE=$(CROSSPLANE_NAMESPACE) TEST_SERVER_IMAGE=$(TEST_SERVER_IMAGE) $(UPTEST) e2e "$(UPTEST_EXAMPLE_LIST)" --setup-script=cluster/test/setup.sh || $(FAIL)
 	@$(OK) running automated tests
 
 local-dev: controlplane.up
