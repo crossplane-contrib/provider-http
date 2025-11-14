@@ -18,3 +18,4 @@ cluster/test/testserver
 # Local backup directory (not for upstream)
 .local-backup/
 bin/
+cluster/test/vendor/

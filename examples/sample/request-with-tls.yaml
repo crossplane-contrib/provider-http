@@ -1,6 +1,6 @@
 ---
 # Example: Request resource with TLS configuration override
-apiVersion: http.crossplane.io/v1alpha1
+apiVersion: http.crossplane.io/v1alpha2
 kind: Request
 metadata:
   name: example-request-tls
@@ -8,39 +8,31 @@ spec:
   providerConfigRef:
     name: provider-http-tls
   forProvider:
-    mappings:
-      - action: CREATE
-        method: POST
-        url: https://api.example.com/resource
-        body: |
-          {
-            "name": "example",
-            "value": "test"
-          }
-      - action: OBSERVE
-        method: GET
-        url: https://api.example.com/resource/{{.response.body.id}}
-      - action: UPDATE
-        method: PUT
-        url: https://api.example.com/resource/{{.response.body.id}}
-      - action: REMOVE
-        method: DELETE
-        url: https://api.example.com/resource/{{.response.body.id}}
     payload:
       baseUrl: https://api.example.com
+    mappings:
+      - method: POST
+        body: '{ "name": "example", "value": "test" }'
+        url: .payload.baseUrl + "/resource"
+      - method: GET
+        url: .payload.baseUrl + "/resource/" + (.response.body.id | tostring)
+      - method: PUT
+        body: '{ "name": "example-updated", "value": "updated" }'
+        url: .payload.baseUrl + "/resource/" + (.response.body.id | tostring)
+      - method: DELETE
+        url: .payload.baseUrl + "/resource/" + (.response.body.id | tostring)
     headers:
       Content-Type:
         - application/json
     # Override TLS configuration for this specific request (optional)
     tlsConfig:
-      # Use a different CA certificate for this request
       caCertSecretRef:
         name: api-specific-ca
         namespace: crossplane-system
         key: ca.crt
 ---
 # Example: Request without TLS config override (uses ProviderConfig TLS)
-apiVersion: http.crossplane.io/v1alpha1
+apiVersion: http.crossplane.io/v1alpha2
 kind: Request
 metadata:
   name: example-request-provider-tls
@@ -48,17 +40,13 @@ spec:
   providerConfigRef:
     name: provider-http-tls
   forProvider:
-    mappings:
-      - action: CREATE
-        method: POST
-        url: https://api.example.com/resource
-        body: |
-          {
-            "name": "example"
-          }
-      - action: OBSERVE
-        method: GET
-        url: https://api.example.com/resource/{{.response.body.id}}
     payload:
       baseUrl: https://api.example.com
-    # This request will use TLS configuration from ProviderConfig
+    mappings:
+      - method: POST
+        body: '{ "name": "example", "value": "test" }'
+        url: .payload.baseUrl + "/resource"
+      - method: GET
+        url: .payload.baseUrl + "/resource/" + (.response.body.id | tostring)
+      - method: DELETE
+        url: .payload.baseUrl + "/resource/" + (.response.body.id | tostring)
