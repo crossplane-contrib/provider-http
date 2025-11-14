@@ -28,6 +28,30 @@ const (
 )
 
 var (
+	testPostMapping = v1alpha2.Mapping{
+		Method: "POST",
+		Body:   "{ username: .payload.body.username, email: .payload.body.email }",
+		URL:    ".payload.baseUrl",
+	}
+
+	testPutMapping = v1alpha2.Mapping{
+		Method: "PUT",
+		Body:   "{ username: \"john_doe_new_username\" }",
+		URL:    "(.payload.baseUrl + \"/\" + .response.body.id)",
+	}
+
+	testGetMapping = v1alpha2.Mapping{
+		Method: "GET",
+		URL:    "(.payload.baseUrl + \"/\" + .response.body.id)",
+	}
+
+	testDeleteMapping = v1alpha2.Mapping{
+		Method: "DELETE",
+		URL:    "(.payload.baseUrl + \"/\" + .response.body.id)",
+	}
+)
+
+var (
 	testForProvider = v1alpha2.RequestParameters{
 		Payload: v1alpha2.Payload{
 			Body:    "{\"username\": \"john_doe\", \"email\": \"john.doe@example.com\"}",
@@ -58,7 +82,12 @@ func httpRequest(rm ...httpRequestModifier) *v1alpha2.Request {
 			},
 			ForProvider: testForProvider,
 		},
-		Status: v1alpha2.RequestStatus{},
+		Status: v1alpha2.RequestStatus{
+			Response: v1alpha2.Response{
+				Body:       `{"id": "123"}`,
+				StatusCode: 200,
+			},
+		},
 	}
 
 	for _, m := range rm {

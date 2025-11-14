@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/crossplane-contrib/provider-http/apis/common"
+	"github.com/crossplane-contrib/provider-http/apis/interfaces"
 	"github.com/crossplane-contrib/provider-http/apis/request/v1alpha2"
 	httpClient "github.com/crossplane-contrib/provider-http/internal/clients/http"
 	kubehandler "github.com/crossplane-contrib/provider-http/internal/kube-handler"
@@ -21,19 +22,19 @@ const (
 )
 
 // PatchSecretsIntoResponse patches secrets into the provided response.
-func PatchSecretsIntoResponse(ctx context.Context, localKube client.Client, response v1alpha2.Response, logger logging.Logger) (v1alpha2.Response, error) {
-	patchedBody, err := PatchSecretsIntoString(ctx, localKube, response.Body, logger)
+func PatchSecretsIntoResponse(ctx context.Context, localKube client.Client, response interfaces.HTTPResponse, logger logging.Logger) (interfaces.HTTPResponse, error) {
+	patchedBody, err := PatchSecretsIntoString(ctx, localKube, response.GetBody(), logger)
 	if err != nil {
-		return v1alpha2.Response{}, err
+		return nil, err
 	}
 
-	patchedHeaders, err := PatchSecretsIntoHeaders(ctx, localKube, response.Headers, logger)
+	patchedHeaders, err := PatchSecretsIntoHeaders(ctx, localKube, response.GetHeaders(), logger)
 	if err != nil {
-		return v1alpha2.Response{}, err
+		return nil, err
 	}
 
-	return v1alpha2.Response{
-		StatusCode: response.StatusCode,
+	return &v1alpha2.Response{
+		StatusCode: response.GetStatusCode(),
 		Body:       patchedBody,
 		Headers:    patchedHeaders,
 	}, nil

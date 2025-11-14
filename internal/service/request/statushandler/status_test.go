@@ -197,7 +197,7 @@ func Test_SetRequestStatus(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			r, _ := NewStatusHandler(context.Background(), tc.args.cr, tc.args.requestDetails, tc.args.err, tc.args.localKube, logging.NewNopLogger())
+			r, _ := NewStatusHandler(context.Background(), tc.args.cr, &tc.args.cr.Spec.ForProvider, tc.args.requestDetails, tc.args.err, tc.args.localKube, logging.NewNopLogger())
 			if tc.args.isSynced {
 				r.ResetFailures()
 			}

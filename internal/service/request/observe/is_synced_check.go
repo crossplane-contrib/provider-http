@@ -6,12 +6,13 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/crossplane-contrib/provider-http/apis/request/v1alpha2"
+	"github.com/crossplane-contrib/provider-http/apis/common"
+	"github.com/crossplane-contrib/provider-http/apis/interfaces"
 	httpClient "github.com/crossplane-contrib/provider-http/internal/clients/http"
-	"github.com/crossplane-contrib/provider-http/internal/controller/request/requestgen"
-	"github.com/crossplane-contrib/provider-http/internal/controller/request/requestmapping"
 	datapatcher "github.com/crossplane-contrib/provider-http/internal/data-patcher"
 	"github.com/crossplane-contrib/provider-http/internal/json"
+	"github.com/crossplane-contrib/provider-http/internal/service/request/requestgen"
+	"github.com/crossplane-contrib/provider-http/internal/service/request/requestmapping"
 	"github.com/crossplane-contrib/provider-http/internal/utils"
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
 	"github.com/pkg/errors"
@@ -31,8 +32,8 @@ type defaultIsUpToDateResponseCheck struct {
 }
 
 // Check performs a default comparison between the response and desired state.
-func (d *defaultIsUpToDateResponseCheck) Check(ctx context.Context, cr *v1alpha2.Request, details httpClient.HttpDetails, responseErr error) (bool, error) {
-	desiredState, err := d.desiredState(ctx, cr)
+func (d *defaultIsUpToDateResponseCheck) Check(ctx context.Context, spec interfaces.MappedHTTPRequestSpec, statusReader interfaces.RequestStatusReader, cachedReader interfaces.CachedResponse, details httpClient.HttpDetails, responseErr error) (bool, error) {
+	desiredState, err := d.desiredState(ctx, spec, statusReader, cachedReader)
 	if err != nil {
 		if isErrorMappingNotFound(err) {
 			return true, nil
@@ -102,8 +103,8 @@ func (d *defaultIsUpToDateResponseCheck) compareJSON(body, desiredState string, 
 }
 
 // desiredState returns the desired state for a given request
-func (d *defaultIsUpToDateResponseCheck) desiredState(ctx context.Context, cr *v1alpha2.Request) (string, error) {
-	requestDetails, err := d.requestDetails(ctx, cr, v1alpha2.ActionUpdate)
+func (d *defaultIsUpToDateResponseCheck) desiredState(ctx context.Context, spec interfaces.MappedHTTPRequestSpec, statusReader interfaces.RequestStatusReader, cachedReader interfaces.CachedResponse) (string, error) {
+	requestDetails, err := d.requestDetails(ctx, spec, statusReader, cachedReader, common.ActionUpdate)
 	if err != nil {
 		return "", err
 	}
@@ -119,11 +120,16 @@ type customIsUpToDateResponseCheck struct {
 }
 
 // Check performs a custom response check using JQ logic.
-func (c *customIsUpToDateResponseCheck) Check(ctx context.Context, cr *v1alpha2.Request, details httpClient.HttpDetails, responseErr error) (bool, error) {
-	logic := cr.Spec.ForProvider.ExpectedResponseCheck.Logic
+func (c *customIsUpToDateResponseCheck) Check(ctx context.Context, spec interfaces.MappedHTTPRequestSpec, statusReader interfaces.RequestStatusReader, cachedReader interfaces.CachedResponse, details httpClient.HttpDetails, responseErr error) (bool, error) {
+	responseCheckAware, ok := spec.(interfaces.ResponseCheckAware)
+	if !ok {
+		return false, errors.New("spec does not support custom response checks")
+	}
+
+	logic := responseCheckAware.GetExpectedResponseCheck().GetLogic()
 	customCheck := &customCheck{localKube: c.localKube, logger: c.logger, http: c.http}
 
-	isUpToDate, err := customCheck.check(ctx, cr, details, logic)
+	isUpToDate, err := customCheck.check(ctx, spec, details, logic)
 	if err != nil {
 		return false, errors.Errorf(errExpectedFormat, "expectedResponseCheck", err.Error())
 	}
@@ -134,33 +140,38 @@ func (c *customIsUpToDateResponseCheck) Check(ctx context.Context, cr *v1alpha2.
 // isErrorMappingNotFound checks if the provided error indicates that the
 // mapping for an HTTP PUT request is not found.
 func isErrorMappingNotFound(err error) bool {
-	return errors.Cause(err).Error() == fmt.Sprintf(requestmapping.ErrMappingNotFound, v1alpha2.ActionUpdate, http.MethodPut)
+	return errors.Cause(err).Error() == fmt.Sprintf(requestmapping.ErrMappingNotFound, common.ActionUpdate, http.MethodPut)
 }
 
 // requestDetails generates the request details for a given method or action.
-func (d *defaultIsUpToDateResponseCheck) requestDetails(ctx context.Context, cr *v1alpha2.Request, action string) (requestgen.RequestDetails, error) {
-	mapping, err := requestmapping.GetMapping(&cr.Spec.ForProvider, action, d.logger)
+func (d *defaultIsUpToDateResponseCheck) requestDetails(ctx context.Context, spec interfaces.MappedHTTPRequestSpec, statusReader interfaces.RequestStatusReader, cachedReader interfaces.CachedResponse, action string) (requestgen.RequestDetails, error) {
+	mapping, err := requestmapping.GetMapping(spec, action, d.logger)
 	if err != nil {
 		return requestgen.RequestDetails{}, err
 	}
 
-	return requestgen.GenerateValidRequestDetails(ctx, cr, mapping, d.localKube, d.logger)
+	return requestgen.GenerateValidRequestDetails(ctx, spec, mapping, statusReader.GetResponse(), cachedReader.GetCachedResponse(), d.localKube, d.logger)
 }
 
 // isUpToDateChecksFactoryMap is a map that associates each check type with its corresponding factory function.
 var isUpToDateChecksFactoryMap = map[string]func(localKube client.Client, logger logging.Logger, http httpClient.Client) responseCheck{
-	v1alpha2.ExpectedResponseCheckTypeDefault: func(localKube client.Client, logger logging.Logger, http httpClient.Client) responseCheck {
+	common.ExpectedResponseCheckTypeDefault: func(localKube client.Client, logger logging.Logger, http httpClient.Client) responseCheck {
 		return &defaultIsUpToDateResponseCheck{localKube: localKube, logger: logger, http: http}
 	},
-	v1alpha2.ExpectedResponseCheckTypeCustom: func(localKube client.Client, logger logging.Logger, http httpClient.Client) responseCheck {
+	common.ExpectedResponseCheckTypeCustom: func(localKube client.Client, logger logging.Logger, http httpClient.Client) responseCheck {
 		return &customIsUpToDateResponseCheck{localKube: localKube, logger: logger, http: http}
 	},
 }
 
 // GetIsUpToDateResponseCheck uses a map to select and return the appropriate ResponseCheck.
-func GetIsUpToDateResponseCheck(cr *v1alpha2.Request, localKube client.Client, logger logging.Logger, http httpClient.Client) responseCheck {
-	if factory, ok := isUpToDateChecksFactoryMap[cr.Spec.ForProvider.ExpectedResponseCheck.Type]; ok {
+func GetIsUpToDateResponseCheck(spec interfaces.MappedHTTPRequestSpec, localKube client.Client, logger logging.Logger, http httpClient.Client) responseCheck {
+	responseCheckAware, ok := spec.(interfaces.ResponseCheckAware)
+	if !ok {
+		return isUpToDateChecksFactoryMap[common.ExpectedResponseCheckTypeDefault](localKube, logger, http)
+	}
+
+	if factory, ok := isUpToDateChecksFactoryMap[responseCheckAware.GetExpectedResponseCheck().GetType()]; ok {
 		return factory(localKube, logger, http)
 	}
-	return isUpToDateChecksFactoryMap[v1alpha2.ExpectedResponseCheckTypeDefault](localKube, logger, http)
+	return isUpToDateChecksFactoryMap[common.ExpectedResponseCheckTypeDefault](localKube, logger, http)
 }

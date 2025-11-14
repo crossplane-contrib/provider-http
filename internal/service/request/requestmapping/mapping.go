@@ -4,7 +4,8 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/crossplane-contrib/provider-http/apis/request/v1alpha2"
+	"github.com/crossplane-contrib/provider-http/apis/common"
+	"github.com/crossplane-contrib/provider-http/apis/interfaces"
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
 	"github.com/pkg/errors"
 )
@@ -16,28 +17,28 @@ const (
 var (
 	// actionToMathodFactoryMap maps action to the default corresponding HTTP method.
 	actionToMathodFactoryMap = map[string]string{
-		v1alpha2.ActionCreate:  http.MethodPost,
-		v1alpha2.ActionObserve: http.MethodGet,
-		v1alpha2.ActionUpdate:  http.MethodPut,
-		v1alpha2.ActionRemove:  http.MethodDelete,
+		common.ActionCreate:  http.MethodPost,
+		common.ActionObserve: http.MethodGet,
+		common.ActionUpdate:  http.MethodPut,
+		common.ActionRemove:  http.MethodDelete,
 	}
 )
 
 // getMappingByMethod returns the mapping for the given method from the request parameters.
-func getMappingByMethod(requestParams *v1alpha2.RequestParameters, method string) (*v1alpha2.Mapping, bool) {
-	for _, mapping := range requestParams.Mappings {
-		if mapping.Method == method {
-			return &mapping, true
+func getMappingByMethod(requestParams interfaces.MappedHTTPRequestSpec, method string) (interfaces.HTTPMapping, bool) {
+	for _, mapping := range requestParams.GetMappings() {
+		if mapping.GetMethod() == method {
+			return mapping, true
 		}
 	}
 	return nil, false
 }
 
 // getMappingByAction returns the mapping for the given action from the request parameters.
-func getMappingByAction(requestParams *v1alpha2.RequestParameters, action string) (*v1alpha2.Mapping, bool) {
-	for _, mapping := range requestParams.Mappings {
-		if mapping.Action == action {
-			return &mapping, true
+func getMappingByAction(requestParams interfaces.MappedHTTPRequestSpec, action string) (interfaces.HTTPMapping, bool) {
+	for _, mapping := range requestParams.GetMappings() {
+		if mapping.GetAction() == action {
+			return mapping, true
 		}
 	}
 	return nil, false
@@ -46,11 +47,11 @@ func getMappingByAction(requestParams *v1alpha2.RequestParameters, action string
 // GetMapping retrieves the mapping based on the provided request parameters, method, and action.
 // It first attempts to find the mapping by the specified action. If found, it sets the method if it's not defined.
 // If no action is specified or the mapping by action is not found, it falls back to finding the mapping by the default method.
-func GetMapping(requestParams *v1alpha2.RequestParameters, action string, logger logging.Logger) (*v1alpha2.Mapping, error) {
+func GetMapping(requestParams interfaces.MappedHTTPRequestSpec, action string, logger logging.Logger) (interfaces.HTTPMapping, error) {
 	method := getDefaultMethodByAction(action)
 	if mapping, found := getMappingByAction(requestParams, action); found {
-		if mapping.Method == "" {
-			mapping.Method = method
+		if mapping.GetMethod() == "" {
+			mapping.SetMethod(method)
 		}
 		return mapping, nil
 	}
@@ -61,6 +62,15 @@ func GetMapping(requestParams *v1alpha2.RequestParameters, action string, logger
 	}
 
 	return nil, errors.Errorf(ErrMappingNotFound, action, method)
+}
+
+// GetEffectiveMethod returns the effective HTTP method for a mapping.
+// If the mapping has a method defined, it returns that. Otherwise, it derives the method from the action.
+func GetEffectiveMethod(mapping interfaces.HTTPMapping) string {
+	if method := mapping.GetMethod(); method != "" {
+		return method
+	}
+	return getDefaultMethodByAction(mapping.GetAction())
 }
 
 // getDefaultMethodByAction returns the default HTTP method for the given action.

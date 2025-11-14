@@ -22,20 +22,21 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	"github.com/crossplane-contrib/provider-http/apis/common"
+	apicommon "github.com/crossplane-contrib/provider-http/apis/common"
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 )
 
+// Re-export common constants for backward compatibility
 const (
-	ExpectedResponseCheckTypeDefault = "DEFAULT"
-	ExpectedResponseCheckTypeCustom  = "CUSTOM"
+	ExpectedResponseCheckTypeDefault = apicommon.ExpectedResponseCheckTypeDefault
+	ExpectedResponseCheckTypeCustom  = apicommon.ExpectedResponseCheckTypeCustom
 )
 
 const (
-	ActionCreate  = "CREATE"
-	ActionObserve = "OBSERVE"
-	ActionUpdate  = "UPDATE"
-	ActionRemove  = "REMOVE"
+	ActionCreate  = apicommon.ActionCreate
+	ActionObserve = apicommon.ActionObserve
+	ActionUpdate  = apicommon.ActionUpdate
+	ActionRemove  = apicommon.ActionRemove
 )
 
 // RequestParameters are the configurable fields of a Request.
@@ -58,7 +59,7 @@ type RequestParameters struct {
 	InsecureSkipTLSVerify bool `json:"insecureSkipTLSVerify,omitempty"`
 
 	// SecretInjectionConfig specifies the secrets receiving patches for response data.
-	SecretInjectionConfigs []common.SecretInjectionConfig `json:"secretInjectionConfigs,omitempty"`
+	SecretInjectionConfigs []apicommon.SecretInjectionConfig `json:"secretInjectionConfigs,omitempty"`
 
 	// ExpectedResponseCheck specifies the mechanism to validate the OBSERVE response against expected value.
 	ExpectedResponseCheck ExpectedResponseCheck `json:"expectedResponseCheck,omitempty"`
