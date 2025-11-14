@@ -7,48 +7,20 @@ metadata:
 spec:
   credentials:
     source: None
-  # TLS configuration for certificate-based authentication
   tls:
-    # Reference to CA certificate(s) in a Kubernetes secret
     caCertSecretRef:
       name: ca-certificates
       namespace: crossplane-system
       key: ca-bundle.crt
-    # Reference to client certificate in a Kubernetes secret
     clientCertSecretRef:
       name: client-certificates
       namespace: crossplane-system
       key: tls.crt
-    # Reference to client private key in a Kubernetes secret
     clientKeySecretRef:
       name: client-certificates
       namespace: crossplane-system
       key: tls.key
-    # Set to true to skip TLS verification (not recommended for production)
     insecureSkipVerify: false
----
-# Example: ProviderConfig with inline CA bundle and secrets for client certs
-apiVersion: http.crossplane.io/v1alpha1
-kind: ProviderConfig
-metadata:
-  name: provider-http-tls-inline-ca
-spec:
-  credentials:
-    source: None
-  tls:
-    # Inline CA bundle (PEM encoded) - replace with your actual CA certificate
-    caBundle: |
-      -----BEGIN CERTIFICATE-----
-      MIIDXTCCAkWgAwIBAgIJAKJ...
-      -----END CERTIFICATE-----
-    clientCertSecretRef:
-      name: client-certificates
-      namespace: crossplane-system
-      key: tls.crt
-    clientKeySecretRef:
-      name: client-certificates
-      namespace: crossplane-system
-      key: tls.key
 ---
 # Example: ProviderConfig with just CA certificates (no client certs)
 apiVersion: http.crossplane.io/v1alpha1
