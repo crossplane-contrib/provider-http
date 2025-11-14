@@ -188,6 +188,7 @@ func toJSON(request HttpRequest) string {
 // buildTLSConfig builds a tls.Config from TLSConfigData
 func buildTLSConfig(data *TLSConfigData) (*tls.Config, error) {
 	if data == nil {
+		// #nosec G402 -- Empty TLS config is valid when no TLS configuration is provided
 		return &tls.Config{}, nil
 	}
 
