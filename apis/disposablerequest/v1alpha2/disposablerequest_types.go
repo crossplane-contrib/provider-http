@@ -27,6 +27,7 @@ import (
 )
 
 // DisposableRequestParameters are the configurable fields of a DisposableRequest.
+// +kubebuilder:validation:XValidation:rule="!(self.insecureSkipTLSVerify == true && has(self.tlsConfig))",message="insecureSkipTLSVerify and tlsConfig are mutually exclusive"
 type DisposableRequestParameters struct {
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="Field 'forProvider.url' is immutable"
 	URL string `json:"url"`
@@ -46,13 +47,11 @@ type DisposableRequestParameters struct {
 	// InsecureSkipTLSVerify, when set to true, skips TLS certificate checks for the HTTP request.
 	// This field is mutually exclusive with TLSConfig.
 	// +optional
-	// +kubebuilder:validation:XValidation:rule="!(self == true && has(oldSelf.tlsConfig))",message="insecureSkipTLSVerify and tlsConfig are mutually exclusive"
 	InsecureSkipTLSVerify bool `json:"insecureSkipTLSVerify,omitempty"`
 
 	// TLSConfig allows overriding the TLS configuration from ProviderConfig for this specific request.
 	// This field is mutually exclusive with InsecureSkipTLSVerify.
 	// +optional
-	// +kubebuilder:validation:XValidation:rule="!(has(self) && has(oldSelf.insecureSkipTLSVerify) && oldSelf.insecureSkipTLSVerify == true)",message="tlsConfig and insecureSkipTLSVerify are mutually exclusive"
 	TLSConfig *common.TLSConfig `json:"tlsConfig,omitempty"`
 
 	// ExpectedResponse is a jq filter expression used to evaluate the HTTP response and determine if it matches the expected criteria.

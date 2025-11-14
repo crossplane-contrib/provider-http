@@ -40,6 +40,7 @@ const (
 )
 
 // RequestParameters are the configurable fields of a Request.
+// +kubebuilder:validation:XValidation:rule="!(self.insecureSkipTLSVerify == true && has(self.tlsConfig))",message="insecureSkipTLSVerify and tlsConfig are mutually exclusive"
 type RequestParameters struct {
 	// Mappings defines the HTTP mappings for different methods.
 	// Either Method or Action must be specified. If both are omitted, the mapping will not be used.
@@ -58,13 +59,11 @@ type RequestParameters struct {
 	// InsecureSkipTLSVerify, when set to true, skips TLS certificate checks for the HTTP request.
 	// This field is mutually exclusive with TLSConfig.
 	// +optional
-	// +kubebuilder:validation:XValidation:rule="!(self == true && has(oldSelf.tlsConfig))",message="insecureSkipTLSVerify and tlsConfig are mutually exclusive"
 	InsecureSkipTLSVerify bool `json:"insecureSkipTLSVerify,omitempty"`
 
 	// TLSConfig allows overriding the TLS configuration from ProviderConfig for this specific request.
 	// This field is mutually exclusive with InsecureSkipTLSVerify.
 	// +optional
-	// +kubebuilder:validation:XValidation:rule="!(has(self) && has(oldSelf.insecureSkipTLSVerify) && oldSelf.insecureSkipTLSVerify == true)",message="tlsConfig and insecureSkipTLSVerify are mutually exclusive"
 	TLSConfig *common.TLSConfig `json:"tlsConfig,omitempty"`
 
 	// SecretInjectionConfig specifies the secrets receiving patches for response data.
