@@ -34,6 +34,7 @@ import (
 
 	"github.com/crossplane/crossplane-runtime/pkg/feature"
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
+	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
 	"github.com/crossplane/crossplane-runtime/pkg/test"
 )
@@ -273,6 +274,145 @@ func Test_httpExternal_Update(t *testing.T) {
 			_, gotErr := e.Update(context.Background(), tc.args.mg)
 			if diff := cmp.Diff(tc.want.err, gotErr, test.EquateErrors()); diff != "" {
 				t.Fatalf("e.Update(...): -want error, +got error: %s", diff)
+			}
+		})
+	}
+}
+
+func Test_httpExternal_Observe(t *testing.T) {
+	type args struct {
+		http      httpClient.Client
+		localKube client.Client
+		mg        resource.Managed
+	}
+	type want struct {
+		observation managed.ExternalObservation
+		err         error
+	}
+
+	cases := []struct {
+		name string
+		args args
+		want want
+	}{
+		{
+			name: "NotDisposableRequestResource",
+			args: args{
+				mg: notHttpDisposableRequest{},
+			},
+			want: want{
+				err: errors.New(errNotDisposableRequest),
+			},
+		},
+		{
+			name: "ResourceNotSynced",
+			args: args{
+				http: &MockHttpClient{},
+				localKube: &test.MockClient{
+					MockGet: test.NewMockGetFn(nil),
+				},
+				mg: &v1alpha2.DisposableRequest{
+					Spec: v1alpha2.DisposableRequestSpec{
+						ForProvider: v1alpha2.DisposableRequestParameters{
+							URL:    testURL,
+							Method: testMethod,
+						},
+					},
+					Status: v1alpha2.DisposableRequestStatus{
+						Synced: false,
+					},
+				},
+			},
+			want: want{
+				observation: managed.ExternalObservation{
+					ResourceExists: false,
+				},
+				err: nil,
+			},
+		},
+		{
+			name: "ResourceSyncedAndUpToDate",
+			args: args{
+				http: &MockHttpClient{},
+				localKube: &test.MockClient{
+					MockGet:          test.NewMockGetFn(nil),
+					MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
+				},
+				mg: &v1alpha2.DisposableRequest{
+					Spec: v1alpha2.DisposableRequestSpec{
+						ForProvider: v1alpha2.DisposableRequestParameters{
+							URL:    testURL,
+							Method: testMethod,
+						},
+					},
+					Status: v1alpha2.DisposableRequestStatus{
+						Synced: true,
+						Response: v1alpha2.Response{
+							StatusCode: 200,
+							Body:       testBody,
+							Headers:    testHeaders,
+						},
+					},
+				},
+			},
+			want: want{
+				observation: managed.ExternalObservation{
+					ResourceExists:   true,
+					ResourceUpToDate: true,
+				},
+				err: nil,
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			e := &external{
+				localKube: tc.args.localKube,
+				logger:    logging.NewNopLogger(),
+				http:      tc.args.http,
+			}
+			got, gotErr := e.Observe(context.Background(), tc.args.mg)
+			if diff := cmp.Diff(tc.want.err, gotErr, test.EquateErrors()); diff != "" {
+				t.Fatalf("e.Observe(...): -want error, +got error: %s", diff)
+			}
+			if diff := cmp.Diff(tc.want.observation.ResourceExists, got.ResourceExists); diff != "" {
+				t.Fatalf("e.Observe(...): -want ResourceExists, +got ResourceExists: %s", diff)
+			}
+			if tc.want.err == nil {
+				if diff := cmp.Diff(tc.want.observation.ResourceUpToDate, got.ResourceUpToDate); diff != "" {
+					t.Fatalf("e.Observe(...): -want ResourceUpToDate, +got ResourceUpToDate: %s", diff)
+				}
+			}
+		})
+	}
+}
+
+func Test_httpExternal_Delete(t *testing.T) {
+	type args struct {
+		mg resource.Managed
+	}
+
+	cases := []struct {
+		name string
+		args args
+	}{
+		{
+			name: "AlwaysSucceeds",
+			args: args{
+				mg: httpDisposableRequest(),
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			e := &external{
+				logger: logging.NewNopLogger(),
+			}
+			_, err := e.Delete(context.Background(), tc.args.mg)
+			if err != nil {
+				t.Fatalf("e.Delete(...): unexpected error: %v", err)
 			}
 		})
 	}
