@@ -42,7 +42,7 @@ func DeployAction(
 		return nil
 	}
 
-	details, httpRequestErr := sendHttpRequest(ctx, spec, obj.(metav1.Object), localKube, logger, httpCli)
+	details, httpRequestErr := sendHttpRequest(ctx, spec, localKube, logger, httpCli)
 
 	resource, err := prepareRequestResource(ctx, obj, details, localKube)
 	if err != nil {
@@ -61,7 +61,6 @@ func DeployAction(
 func sendHttpRequest(
 	ctx context.Context,
 	spec interfaces.SimpleHTTPRequestSpec,
-	obj metav1.Object,
 	localKube client.Client,
 	logger logging.Logger,
 	httpCli httpClient.Client,
