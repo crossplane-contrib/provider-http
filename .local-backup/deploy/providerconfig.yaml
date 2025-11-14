@@ -1,0 +1,69 @@
+---
+# ProviderConfig with TLS configuration
+# This example shows how to configure TLS/mTLS authentication
+apiVersion: http.crossplane.io/v1alpha1
+kind: ProviderConfig
+metadata:
+  name: default
+spec:
+  # Optional: Provider-level TLS configuration
+  # These settings apply to all Requests/DisposableRequests that don't specify their own TLS config
+  tls:
+    # CA certificate bundle for verifying server certificates
+    # Reference to a Kubernetes secret containing the CA bundle
+    caBundleSecretRef:
+      name: ca-bundle           # Name of the Kubernetes secret
+      namespace: crossplane-system  # Namespace where the secret exists
+      key: ca.crt               # Key in the secret's data field
+    
+    # Client certificate for mTLS authentication
+    # Reference to a Kubernetes secret containing the client certificate
+    clientCertSecretRef:
+      name: client-cert-tls    # Name of the Kubernetes secret
+      namespace: default        # Namespace where the secret exists
+      key: tls.crt             # Key in the secret's data field (certificate)
+    
+    # Client private key for mTLS authentication
+    # Reference to a Kubernetes secret containing the client private key
+    clientKeySecretRef:
+      name: client-cert-tls    # Name of the Kubernetes secret (often same as cert)
+      namespace: default        # Namespace where the secret exists
+      key: tls.key             # Key in the secret's data field (private key)
+    
+    # Skip TLS verification (NOT recommended for production)
+    # Use only for testing with self-signed certificates
+    insecureSkipVerify: false
+
+---
+# Alternative: ProviderConfig without TLS (HTTP only)
+apiVersion: http.crossplane.io/v1alpha1
+kind: ProviderConfig
+metadata:
+  name: http-only
+spec:
+  # No TLS configuration - plain HTTP requests only
+
+---
+# Alternative: ProviderConfig with CA bundle only (verify server cert)
+apiVersion: http.crossplane.io/v1alpha1
+kind: ProviderConfig
+metadata:
+  name: ca-only
+spec:
+  tls:
+    # Only verify server certificate with custom CA bundle
+    caBundleSecretRef:
+      name: ca-bundle
+      namespace: crossplane-system
+      key: ca.crt
+
+---
+# Alternative: ProviderConfig with insecureSkipVerify (testing only)
+apiVersion: http.crossplane.io/v1alpha1
+kind: ProviderConfig
+metadata:
+  name: skip-verify
+spec:
+  tls:
+    # Skip certificate verification (NOT recommended for production)
+    insecureSkipVerify: true

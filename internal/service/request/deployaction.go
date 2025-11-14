@@ -22,7 +22,7 @@ func DeployAction(svcCtx *service.ServiceContext, crCtx *service.RequestCRContex
 		return err
 	}
 
-	details, sendErr := svcCtx.HTTP.SendRequest(svcCtx.Ctx, requestmapping.GetEffectiveMethod(mapping), requestDetails.Url, requestDetails.Body, requestDetails.Headers, spec.GetInsecureSkipTLSVerify())
+	details, sendErr := svcCtx.HTTP.SendRequest(svcCtx.Ctx, requestmapping.GetEffectiveMethod(mapping), requestDetails.Url, requestDetails.Body, requestDetails.Headers, svcCtx.TLSConfigData)
 
 	// Apply response data to secrets and update CR status
 	secretConfigs := spec.GetSecretInjectionConfigs()

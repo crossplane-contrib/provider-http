@@ -58,6 +58,10 @@ type RequestParameters struct {
 	// InsecureSkipTLSVerify, when set to true, skips TLS certificate checks for the HTTP request
 	InsecureSkipTLSVerify bool `json:"insecureSkipTLSVerify,omitempty"`
 
+	// TLSConfig allows overriding the TLS configuration from ProviderConfig for this specific request.
+	// +optional
+	TLSConfig *common.TLSConfig `json:"tlsConfig,omitempty"`
+
 	// SecretInjectionConfig specifies the secrets receiving patches for response data.
 	SecretInjectionConfigs []apicommon.SecretInjectionConfig `json:"secretInjectionConfigs,omitempty"`
 

@@ -198,7 +198,7 @@ func Test_GenerateRequestDetails(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			svcCtx := service.NewServiceContext(context.Background(), tc.args.localKube, tc.args.logger, nil)
+			svcCtx := service.NewServiceContext(context.Background(, nil), tc.args.localKube, tc.args.logger, nil)
 			got, gotErr, ok := GenerateRequestDetails(svcCtx, &tc.args.methodMapping, &tc.args.forProvider, &tc.args.response)
 			if diff := cmp.Diff(tc.want.err, gotErr, test.EquateErrors()); diff != "" {
 				t.Fatalf("GenerateRequestDetails(...): -want error, +got error: %s", diff)

@@ -1,0 +1,36 @@
+apiVersion: apiextensions.crossplane.io/v1
+kind: CompositeResourceDefinition
+metadata:
+  name: xdemos.releases.example.io
+spec:
+  group: releases.example.io
+  names:
+    kind: XDemo
+    plural: xdemos
+  claimNames:
+    kind: Demo
+    plural: demos
+  versions:
+    - name: v1alpha1
+      served: true
+      referenceable: true
+      schema:
+        openAPIV3Schema:
+          description: A Demo is a composite resource that represents a Demo Installed
+          type: object
+          properties:
+            spec:
+              type: object
+              properties:
+                demoVersion:
+                  type: string
+              required:
+                - demoVersion
+            status:
+              description: A Status represents the observed state
+              properties:
+                http:
+                  description: Freeform field containing status information for http request
+                  type: object
+                  x-kubernetes-preserve-unknown-fields: true
+              type: object

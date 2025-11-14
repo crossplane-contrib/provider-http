@@ -1,0 +1,112 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: crossplane-system
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: provider-http-tls
+  namespace: crossplane-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: provider-http-tls
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - secrets
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - ""
+    resources:
+      - events
+    verbs:
+      - create
+      - patch
+      - update
+  - apiGroups:
+      - http.crossplane.io
+    resources:
+      - "*"
+    verbs:
+      - "*"
+  - apiGroups:
+      - apiextensions.k8s.io
+    resources:
+      - customresourcedefinitions
+    verbs:
+      - get
+      - list
+      - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: provider-http-tls
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: provider-http-tls
+subjects:
+  - kind: ServiceAccount
+    name: provider-http-tls
+    namespace: crossplane-system
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: provider-http-tls
+  namespace: crossplane-system
+  labels:
+    app: provider-http-tls
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: provider-http-tls
+  template:
+    metadata:
+      labels:
+        app: provider-http-tls
+    spec:
+      serviceAccountName: provider-http-tls
+      containers:
+        - name: provider-http-tls
+          image: iaactmpreg.azurecr.io/provider-http:v0.1.0-tls
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+              name: metrics
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          resources:
+            limits:
+              cpu: 500m
+              memory: 512Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65532
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+      imagePullSecrets:
+        - name: dockerconfigjson

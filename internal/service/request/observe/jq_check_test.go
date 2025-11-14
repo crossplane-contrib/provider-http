@@ -101,7 +101,7 @@ func Test_CustomCheck(t *testing.T) {
 
 		t.Run(name, func(t *testing.T) {
 			e := &customCheck{}
-			svcCtx := service.NewServiceContext(tc.args.ctx, nil, logging.NewNopLogger(), nil)
+			svcCtx := service.NewServiceContext(tc.args.ctx, nil, logging.NewNopLogger(, nil), nil)
 			got, gotErr := e.check(svcCtx, &tc.args.cr.Spec.ForProvider, tc.args.details, tc.args.logic)
 			if diff := cmp.Diff(tc.want.err, gotErr, test.EquateErrors()); diff != "" {
 				t.Fatalf("Check(...): -want error, +got error: %s", diff)

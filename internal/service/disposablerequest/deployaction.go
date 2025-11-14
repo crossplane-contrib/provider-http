@@ -64,7 +64,7 @@ func sendHttpRequest(svcCtx *service.ServiceContext, spec interfaces.SimpleHTTPR
 
 	bodyData := httpClient.Data{Encrypted: spec.GetBody(), Decrypted: sensitiveBody}
 	headersData := httpClient.Data{Encrypted: spec.GetHeaders(), Decrypted: sensitiveHeaders}
-	details, err := svcCtx.HTTP.SendRequest(svcCtx.Ctx, spec.GetMethod(), spec.GetURL(), bodyData, headersData, spec.GetInsecureSkipTLSVerify())
+	details, err := svcCtx.HTTP.SendRequest(svcCtx.Ctx, spec.GetMethod(), spec.GetURL(), bodyData, headersData, svcCtx.TLSConfigData)
 
 	return details, err
 }

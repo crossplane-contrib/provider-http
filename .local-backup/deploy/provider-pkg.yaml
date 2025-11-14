@@ -1,0 +1,20 @@
+---
+apiVersion: pkg.crossplane.io/v1
+kind: Provider
+metadata:
+  name: provider-http-tls
+spec:
+  package: iaactmpreg.azurecr.io/provider-http:v0.1.0-tls-xpkg
+  packagePullSecrets:
+    - name: dockerconfigjson
+  controllerConfigRef:
+    name: provider-http-tls-config
+---
+apiVersion: pkg.crossplane.io/v1alpha1
+kind: ControllerConfig
+metadata:
+  name: provider-http-tls-config
+spec:
+  args:
+    - --poll=10m
+    - --debug

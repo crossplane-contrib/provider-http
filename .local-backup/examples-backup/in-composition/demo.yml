@@ -1,0 +1,7 @@
+apiVersion: releases.example.io/v1alpha1
+kind: Demo
+metadata:
+  namespace: default
+  name: my-demo
+spec:
+  demoVersion: 15.2.5

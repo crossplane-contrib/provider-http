@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -18,9 +19,21 @@ const (
 	authKey = "Authorization"
 )
 
+// TLSConfigData contains the TLS configuration data loaded from secrets or inline.
+type TLSConfigData struct {
+	// CABundle contains PEM encoded CA certificates
+	CABundle []byte
+	// ClientCert contains PEM encoded client certificate
+	ClientCert []byte
+	// ClientKey contains PEM encoded client private key
+	ClientKey []byte
+	// InsecureSkipVerify controls whether to skip TLS verification
+	InsecureSkipVerify bool
+}
+
 // Client is the interface to interact with Http
 type Client interface {
-	SendRequest(ctx context.Context, method string, url string, body Data, headers Data, skipTLSVerify bool) (resp HttpDetails, err error)
+	SendRequest(ctx context.Context, method string, url string, body Data, headers Data, tlsConfig *TLSConfigData) (resp HttpDetails, err error)
 }
 
 type client struct {
@@ -70,8 +83,8 @@ type HttpDetails struct {
 	HttpRequest  HttpRequest
 }
 
-// SendRequest sends an HTTP request to the specified URL with the given method, body, headers and skipTLSVerify.
-func (hc *client) SendRequest(ctx context.Context, method string, url string, body Data, headers Data, skipTLSVerify bool) (details HttpDetails, err error) {
+// SendRequest sends an HTTP request with optional TLS configuration.
+func (hc *client) SendRequest(ctx context.Context, method string, url string, body Data, headers Data, tlsConfigData *TLSConfigData) (details HttpDetails, err error) {
 	requestBody := []byte(body.Decrypted.(string))
 
 	// request contains the HTTP request that will be sent.
@@ -102,10 +115,17 @@ func (hc *client) SendRequest(ctx context.Context, method string, url string, bo
 		request.Header[authKey] = []string{hc.authorizationToken}
 	}
 
+	// Build TLS configuration
+	tlsConfig, err := buildTLSConfig(tlsConfigData)
+	if err != nil {
+		return HttpDetails{
+			HttpRequest: requestDetails,
+		}, fmt.Errorf("failed to build TLS config: %w", err)
+	}
+
 	client := &http.Client{
 		Transport: &http.Transport{
-			// #nosec G402
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: skipTLSVerify},
+			TLSClientConfig: tlsConfig,
 			Proxy:           http.ProxyFromEnvironment, // Use proxy settings from environment
 		},
 		Timeout: hc.timeout,
@@ -163,4 +183,36 @@ func toJSON(request HttpRequest) string {
 	}
 
 	return string(jsonBytes)
+}
+
+// buildTLSConfig builds a tls.Config from TLSConfigData
+func buildTLSConfig(data *TLSConfigData) (*tls.Config, error) {
+	if data == nil {
+		return &tls.Config{}, nil
+	}
+
+	tlsConfig := &tls.Config{
+		// #nosec G402 - InsecureSkipVerify is configurable by the user
+		InsecureSkipVerify: data.InsecureSkipVerify,
+	}
+
+	// Load CA bundle if provided
+	if len(data.CABundle) > 0 {
+		caCertPool := x509.NewCertPool()
+		if !caCertPool.AppendCertsFromPEM(data.CABundle) {
+			return nil, fmt.Errorf("failed to parse CA bundle")
+		}
+		tlsConfig.RootCAs = caCertPool
+	}
+
+	// Load client certificate and key if provided
+	if len(data.ClientCert) > 0 && len(data.ClientKey) > 0 {
+		cert, err := tls.X509KeyPair(data.ClientCert, data.ClientKey)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load client certificate: %w", err)
+		}
+		tlsConfig.Certificates = []tls.Certificate{cert}
+	}
+
+	return tlsConfig, nil
 }

@@ -230,7 +230,7 @@ func TestClient_SendRequest(t *testing.T) {
 
 			// Send request
 			ctx := context.Background()
-			got, err := c.SendRequest(ctx, tt.method, server.URL, bodyData, headerData, tt.skipTLSVerify)
+			got, err := c.SendRequest(ctx, tt.method, server.URL, bodyData, headerData, &TLSConfigData{InsecureSkipVerify: tt.skipTLSVerify})
 
 			if (err != nil) != tt.wantErr {
 				t.Errorf("SendRequest() error = %v, wantErr %v", err, tt.wantErr)
@@ -284,7 +284,7 @@ func TestClient_SendRequest_Timeout(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	_, err = c.SendRequest(ctx, "GET", server.URL, bodyData, headerData, false)
+	_, err = c.SendRequest(ctx, "GET", server.URL, bodyData, headerData, nil)
 
 	if err == nil {
 		t.Error("SendRequest() expected timeout error, got nil")
@@ -308,7 +308,7 @@ func TestClient_SendRequest_InvalidURL(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	_, err = c.SendRequest(ctx, "GET", "://invalid-url", bodyData, headerData, false)
+	_, err = c.SendRequest(ctx, "GET", "://invalid-url", bodyData, headerData, nil)
 
 	if err == nil {
 		t.Error("SendRequest() expected error for invalid URL, got nil")
@@ -342,7 +342,7 @@ func TestClient_SendRequest_ContextCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	_, err = c.SendRequest(ctx, "GET", server.URL, bodyData, headerData, false)
+	_, err = c.SendRequest(ctx, "GET", server.URL, bodyData, headerData, nil)
 
 	if err == nil {
 		t.Error("SendRequest() expected context cancellation error, got nil")
@@ -396,7 +396,7 @@ func TestClient_SendRequest_ResponseHeadersAndJSON(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	got, err := c.SendRequest(ctx, "GET", server.URL, bodyData, headerData, false)
+	got, err := c.SendRequest(ctx, "GET", server.URL, bodyData, headerData, nil)
 
 	if err != nil {
 		t.Fatalf("SendRequest() error = %v", err)
@@ -459,7 +459,7 @@ func TestClient_SendRequest_DifferentEncryptedDecrypted(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	got, err := c.SendRequest(ctx, "POST", server.URL, bodyData, headerData, false)
+	got, err := c.SendRequest(ctx, "POST", server.URL, bodyData, headerData, nil)
 
 	if err != nil {
 		t.Fatalf("SendRequest() error = %v", err)

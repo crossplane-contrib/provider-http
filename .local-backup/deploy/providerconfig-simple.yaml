@@ -1,0 +1,15 @@
+---
+# ProviderConfig with CA bundle for server verification
+apiVersion: http.crossplane.io/v1alpha1
+kind: ProviderConfig
+metadata:
+  name: http-tls
+spec:
+  credentials:
+    source: None
+  tls:
+    # CA certificate bundle for verifying server certificates
+    caCertSecretRef:
+      name: ca-bundle
+      namespace: crossplane-system
+      key: ca.crt
