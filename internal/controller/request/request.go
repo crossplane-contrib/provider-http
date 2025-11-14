@@ -168,11 +168,6 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.Wrap(err, errFailedToCheckIfUpToDate)
 	}
 
-	// Get the latest version of the resource before updating
-	if err := c.localKube.Get(ctx, types.NamespacedName{Name: cr.Name, Namespace: cr.Namespace}, cr); err != nil {
-		return managed.ExternalObservation{}, errors.Wrap(err, errGetLatestVersion)
-	}
-
 	statusHandler, err := statushandler.NewStatusHandler(ctx, cr, &cr.Spec.ForProvider, observeRequestDetails.Details, observeRequestDetails.ResponseError, c.localKube, c.logger)
 	if err != nil {
 		return managed.ExternalObservation{}, err
@@ -202,6 +197,11 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalCreation{}, errors.New(errNotRequest)
 	}
 
+	// Get the latest version of the resource before deploying
+	if err := c.localKube.Get(ctx, types.NamespacedName{Name: cr.Name, Namespace: cr.Namespace}, cr); err != nil {
+		return managed.ExternalCreation{}, errors.Wrap(err, errGetLatestVersion)
+	}
+
 	return managed.ExternalCreation{}, errors.Wrap(request.DeployAction(ctx, cr, v1alpha2.ActionCreate, c.localKube, c.logger, c.http), errFailedToSendHttpRequest)
 }
 
@@ -211,6 +211,11 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalUpdate{}, errors.New(errNotRequest)
 	}
 
+	// Get the latest version of the resource before deploying
+	if err := c.localKube.Get(ctx, types.NamespacedName{Name: cr.Name, Namespace: cr.Namespace}, cr); err != nil {
+		return managed.ExternalUpdate{}, errors.Wrap(err, errGetLatestVersion)
+	}
+
 	return managed.ExternalUpdate{}, errors.Wrap(request.DeployAction(ctx, cr, v1alpha2.ActionUpdate, c.localKube, c.logger, c.http), errFailedToSendHttpRequest)
 }
 
@@ -218,6 +223,11 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 	cr, ok := mg.(*v1alpha2.Request)
 	if !ok {
 		return managed.ExternalDelete{}, errors.New(errNotRequest)
+	}
+
+	// Get the latest version of the resource before deploying
+	if err := c.localKube.Get(ctx, types.NamespacedName{Name: cr.Name, Namespace: cr.Namespace}, cr); err != nil {
+		return managed.ExternalDelete{}, errors.Wrap(err, errGetLatestVersion)
 	}
 
 	return managed.ExternalDelete{}, errors.Wrap(request.DeployAction(ctx, cr, v1alpha2.ActionRemove, c.localKube, c.logger, c.http), errFailedToSendHttpRequest)

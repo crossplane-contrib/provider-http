@@ -60,11 +60,7 @@ func GenerateRequestDetails(ctx context.Context, localKube client.Client, method
 func GenerateRequestContext(forProvider interfaces.MappedHTTPRequestSpec, patchedResponse interfaces.HTTPResponse) map[string]interface{} {
 	baseMap, _ := json_util.StructToMap(forProvider)
 	statusMap, _ := json_util.StructToMap(map[string]interface{}{
-		"response": map[string]interface{}{
-			"statusCode": patchedResponse.GetStatusCode(),
-			"body":       patchedResponse.GetBody(),
-			"headers":    patchedResponse.GetHeaders(),
-		},
+		"response": patchedResponse,
 	})
 
 	maps.Copy(baseMap, statusMap)

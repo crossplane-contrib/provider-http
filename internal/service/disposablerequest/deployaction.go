@@ -21,16 +21,7 @@ const (
 )
 
 // DeployAction sends the HTTP request defined in the DisposableRequest resource and updates its status based on the response.
-func DeployAction(
-	ctx context.Context,
-	spec interfaces.SimpleHTTPRequestSpec,
-	rollbackPolicy interfaces.RollbackAware,
-	status interfaces.DisposableRequestStatus,
-	obj client.Object,
-	localKube client.Client,
-	logger logging.Logger,
-	httpCli httpClient.Client,
-) error {
+func DeployAction(ctx context.Context, spec interfaces.SimpleHTTPRequestSpec, rollbackPolicy interfaces.RollbackAware, status interfaces.DisposableRequestStatus, obj client.Object, localKube client.Client, logger logging.Logger, httpCli httpClient.Client) error {
 	if status.GetSynced() {
 		logger.Debug("Resource is already synced, skipping deployment action")
 		return nil
@@ -58,13 +49,7 @@ func DeployAction(
 }
 
 // sendHttpRequest sends the HTTP request with sensitive data patched
-func sendHttpRequest(
-	ctx context.Context,
-	spec interfaces.SimpleHTTPRequestSpec,
-	localKube client.Client,
-	logger logging.Logger,
-	httpCli httpClient.Client,
-) (httpClient.HttpDetails, error) {
+func sendHttpRequest(ctx context.Context, spec interfaces.SimpleHTTPRequestSpec, localKube client.Client, logger logging.Logger, httpCli httpClient.Client) (httpClient.HttpDetails, error) {
 	sensitiveBody, err := datapatcher.PatchSecretsIntoString(ctx, localKube, spec.GetBody(), logger)
 	if err != nil {
 		return httpClient.HttpDetails{}, err
@@ -83,12 +68,7 @@ func sendHttpRequest(
 }
 
 // prepareRequestResource creates and initializes the RequestResource
-func prepareRequestResource(
-	ctx context.Context,
-	obj client.Object,
-	details httpClient.HttpDetails,
-	localKube client.Client,
-) (*utils.RequestResource, error) {
+func prepareRequestResource(ctx context.Context, obj client.Object, details httpClient.HttpDetails, localKube client.Client) (*utils.RequestResource, error) {
 	resource := &utils.RequestResource{
 		Resource:       obj,
 		RequestContext: ctx,
@@ -106,16 +86,7 @@ func prepareRequestResource(
 }
 
 // handleHttpResponse processes the HTTP response and updates resource status accordingly
-func handleHttpResponse(
-	ctx context.Context,
-	spec interfaces.SimpleHTTPRequestSpec,
-	rollbackPolicy interfaces.RollbackAware,
-	sensitiveResponse httpClient.HttpResponse,
-	resource *utils.RequestResource,
-	obj metav1.Object,
-	localKube client.Client,
-	logger logging.Logger,
-) error {
+func handleHttpResponse(ctx context.Context, spec interfaces.SimpleHTTPRequestSpec, rollbackPolicy interfaces.RollbackAware, sensitiveResponse httpClient.HttpResponse, resource *utils.RequestResource, obj metav1.Object, localKube client.Client, logger logging.Logger) error {
 	// Handle HTTP error status codes
 	if utils.IsHTTPError(resource.HttpResponse.StatusCode) {
 		return handleHttpErrorStatus(ctx, spec, resource, obj, localKube, logger)
@@ -127,16 +98,8 @@ func handleHttpResponse(
 
 // handleHttpRequestError handles cases where the HTTP request itself failed
 func handleHttpRequestError(
-	ctx context.Context,
-	spec interfaces.SimpleHTTPRequestSpec,
-	obj metav1.Object,
-	resource *utils.RequestResource,
-	httpRequestErr error,
-	localKube client.Client,
-	logger logging.Logger,
-) error {
+	ctx context.Context, spec interfaces.SimpleHTTPRequestSpec, obj metav1.Object, resource *utils.RequestResource, httpRequestErr error, localKube client.Client, logger logging.Logger) error {
 	setErr := resource.SetError(httpRequestErr)
-	datapatcher.ApplyResponseDataToSecrets(ctx, localKube, logger, &resource.HttpResponse, spec.GetSecretInjectionConfigs(), obj)
 	if settingError := utils.SetRequestResourceStatus(*resource, setErr, resource.SetLastReconcileTime(), resource.SetRequestDetails()); settingError != nil {
 		return errors.Wrap(settingError, utils.ErrFailedToSetStatus)
 	}
@@ -144,15 +107,7 @@ func handleHttpRequestError(
 }
 
 // handleHttpErrorStatus handles HTTP error status codes
-func handleHttpErrorStatus(
-	ctx context.Context,
-	spec interfaces.SimpleHTTPRequestSpec,
-	resource *utils.RequestResource,
-	obj metav1.Object,
-	localKube client.Client,
-	logger logging.Logger,
-) error {
-	datapatcher.ApplyResponseDataToSecrets(ctx, localKube, logger, &resource.HttpResponse, spec.GetSecretInjectionConfigs(), obj)
+func handleHttpErrorStatus(ctx context.Context, spec interfaces.SimpleHTTPRequestSpec, resource *utils.RequestResource, obj metav1.Object, localKube client.Client, logger logging.Logger) error {
 	if settingError := utils.SetRequestResourceStatus(*resource, resource.SetStatusCode(), resource.SetLastReconcileTime(), resource.SetHeaders(), resource.SetBody(), resource.SetRequestDetails(), resource.SetError(nil)); settingError != nil {
 		return errors.Wrap(settingError, utils.ErrFailedToSetStatus)
 	}
@@ -161,16 +116,7 @@ func handleHttpErrorStatus(
 }
 
 // handleResponseValidation validates the response and updates status accordingly
-func handleResponseValidation(
-	ctx context.Context,
-	spec interfaces.SimpleHTTPRequestSpec,
-	rollbackPolicy interfaces.RollbackAware,
-	sensitiveResponse httpClient.HttpResponse,
-	resource *utils.RequestResource,
-	obj metav1.Object,
-	localKube client.Client,
-	logger logging.Logger,
-) error {
+func handleResponseValidation(ctx context.Context, spec interfaces.SimpleHTTPRequestSpec, rollbackPolicy interfaces.RollbackAware, sensitiveResponse httpClient.HttpResponse, resource *utils.RequestResource, obj metav1.Object, localKube client.Client, logger logging.Logger) error {
 	isExpectedResponse, err := IsResponseAsExpected(spec, sensitiveResponse)
 	if err != nil {
 		return err

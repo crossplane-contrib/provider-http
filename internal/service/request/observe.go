@@ -50,17 +50,12 @@ func FailedObserve() ObserveRequestDetails {
 // IsUpToDate checks whether desired spec up to date with the observed state for a given request
 func IsUpToDate(ctx context.Context, cr interfaces.RequestResource, localKube client.Client, logger logging.Logger, httpClient httpClient.Client) (ObserveRequestDetails, error) {
 	spec := cr.GetSpec()
-	objectNotCreated := !isObjectValidForObservation(cr)
-
 	mapping, err := requestmapping.GetMapping(spec, common.ActionObserve, logger)
 	if err != nil {
-		if objectNotCreated {
-			// No mapping found and object not created yet, jumping to the default
-			// behavior of creating before observing.
-			return FailedObserve(), errors.New(observe.ErrObjectNotFound)
-		}
 		return FailedObserve(), err
 	}
+
+	objectNotCreated := !isObjectValidForObservation(cr)
 
 	// Evaluate the HTTP request template. If successfully templated, attempt to
 	// observe the resource.
@@ -87,9 +82,15 @@ func IsUpToDate(ctx context.Context, cr interfaces.RequestResource, localKube cl
 		return FailedObserve(), err
 	}
 
-	// Get SecretInjectionConfigs from spec
+	// Apply response data to secrets and update CR status with response
 	secretConfigs := spec.GetSecretInjectionConfigs()
 	datapatcher.ApplyResponseDataToSecrets(ctx, localKube, logger, &details.HttpResponse, secretConfigs, cr)
+	
+	// Update CR with the response data
+	cr.SetStatusCode(details.HttpResponse.StatusCode)
+	cr.SetHeaders(details.HttpResponse.Headers)
+	cr.SetBody(details.HttpResponse.Body)
+
 	return determineIfUpToDate(ctx, spec, cr, cr, details, responseErr, localKube, logger, httpClient)
 }
 

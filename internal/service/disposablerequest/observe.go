@@ -22,14 +22,7 @@ const (
 )
 
 // ValidateStoredResponse validates the stored response against expected criteria
-func ValidateStoredResponse(
-	ctx context.Context,
-	spec interfaces.SimpleHTTPRequestSpec,
-	status interfaces.DisposableRequestStatusReader,
-	obj metav1.Object,
-	localKube client.Client,
-	logger logging.Logger,
-) (bool, httpClient.HttpResponse, error) {
+func ValidateStoredResponse(ctx context.Context, spec interfaces.SimpleHTTPRequestSpec, status interfaces.DisposableRequestStatusReader, obj metav1.Object, localKube client.Client, logger logging.Logger) (bool, httpClient.HttpResponse, error) {
 	response := status.GetResponse()
 	if response == nil || response.GetStatusCode() == 0 {
 		return false, httpClient.HttpResponse{}, nil
@@ -60,11 +53,7 @@ func ValidateStoredResponse(
 }
 
 // CalculateUpToDateStatus determines if the resource should be considered up-to-date
-func CalculateUpToDateStatus(
-	reconciliationPolicy interfaces.ReconciliationPolicyAware,
-	rollbackPolicy interfaces.RollbackAware,
-	currentStatus bool,
-) bool {
+func CalculateUpToDateStatus(reconciliationPolicy interfaces.ReconciliationPolicyAware, rollbackPolicy interfaces.RollbackAware, currentStatus bool) bool {
 	// If shouldLoopInfinitely is true, the resource should never be considered up-to-date
 	if reconciliationPolicy.GetShouldLoopInfinitely() {
 		if rollbackPolicy.GetRollbackRetriesLimit() == nil {
@@ -92,14 +81,7 @@ func UpdateResourceStatus(ctx context.Context, obj client.Object, localKube clie
 
 // ApplySecretInjectionsFromStoredResponse applies secret injection configurations using the stored response
 // This is used when the resource is already synced but secret injection configs may have been updated
-func ApplySecretInjectionsFromStoredResponse(
-	ctx context.Context,
-	spec interfaces.SimpleHTTPRequestSpec,
-	storedResponse httpClient.HttpResponse,
-	obj metav1.Object,
-	localKube client.Client,
-	logger logging.Logger,
-) {
+func ApplySecretInjectionsFromStoredResponse(ctx context.Context, spec interfaces.SimpleHTTPRequestSpec, storedResponse httpClient.HttpResponse, obj metav1.Object, localKube client.Client, logger logging.Logger) {
 	logger.Debug("Applying secret injections from stored response")
 	datapatcher.ApplyResponseDataToSecrets(ctx, localKube, logger, &storedResponse, spec.GetSecretInjectionConfigs(), obj)
 }

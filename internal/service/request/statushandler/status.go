@@ -12,7 +12,6 @@ import (
 	"github.com/crossplane-contrib/provider-http/internal/utils"
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
 	"github.com/pkg/errors"
-	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -122,12 +121,7 @@ func (r *requestStatusHandler) ResetFailures() {
 }
 
 // NewStatusHandler returns a new Request statusHandler
-func NewStatusHandler(ctx context.Context, resource client.Object, forProvider interfaces.MappedHTTPRequestSpec, requestDetails httpClient.HttpDetails, err error, localKube client.Client, logger logging.Logger) (RequestStatusHandler, error) {
-	// Get the latest version of the resource before updating
-	if err := localKube.Get(ctx, types.NamespacedName{Name: resource.GetName(), Namespace: resource.GetNamespace()}, resource); err != nil {
-		return nil, errors.Wrap(err, "failed to get the latest version of the resource")
-	}
-
+func NewStatusHandler(ctx context.Context, resource client.Object, forProvider interfaces.MappedHTTPRequestSpec, requestDetails httpClient.HttpDetails, requestErr error, localKube client.Client, logger logging.Logger) (RequestStatusHandler, error) {
 	requestStatusHandler := &requestStatusHandler{
 		logger:       logger,
 		extraSetters: &[]utils.SetRequestStatusFunc{},
@@ -138,7 +132,7 @@ func NewStatusHandler(ctx context.Context, resource client.Object, forProvider i
 			RequestContext: ctx,
 			LocalClient:    localKube,
 		},
-		responseError: err,
+		responseError: requestErr,
 		forProvider:   forProvider,
 	}
 

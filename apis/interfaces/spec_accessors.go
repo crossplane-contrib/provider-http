@@ -236,6 +236,9 @@ type RequestResource interface {
 	// RequestStatusReader for accessing response and status information
 	RequestStatusReader
 
+	// RequestStatusWriter for modifying response and status information
+	RequestStatusWriter
+
 	// CachedResponse for accessing cached response
 	CachedResponse
 }

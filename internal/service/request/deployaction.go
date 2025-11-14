@@ -27,11 +27,18 @@ func DeployAction(ctx context.Context, cr interfaces.RequestResource, action str
 		return err
 	}
 
-	details, err := httpClient.SendRequest(ctx, requestmapping.GetEffectiveMethod(mapping), requestDetails.Url, requestDetails.Body, requestDetails.Headers, spec.GetInsecureSkipTLSVerify())
+	details, sendErr := httpClient.SendRequest(ctx, requestmapping.GetEffectiveMethod(mapping), requestDetails.Url, requestDetails.Body, requestDetails.Headers, spec.GetInsecureSkipTLSVerify())
+	
+	// Apply response data to secrets and update CR status
 	secretConfigs := spec.GetSecretInjectionConfigs()
 	datapatcher.ApplyResponseDataToSecrets(ctx, localKube, logger, &details.HttpResponse, secretConfigs, cr)
+	
+	// Update CR with the response data
+	cr.SetStatusCode(details.HttpResponse.StatusCode)
+	cr.SetHeaders(details.HttpResponse.Headers)
+	cr.SetBody(details.HttpResponse.Body)
 
-	statusHandler, err := statushandler.NewStatusHandler(ctx, cr, spec, details, err, localKube, logger)
+	statusHandler, err := statushandler.NewStatusHandler(ctx, cr, spec, details, sendErr, localKube, logger)
 	if err != nil {
 		return err
 	}

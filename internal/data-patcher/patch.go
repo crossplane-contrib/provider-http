@@ -23,6 +23,11 @@ const (
 
 // PatchSecretsIntoResponse patches secrets into the provided response.
 func PatchSecretsIntoResponse(ctx context.Context, localKube client.Client, response interfaces.HTTPResponse, logger logging.Logger) (interfaces.HTTPResponse, error) {
+	// If response is nil, return nil (no response to patch)
+	if response == nil {
+		return nil, nil
+	}
+
 	patchedBody, err := PatchSecretsIntoString(ctx, localKube, response.GetBody(), logger)
 	if err != nil {
 		return nil, err
