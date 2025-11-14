@@ -16,19 +16,19 @@ spec:
       baseUrl: http://test-server.default.svc.cluster.local/v1/users
       body: |
         {
-          "username": "mock_user", 
+          "username": "mock_user",
           "password": "secretdata {{ user-password:crossplane-system:password }}",
-          "email": "mock_user@example.com", 
+          "email": "mock_user@example.com",
           "age": 30
         }
     mappings:
       # Scenario 1: Action specified, method not specified (defaults to POST for CREATE)
       - action: CREATE
-        # method: "POST" 
+        # method: "POST"
         body: |
           {
-            username: .payload.body.username, 
-            email: .payload.body.email, 
+            username: .payload.body.username,
+            email: .payload.body.email,
             age: .payload.body.age,
             password: .payload.body.password
           }
@@ -53,7 +53,7 @@ spec:
         # action: UPDATE
         body: |
           {
-            email: .payload.body.email, 
+            email: .payload.body.email,
             age: .payload.body.age
           }
         url: (.payload.baseUrl + "/" + (.response.body.id|tostring))
@@ -62,8 +62,8 @@ spec:
       - action: REMOVE
         # method: "DELETE"
         url: (.payload.baseUrl + "/" + (.response.body.id|tostring))
-    
-    # expectedResponseCheck is optional. If not specified or if the type is "DEFAULT", 
+
+    # expectedResponseCheck is optional. If not specified or if the type is "DEFAULT",
     # the resource is considered up to date if the GET response containes the PUT body.
     # If specified, the JQ logic determines if the resource is up to date:
     # - If the JQ query is false, a PUT request is sent to update the resource.
@@ -75,11 +75,11 @@ spec:
          and .response.body.age == 30
          and .response.headers."Content-Type" == ["application/json"]
          and .response.headers."X-Secret-Header"[0] == "{{ response-secret:default:extracted-header-data }}"
-         then true 
-         else false 
+         then true
+         else false
          end
 
-    # isRemovedCheck is optional. If not specified or if the type is "DEFAULT", 
+    # isRemovedCheck is optional. If not specified or if the type is "DEFAULT",
     # the resource is considered removed if the OBSERVE response after REMOVE has 404 status code.
     # If specified, the JQ logic determines if the resource is removed:
     # - If the JQ query is false, a REMOVE request is sent to remove the resource.
@@ -89,12 +89,12 @@ spec:
       logic: |
         if .response.statusCode == 404
           and .response.body.error == "User not found"
-          then true 
-          else false 
+          then true
+          else false
           end
 
     # Secrets receiving patches from response data
-    secretInjectionConfigs: 
+    secretInjectionConfigs:
       - secretRef:
           name: response-secret
           namespace: default
@@ -112,7 +112,7 @@ spec:
             missingFieldStrategy: setEmpty
         # setOwnerReference determines if the secret should be deleted when the associated resource is deleted.
         setOwnerReference: true
-      
+
       - secretRef:
           name: response-user-password
           namespace: default

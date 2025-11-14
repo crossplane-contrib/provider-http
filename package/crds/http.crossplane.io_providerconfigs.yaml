@@ -103,6 +103,78 @@ spec:
                 required:
                 - source
                 type: object
+              tls:
+                description: TLS configuration for HTTPS requests.
+                properties:
+                  caBundle:
+                    description: |-
+                      CABundle is a PEM encoded CA bundle which will be used to validate the server certificate.
+                      If empty, system root CAs will be used.
+                    format: byte
+                    type: string
+                  caCertSecretRef:
+                    description: |-
+                      CACertSecretRef is a reference to a secret containing the CA certificate(s).
+                      The secret must contain a key specified in the SecretKeySelector.
+                    properties:
+                      key:
+                        description: The key to select.
+                        type: string
+                      name:
+                        description: Name of the secret.
+                        type: string
+                      namespace:
+                        description: Namespace of the secret.
+                        type: string
+                    required:
+                    - key
+                    - name
+                    - namespace
+                    type: object
+                  clientCertSecretRef:
+                    description: |-
+                      ClientCertSecretRef is a reference to a secret containing the client certificate.
+                      The secret must contain a key specified in the SecretKeySelector.
+                    properties:
+                      key:
+                        description: The key to select.
+                        type: string
+                      name:
+                        description: Name of the secret.
+                        type: string
+                      namespace:
+                        description: Namespace of the secret.
+                        type: string
+                    required:
+                    - key
+                    - name
+                    - namespace
+                    type: object
+                  clientKeySecretRef:
+                    description: |-
+                      ClientKeySecretRef is a reference to a secret containing the client private key.
+                      The secret must contain a key specified in the SecretKeySelector.
+                    properties:
+                      key:
+                        description: The key to select.
+                        type: string
+                      name:
+                        description: Name of the secret.
+                        type: string
+                      namespace:
+                        description: Namespace of the secret.
+                        type: string
+                    required:
+                    - key
+                    - name
+                    - namespace
+                    type: object
+                  insecureSkipVerify:
+                    description: |-
+                      InsecureSkipVerify controls whether the client verifies the server's certificate chain and host name.
+                      If true, any certificate presented by the server and any host name in that certificate is accepted.
+                    type: boolean
+                type: object
             required:
             - credentials
             type: object
