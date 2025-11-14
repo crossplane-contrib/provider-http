@@ -36,10 +36,10 @@ spec:
   credentials:
     source: None
   tls:
-    # Inline CA bundle (PEM encoded)
+    # Inline CA bundle (PEM encoded) - replace with your actual CA certificate
     caBundle: |
       -----BEGIN CERTIFICATE-----
-      MIIDXTCCAkWgAwIBAgIJAKJ... (your CA certificate here)
+      MIIDXTCCAkWgAwIBAgIJAKJ...
       -----END CERTIFICATE-----
     clientCertSecretRef:
       name: client-certificates
