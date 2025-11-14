@@ -1,0 +1,44 @@
+---
+# Example Request with TLS verification using ProviderConfig
+apiVersion: http.crossplane.io/v1alpha2
+kind: Request
+metadata:
+  name: example-https-with-tls
+spec:
+  deletionPolicy: Delete
+  forProvider:
+    url: https://api.example.com/v1/resource
+    method: GET
+    headers:
+      Accept:
+        - application/json
+  # Reference ProviderConfig with TLS settings
+  providerConfigRef:
+    name: example-with-tls
+---
+# Example Request with resource-level TLS override
+# Resource-level TLS settings take precedence over ProviderConfig
+apiVersion: http.crossplane.io/v1alpha2
+kind: Request
+metadata:
+  name: example-https-with-custom-tls
+spec:
+  deletionPolicy: Delete
+  forProvider:
+    url: https://api.example.com/v1/resource
+    method: POST
+    headers:
+      Content-Type:
+        - application/json
+    body: |
+      {
+        "key": "value"
+      }
+    # Resource-specific TLS configuration
+    tls:
+      caCertSecretRef:
+        name: custom-ca-secret
+        namespace: default
+        key: ca.pem
+  providerConfigRef:
+    name: example-with-tls

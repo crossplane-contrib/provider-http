@@ -1,0 +1,33 @@
+---
+# Example DisposableRequest with TLS verification
+apiVersion: http.crossplane.io/v1alpha2
+kind: DisposableRequest
+metadata:
+  name: example-disposable-https-tls
+spec:
+  deletionPolicy: Orphan
+  forProvider:
+    url: https://api.example.com/v1/resource
+    method: GET
+    headers:
+      Accept:
+        - application/json
+  providerConfigRef:
+    name: example-with-tls
+---
+# Example DisposableRequest with mTLS authentication
+apiVersion: http.crossplane.io/v1alpha2
+kind: DisposableRequest
+metadata:
+  name: example-disposable-mtls
+spec:
+  deletionPolicy: Orphan
+  forProvider:
+    url: https://api.example.com/v1/protected-resource
+    method: GET
+    headers:
+      Accept:
+        - application/json
+  # Use ProviderConfig with mTLS settings
+  providerConfigRef:
+    name: example-with-mtls

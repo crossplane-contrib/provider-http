@@ -14,3 +14,7 @@ kubeconfig
 # Test server binaries
 cluster/test/server
 cluster/test/testserver
+
+# Local backup directory (not for upstream)
+.local-backup/
+bin/
