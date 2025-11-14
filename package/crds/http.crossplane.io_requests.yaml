@@ -493,9 +493,13 @@ spec:
                     description: Headers defines default headers for each request.
                     type: object
                   insecureSkipTLSVerify:
-                    description: InsecureSkipTLSVerify, when set to true, skips TLS
-                      certificate checks for the HTTP request
+                    description: |-
+                      InsecureSkipTLSVerify, when set to true, skips TLS certificate checks for the HTTP request.
+                      This field is mutually exclusive with TLSConfig.
                     type: boolean
+                    x-kubernetes-validations:
+                    - message: insecureSkipTLSVerify and tlsConfig are mutually exclusive
+                      rule: '!(self == true && has(oldSelf.tlsConfig))'
                   isRemovedCheck:
                     description: IsRemovedCheck specifies the mechanism to validate
                       the OBSERVE response after removal against expected value.
@@ -660,8 +664,9 @@ spec:
                       type: object
                     type: array
                   tlsConfig:
-                    description: TLSConfig allows overriding the TLS configuration
-                      from ProviderConfig for this specific request.
+                    description: |-
+                      TLSConfig allows overriding the TLS configuration from ProviderConfig for this specific request.
+                      This field is mutually exclusive with InsecureSkipTLSVerify.
                     properties:
                       caBundle:
                         description: |-
@@ -732,6 +737,10 @@ spec:
                           If true, any certificate presented by the server and any host name in that certificate is accepted.
                         type: boolean
                     type: object
+                    x-kubernetes-validations:
+                    - message: tlsConfig and insecureSkipTLSVerify are mutually exclusive
+                      rule: '!(has(self) && has(oldSelf.insecureSkipTLSVerify) &&
+                        oldSelf.insecureSkipTLSVerify == true)'
                   waitTimeout:
                     description: WaitTimeout specifies the maximum time duration for
                       waiting.

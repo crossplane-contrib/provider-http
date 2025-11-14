@@ -43,11 +43,16 @@ type DisposableRequestParameters struct {
 	// RollbackRetriesLimit is max number of attempts to retry HTTP request by sending again the request.
 	RollbackRetriesLimit *int32 `json:"rollbackRetriesLimit,omitempty"`
 
-	// InsecureSkipTLSVerify, when set to true, skips TLS certificate checks for the HTTP request
+	// InsecureSkipTLSVerify, when set to true, skips TLS certificate checks for the HTTP request.
+	// This field is mutually exclusive with TLSConfig.
+	// +optional
+	// +kubebuilder:validation:XValidation:rule="!(self == true && has(oldSelf.tlsConfig))",message="insecureSkipTLSVerify and tlsConfig are mutually exclusive"
 	InsecureSkipTLSVerify bool `json:"insecureSkipTLSVerify,omitempty"`
 
 	// TLSConfig allows overriding the TLS configuration from ProviderConfig for this specific request.
+	// This field is mutually exclusive with InsecureSkipTLSVerify.
 	// +optional
+	// +kubebuilder:validation:XValidation:rule="!(has(self) && has(oldSelf.insecureSkipTLSVerify) && oldSelf.insecureSkipTLSVerify == true)",message="tlsConfig and insecureSkipTLSVerify are mutually exclusive"
 	TLSConfig *common.TLSConfig `json:"tlsConfig,omitempty"`
 
 	// ExpectedResponse is a jq filter expression used to evaluate the HTTP response and determine if it matches the expected criteria.
