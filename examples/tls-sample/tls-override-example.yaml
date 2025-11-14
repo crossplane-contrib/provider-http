@@ -1,0 +1,126 @@
+# TLS Override Example
+#
+# This example shows how to override ProviderConfig TLS settings
+# at the resource level. This is useful when:
+# - Different endpoints require different certificates
+# - Testing with self-signed certificates
+# - Multi-tenant scenarios with different CA bundles
+#
+# Note: Replace certificate placeholders with your actual certificates
+
+---
+# Default CA for most requests
+apiVersion: v1
+kind: Secret
+metadata:
+  name: default-ca-cert
+  namespace: crossplane-system
+type: Opaque
+stringData:
+  ca.crt: |
+    -----BEGIN CERTIFICATE-----
+    # Default CA certificate
+    -----END CERTIFICATE-----
+
+---
+# Special CA for specific endpoint
+apiVersion: v1
+kind: Secret
+metadata:
+  name: special-endpoint-ca
+  namespace: crossplane-system
+type: Opaque
+stringData:
+  ca.crt: |
+    -----BEGIN CERTIFICATE-----
+    # Special endpoint's CA certificate
+    -----END CERTIFICATE-----
+
+---
+# ProviderConfig with default TLS settings
+apiVersion: http.crossplane.io/v1alpha1
+kind: ProviderConfig
+metadata:
+  name: https-default
+spec:
+  credentials:
+    source: None
+  tlsConfig:
+    caBundleConfig:
+      source: Secret
+      secretRef:
+        name: default-ca-cert
+        namespace: crossplane-system
+        key: ca.crt
+
+---
+# Request using default TLS from ProviderConfig
+apiVersion: http.crossplane.io/v1alpha2
+kind: Request
+metadata:
+  name: default-tls-request
+spec:
+  deletionPolicy: Delete
+  providerConfigRef:
+    name: https-default
+  forProvider:
+    payload:
+      baseUrl: https://api.example.com
+    mappings:
+      - method: POST
+        body: '{"name": "resource1"}'
+        url: .payload.baseUrl + "/resources"
+      - method: GET
+        url: .payload.baseUrl + "/resources/" + (.response.body.id | tostring)
+      - method: DELETE
+        url: .payload.baseUrl + "/resources/" + (.response.body.id | tostring)
+
+---
+# Request overriding TLS settings for a different endpoint
+apiVersion: http.crossplane.io/v1alpha2
+kind: Request
+metadata:
+  name: override-tls-request
+spec:
+  deletionPolicy: Delete
+  providerConfigRef:
+    name: https-default
+  forProvider:
+    payload:
+      baseUrl: https://special.example.com
+    mappings:
+      - method: POST
+        body: '{"name": "resource2"}'
+        url: .payload.baseUrl + "/resources"
+      - method: GET
+        url: .payload.baseUrl + "/resources/" + (.response.body.id | tostring)
+      - method: DELETE
+        url: .payload.baseUrl + "/resources/" + (.response.body.id | tostring)
+    # Override with different CA for this specific endpoint
+    tlsConfig:
+      caBundleConfig:
+        source: Secret
+        secretRef:
+          name: special-endpoint-ca
+          namespace: crossplane-system
+          key: ca.crt
+
+---
+# Request with insecure skip TLS verify (NOT recommended for production)
+apiVersion: http.crossplane.io/v1alpha2
+kind: Request
+metadata:
+  name: insecure-skip-verify-request
+spec:
+  deletionPolicy: Delete
+  providerConfigRef:
+    name: https-default
+  forProvider:
+    payload:
+      baseUrl: https://test.example.com
+    mappings:
+      - method: GET
+        url: .payload.baseUrl + "/health"
+    # Skip TLS verification (useful for testing/development only)
+    tlsConfig:
+      insecureSkipTLSVerify: true

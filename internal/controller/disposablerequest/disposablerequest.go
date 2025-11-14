@@ -144,7 +144,7 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 	}
 
 	// Merge TLS configs: resource-level overrides provider-level
-	mergedTLSConfig := httpClient.MergeTLSConfigs(cr.Spec.ForProvider.TLSConfig, pc.Spec.TLS)
+	mergedTLSConfig := httpClient.MergeTLSConfigs(cr.Spec.ForProvider.TLSConfig, pc.Spec.TLSConfig)
 
 	// Load TLS configuration from secrets
 	tlsConfigData, err := httpClient.LoadTLSConfig(ctx, c.kube, mergedTLSConfig)
@@ -329,14 +329,12 @@ func (c *external) sendHttpRequest(ctx context.Context, cr *v1alpha2.DisposableR
 			ClientCert:         tlsConfig.ClientCert,
 			ClientKey:          tlsConfig.ClientKey,
 		}
-	}
-
-	details, err := c.http.SendRequestWithTLS(ctx, cr.Spec.ForProvider.Method, cr.Spec.ForProvider.URL, bodyData, headersData, tlsConfig)
-
-	return details, err
 }
 
-// prepareRequestResource creates and initializes the RequestResource
+details, err := c.http.SendRequest(ctx, cr.Spec.ForProvider.Method, cr.Spec.ForProvider.URL, bodyData, headersData, tlsConfig)
+
+return details, err
+}// prepareRequestResource creates and initializes the RequestResource
 func (c *external) prepareRequestResource(ctx context.Context, cr *v1alpha2.DisposableRequest, details httpClient.HttpDetails) (*utils.RequestResource, error) {
 	resource := &utils.RequestResource{
 		Resource:       cr,

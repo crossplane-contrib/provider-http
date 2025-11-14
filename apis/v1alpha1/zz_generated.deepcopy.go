@@ -88,8 +88,8 @@ func (in *ProviderConfigList) DeepCopyObject() runtime.Object {
 func (in *ProviderConfigSpec) DeepCopyInto(out *ProviderConfigSpec) {
 	*out = *in
 	in.Credentials.DeepCopyInto(&out.Credentials)
-	if in.TLS != nil {
-		in, out := &in.TLS, &out.TLS
+	if in.TLSConfig != nil {
+		in, out := &in.TLSConfig, &out.TLSConfig
 		*out = new(common.TLSConfig)
 		(*in).DeepCopyInto(*out)
 	}

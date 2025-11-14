@@ -15,7 +15,6 @@ import (
 
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
 	"github.com/google/go-cmp/cmp"
-	"github.com/google/go-cmp/cmp/cmpopts"
 )
 
 const (
@@ -297,7 +296,7 @@ func TestBuildTLSConfigWithRealCertificates(t *testing.T) {
 	})
 }
 
-func TestSendRequestWithTLS(t *testing.T) {
+func TestSendRequest(t *testing.T) {
 	type args struct {
 		method    string
 		body      Data
@@ -550,42 +549,42 @@ func TestSendRequestWithTLS(t *testing.T) {
 				t.Fatalf("NewClient(...): unexpected error: %v", err)
 			}
 
-			got, gotErr := c.SendRequestWithTLS(context.Background(), tc.args.method, server.URL, tc.args.body, tc.args.headers, tc.args.tlsConfig)
+			got, gotErr := c.SendRequest(context.Background(), tc.args.method, server.URL, tc.args.body, tc.args.headers, tc.args.tlsConfig)
 
 			if tc.want.err != nil || tc.want.errContains != "" {
 				if gotErr == nil {
-					t.Fatalf("SendRequestWithTLS(...): expected error, got nil")
+					t.Fatalf("SendRequest(...): expected error, got nil")
 				}
 				if tc.want.errContains != "" && !strings.Contains(gotErr.Error(), tc.want.errContains) {
-					t.Fatalf("SendRequestWithTLS(...): expected error containing %q, got %q", tc.want.errContains, gotErr.Error())
+					t.Fatalf("SendRequest(...): expected error containing %q, got %q", tc.want.errContains, gotErr.Error())
 				}
 				return
 			}
 
 			if gotErr != nil {
-				t.Fatalf("SendRequestWithTLS(...): unexpected error: %v", gotErr)
+				t.Fatalf("SendRequest(...): unexpected error: %v", gotErr)
 			}
 
 			if got.HttpResponse.StatusCode != tc.want.statusCode {
-				t.Errorf("SendRequestWithTLS(...): statusCode = %v, want %v", got.HttpResponse.StatusCode, tc.want.statusCode)
+				t.Errorf("SendRequest(...): statusCode = %v, want %v", got.HttpResponse.StatusCode, tc.want.statusCode)
 			}
 
 			if got.HttpResponse.Body != tc.want.bodyContent {
-				t.Errorf("SendRequestWithTLS(...): body = %v, want %v", got.HttpResponse.Body, tc.want.bodyContent)
+				t.Errorf("SendRequest(...): body = %v, want %v", got.HttpResponse.Body, tc.want.bodyContent)
 			}
 
 			if got.HttpRequest.Method != tc.args.method {
-				t.Errorf("SendRequestWithTLS(...): request method = %v, want %v", got.HttpRequest.Method, tc.args.method)
+				t.Errorf("SendRequest(...): request method = %v, want %v", got.HttpRequest.Method, tc.args.method)
 			}
 
 			if got.HttpRequest.URL != server.URL {
-				t.Errorf("SendRequestWithTLS(...): request URL = %v, want %v", got.HttpRequest.URL, server.URL)
+				t.Errorf("SendRequest(...): request URL = %v, want %v", got.HttpRequest.URL, server.URL)
 			}
 		})
 	}
 }
 
-func TestSendRequestWithTLSIntegration(t *testing.T) {
+func TestSendRequestIntegration(t *testing.T) {
 	t.Run("IntegrationWithTLSServer", func(t *testing.T) {
 		server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("X-Test-Header", "test-value")
@@ -605,159 +604,35 @@ func TestSendRequestWithTLSIntegration(t *testing.T) {
 			t.Fatalf("NewClient(...): unexpected error: %v", err)
 		}
 
-		tlsConfig := &TLSConfigData{
-			CABundle: caCertPEM,
-		}
+	tlsConfig := &TLSConfigData{
+		CABundle: caCertPEM,
+	}
 
-		result, err := c.SendRequestWithTLS(
-			context.Background(),
-			http.MethodGet,
-			server.URL,
-			Data{Encrypted: "", Decrypted: ""},
-			Data{Encrypted: map[string][]string{}, Decrypted: map[string][]string{}},
-			tlsConfig,
-		)
+	result, err := c.SendRequest(
+		context.Background(),
+		http.MethodGet,
+		server.URL,
+		Data{Encrypted: "", Decrypted: ""},
+		Data{Encrypted: map[string][]string{}, Decrypted: map[string][]string{}},
+	tlsConfig,
+)
 
-		if err != nil {
-			t.Fatalf("SendRequestWithTLS(...): unexpected error: %v", err)
-		}
-
-		if result.HttpResponse.StatusCode != http.StatusOK {
-			t.Errorf("SendRequestWithTLS(...): statusCode = %v, want %v", result.HttpResponse.StatusCode, http.StatusOK)
-		}
-
-		if result.HttpResponse.Body != `{"result": "success"}` {
-			t.Errorf("SendRequestWithTLS(...): body = %v, want %v", result.HttpResponse.Body, `{"result": "success"}`)
-		}
-
-		if result.HttpResponse.Headers["X-Test-Header"][0] != "test-value" {
-			t.Errorf("SendRequestWithTLS(...): header = %v, want %v", result.HttpResponse.Headers["X-Test-Header"], "test-value")
-		}
-	})
+if err != nil {
+	t.Fatalf("SendRequest(...): unexpected error: %v", err)
 }
 
-func TestSendRequest(t *testing.T) {
-	type args struct {
-		method        string
-		body          Data
-		headers       Data
-		skipTLSVerify bool
-	}
-	type want struct {
-		statusCode  int
-		bodyContent string
-		err         error
-	}
+if result.HttpResponse.StatusCode != http.StatusOK {
+	t.Errorf("SendRequest(...): statusCode = %v, want %v", result.HttpResponse.StatusCode, http.StatusOK)
+}
 
-	cases := map[string]struct {
-		args        args
-		want        want
-		setupServer func() *httptest.Server
-	}{
-		"SuccessfulRequestWithSkipTLSVerifyFalse": {
-			args: args{
-				method: http.MethodGet,
-				body: Data{
-					Encrypted: "",
-					Decrypted: "",
-				},
-				headers: Data{
-					Encrypted: map[string][]string{},
-					Decrypted: map[string][]string{},
-				},
-				skipTLSVerify: false,
-			},
-			want: want{
-				statusCode:  http.StatusOK,
-				bodyContent: "success",
-				err:         nil,
-			},
-			setupServer: func() *httptest.Server {
-				return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					w.WriteHeader(http.StatusOK)
-					w.Write([]byte("success"))
-				}))
-			},
-		},
-		"SuccessfulRequestWithSkipTLSVerifyTrue": {
-			args: args{
-				method: http.MethodGet,
-				body: Data{
-					Encrypted: "",
-					Decrypted: "",
-				},
-				headers: Data{
-					Encrypted: map[string][]string{},
-					Decrypted: map[string][]string{},
-				},
-				skipTLSVerify: true,
-			},
-			want: want{
-				statusCode:  http.StatusOK,
-				bodyContent: "success-insecure",
-				err:         nil,
-			},
-			setupServer: func() *httptest.Server {
-				return httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					w.WriteHeader(http.StatusOK)
-					w.Write([]byte("success-insecure"))
-				}))
-			},
-		},
-		"VerifyDelegationToSendRequestWithTLS": {
-			args: args{
-				method: http.MethodPost,
-				body: Data{
-					Encrypted: "encrypted",
-					Decrypted: `{"test":"data"}`,
-				},
-				headers: Data{
-					Encrypted: map[string][]string{"Content-Type": {"application/json"}},
-					Decrypted: map[string][]string{"Content-Type": {"application/json"}},
-				},
-				skipTLSVerify: false,
-			},
-			want: want{
-				statusCode:  http.StatusCreated,
-				bodyContent: "created",
-				err:         nil,
-			},
-			setupServer: func() *httptest.Server {
-				return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					w.WriteHeader(http.StatusCreated)
-					w.Write([]byte("created"))
-				}))
-			},
-		},
-	}
+if result.HttpResponse.Body != `{"result": "success"}` {
+	t.Errorf("SendRequest(...): body = %v, want %v", result.HttpResponse.Body, `{"result": "success"}`)
+}
 
-	for name, tc := range cases {
-		t.Run(name, func(t *testing.T) {
-			server := tc.setupServer()
-			defer server.Close()
-
-			c, err := NewClient(logging.NewNopLogger(), 30*time.Second, "")
-			if err != nil {
-				t.Fatalf("NewClient(...): unexpected error: %v", err)
-			}
-
-			got, gotErr := c.SendRequest(context.Background(), tc.args.method, server.URL, tc.args.body, tc.args.headers, tc.args.skipTLSVerify)
-
-			if diff := cmp.Diff(tc.want.err, gotErr, cmpopts.EquateErrors()); diff != "" {
-				t.Fatalf("SendRequest(...): -want error, +got error: %s", diff)
-			}
-
-			if tc.want.err == nil {
-				if got.HttpResponse.StatusCode != tc.want.statusCode {
-					t.Errorf("SendRequest(...): statusCode = %v, want %v", got.HttpResponse.StatusCode, tc.want.statusCode)
-				}
-
-				if got.HttpResponse.Body != tc.want.bodyContent {
-					t.Errorf("SendRequest(...): body = %v, want %v", got.HttpResponse.Body, tc.want.bodyContent)
-				}
-			}
-		})
-	}
+if result.HttpResponse.Headers["X-Test-Header"][0] != "test-value" {
+	t.Errorf("SendRequest(...): header = %v, want %v", result.HttpResponse.Headers["X-Test-Header"], "test-value")
+}
+})
 }
 
 func TestNewClient(t *testing.T) {
@@ -1087,40 +962,40 @@ func TestHTTPClientConfiguration(t *testing.T) {
 			w.WriteHeader(http.StatusOK)
 			w.Write([]byte("ok"))
 		}))
-		defer server.Close()
+	defer server.Close()
 
-		c, err := NewClient(logging.NewNopLogger(), 5*time.Second, "")
-		if err != nil {
-			t.Fatalf("NewClient(...): unexpected error: %v", err)
-		}
+	c, err := NewClient(logging.NewNopLogger(), 5*time.Second, "")
+	if err != nil {
+		t.Fatalf("NewClient(...): unexpected error: %v", err)
+	}
 
-		_, err = c.SendRequestWithTLS(
-			context.Background(),
-			http.MethodGet,
-			server.URL,
-			Data{Encrypted: "", Decrypted: ""},
-			Data{Encrypted: map[string][]string{}, Decrypted: map[string][]string{}},
-			&TLSConfigData{},
-		)
+	_, err = c.SendRequest(
+		context.Background(),
+		http.MethodGet,
+		server.URL,
+		Data{Encrypted: "", Decrypted: ""},
+		Data{Encrypted: map[string][]string{}, Decrypted: map[string][]string{}},
+		&TLSConfigData{},
+	)
 
-		if err != nil {
-			t.Errorf("SendRequestWithTLS(...): unexpected error: %v", err)
-		}
-	})
 
-	t.Run("HTTPClientRespectsTimeout", func(t *testing.T) {
-		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			time.Sleep(2 * time.Second)
-			w.WriteHeader(http.StatusOK)
-		}))
-		defer server.Close()
+if err != nil {
+	t.Errorf("SendRequest(...): unexpected error: %v", err)
+}
+})
 
+t.Run("HTTPClientRespectsTimeout", func(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(2 * time.Second)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
 		c, err := NewClient(logging.NewNopLogger(), 500*time.Millisecond, "")
 		if err != nil {
 			t.Fatalf("NewClient(...): unexpected error: %v", err)
 		}
 
-		_, err = c.SendRequestWithTLS(
+		_, err = c.SendRequest(
 			context.Background(),
 			http.MethodGet,
 			server.URL,
@@ -1130,7 +1005,7 @@ func TestHTTPClientConfiguration(t *testing.T) {
 		)
 
 		if err == nil {
-			t.Error("SendRequestWithTLS(...): expected timeout error, got nil")
+			t.Error("SendRequest(...): expected timeout error, got nil")
 		}
 	})
 }

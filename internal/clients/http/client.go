@@ -32,8 +32,7 @@ type TLSConfigData struct {
 
 // Client is the interface to interact with Http
 type Client interface {
-	SendRequest(ctx context.Context, method string, url string, body Data, headers Data, skipTLSVerify bool) (resp HttpDetails, err error)
-	SendRequestWithTLS(ctx context.Context, method string, url string, body Data, headers Data, tlsConfig *TLSConfigData) (resp HttpDetails, err error)
+	SendRequest(ctx context.Context, method string, url string, body Data, headers Data, tlsConfig *TLSConfigData) (resp HttpDetails, err error)
 }
 
 type client struct {
@@ -65,16 +64,8 @@ type HttpDetails struct {
 	HttpRequest  HttpRequest
 }
 
-// SendRequest sends an HTTP request to the specified URL with the given method, body, headers and skipTLSVerify.
-func (hc *client) SendRequest(ctx context.Context, method string, url string, body Data, headers Data, skipTLSVerify bool) (details HttpDetails, err error) {
-	tlsConfigData := &TLSConfigData{
-		InsecureSkipVerify: skipTLSVerify,
-	}
-	return hc.SendRequestWithTLS(ctx, method, url, body, headers, tlsConfigData)
-}
-
-// SendRequestWithTLS sends an HTTP request with custom TLS configuration.
-func (hc *client) SendRequestWithTLS(ctx context.Context, method string, url string, body Data, headers Data, tlsConfigData *TLSConfigData) (details HttpDetails, err error) {
+// SendRequest sends an HTTP request with optional TLS configuration.
+func (hc *client) SendRequest(ctx context.Context, method string, url string, body Data, headers Data, tlsConfigData *TLSConfigData) (details HttpDetails, err error) {
 	requestBody := []byte(body.Decrypted.(string))
 
 	// request contains the HTTP request that will be sent.

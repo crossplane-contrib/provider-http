@@ -8,8 +8,8 @@ metadata:
 spec:
   credentials:
     source: None
-  tls:
-    # Custom CA certificate for verifying server certificates
+  tlsConfig:
+    # Configure only CA bundle for server certificate verification
     caCertSecretRef:
       name: my-ca-cert-secret
       namespace: crossplane-system
@@ -24,7 +24,7 @@ metadata:
 spec:
   credentials:
     source: None
-  tls:
+  tlsConfig:
     # CA certificate for verifying server
     caCertSecretRef:
       name: my-ca-cert-secret
@@ -50,5 +50,5 @@ metadata:
 spec:
   credentials:
     source: None
-  tls:
+  tlsConfig:
     insecureSkipVerify: true

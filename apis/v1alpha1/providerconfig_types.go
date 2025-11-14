@@ -31,9 +31,9 @@ type ProviderConfigSpec struct {
 	// Credentials required to authenticate to this provider.
 	Credentials ProviderCredentials `json:"credentials"`
 
-	// TLS configuration for HTTPS requests.
+	// TLSConfig configuration for HTTPS requests.
 	// +optional
-	TLS *common.TLSConfig `json:"tls,omitempty"`
+	TLSConfig *common.TLSConfig `json:"tlsConfig,omitempty"`
 }
 
 // ProviderCredentials required to authenticate.

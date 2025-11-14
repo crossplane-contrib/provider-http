@@ -139,7 +139,7 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 	}
 
 	// Merge TLS configs: resource-level overrides provider-level
-	mergedTLSConfig := httpClient.MergeTLSConfigs(cr.Spec.ForProvider.TLSConfig, pc.Spec.TLS)
+	mergedTLSConfig := httpClient.MergeTLSConfigs(cr.Spec.ForProvider.TLSConfig, pc.Spec.TLSConfig)
 
 	// Load TLS configuration from secrets
 	tlsConfigData, err := httpClient.LoadTLSConfig(ctx, c.kube, mergedTLSConfig)
@@ -232,21 +232,21 @@ func (c *external) deployAction(ctx context.Context, cr *v1alpha2.Request, actio
 		// If InsecureSkipTLSVerify is explicitly set to true, override the TLS config
 		tlsConfig = &httpClient.TLSConfigData{
 			InsecureSkipVerify: true,
-			CABundle:           tlsConfig.CABundle,
-			ClientCert:         tlsConfig.ClientCert,
-			ClientKey:          tlsConfig.ClientKey,
-		}
+		CABundle:           tlsConfig.CABundle,
+		ClientCert:         tlsConfig.ClientCert,
+		ClientKey:          tlsConfig.ClientKey,
 	}
+}
 
-	details, err := c.http.SendRequestWithTLS(ctx, mapping.Method, requestDetails.Url, requestDetails.Body, requestDetails.Headers, tlsConfig)
-	datapatcher.ApplyResponseDataToSecrets(ctx, c.localKube, c.logger, &details.HttpResponse, cr.Spec.ForProvider.SecretInjectionConfigs, cr)
+details, err := c.http.SendRequest(ctx, mapping.Method, requestDetails.Url, requestDetails.Body, requestDetails.Headers, tlsConfig)
+datapatcher.ApplyResponseDataToSecrets(ctx, c.localKube, c.logger, &details.HttpResponse, cr.Spec.ForProvider.SecretInjectionConfigs, cr)
 
-	statusHandler, err := statushandler.NewStatusHandler(ctx, cr, details, err, c.localKube, c.logger)
-	if err != nil {
-		return err
-	}
+statusHandler, err := statushandler.NewStatusHandler(ctx, cr, details, err, c.localKube, c.logger)
+if err != nil {
+	return err
+}
 
-	return statusHandler.SetRequestStatus()
+return statusHandler.SetRequestStatus()
 }
 
 func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.ExternalCreation, error) {

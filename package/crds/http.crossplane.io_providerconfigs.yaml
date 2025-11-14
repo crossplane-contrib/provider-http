@@ -103,8 +103,8 @@ spec:
                 required:
                 - source
                 type: object
-              tls:
-                description: TLS configuration for HTTPS requests.
+              tlsConfig:
+                description: TLSConfig configuration for HTTPS requests.
                 properties:
                   caBundle:
                     description: |-

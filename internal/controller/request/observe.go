@@ -66,7 +66,23 @@ func (c *external) isUpToDate(ctx context.Context, cr *v1alpha2.Request) (Observ
 		return FailedObserve(), err
 	}
 
-	details, responseErr := c.http.SendRequest(ctx, mapping.Method, requestDetails.Url, requestDetails.Body, requestDetails.Headers, cr.Spec.ForProvider.InsecureSkipTLSVerify)
+	// Build TLS config for observe request
+	tlsConfig := c.tlsConfigData
+	if tlsConfig == nil {
+		tlsConfig = &httpClient.TLSConfigData{
+			InsecureSkipVerify: cr.Spec.ForProvider.InsecureSkipTLSVerify,
+		}
+	} else if cr.Spec.ForProvider.InsecureSkipTLSVerify {
+		// If InsecureSkipTLSVerify is explicitly set to true, override the TLS config
+		tlsConfig = &httpClient.TLSConfigData{
+			InsecureSkipVerify: true,
+			CABundle:           tlsConfig.CABundle,
+			ClientCert:         tlsConfig.ClientCert,
+			ClientKey:          tlsConfig.ClientKey,
+		}
+	}
+
+	details, responseErr := c.http.SendRequest(ctx, mapping.Method, requestDetails.Url, requestDetails.Body, requestDetails.Headers, tlsConfig)
 	// The initial observation of an object requires a successful HTTP response
 	// to be considered existing.
 	if !utils.IsHTTPSuccess(details.HttpResponse.StatusCode) && objectNotCreated {

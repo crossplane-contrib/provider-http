@@ -1,0 +1,93 @@
+# Complete mTLS (Mutual TLS) Example
+#
+# This example demonstrates client certificate authentication (mTLS)
+# where both server and client certificates are verified.
+#
+# Use cases:
+# - APIs requiring client certificates for authentication
+# - High-security environments with mutual authentication
+#
+# Note: Replace certificate placeholders with your actual certificates
+
+---
+# Secret containing CA certificate to verify the server
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mtls-ca-cert
+  namespace: crossplane-system
+type: Opaque
+stringData:
+  ca.crt: |
+    -----BEGIN CERTIFICATE-----
+    # Replace with your server's CA certificate
+    -----END CERTIFICATE-----
+
+---
+# Secret containing client certificate and key for mTLS
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mtls-client-cert
+  namespace: crossplane-system
+type: kubernetes.io/tls
+stringData:
+  tls.crt: |
+    -----BEGIN CERTIFICATE-----
+    # Replace with your client certificate
+    -----END CERTIFICATE-----
+  tls.key: |
+    -----BEGIN PRIVATE KEY-----
+    # Replace with your client private key
+    -----END PRIVATE KEY-----
+
+---
+# ProviderConfig with mTLS configuration
+apiVersion: http.crossplane.io/v1alpha1
+kind: ProviderConfig
+metadata:
+  name: https-with-mtls
+spec:
+  credentials:
+    source: None
+  tlsConfig:
+    # Server certificate verification
+    caBundleConfig:
+      source: Secret
+      secretRef:
+        name: mtls-ca-cert
+        namespace: crossplane-system
+        key: ca.crt
+    # Client certificate authentication
+    clientCertificateConfig:
+      source: Secret
+      secretRef:
+        name: mtls-client-cert
+        namespace: crossplane-system
+        key: tls.crt
+      clientKeySecretRef:
+        name: mtls-client-cert
+        namespace: crossplane-system
+        key: tls.key
+
+---
+# DisposableRequest using mTLS ProviderConfig
+apiVersion: http.crossplane.io/v1alpha2
+kind: DisposableRequest
+metadata:
+  name: mtls-webhook-example
+spec:
+  deletionPolicy: Orphan
+  providerConfigRef:
+    name: https-with-mtls
+  forProvider:
+    url: https://secure-api.example.com/webhook
+    method: POST
+    headers:
+      Content-Type:
+        - application/json
+    body: |
+      {
+        "event": "test",
+        "message": "Authenticated with mTLS"
+      }
