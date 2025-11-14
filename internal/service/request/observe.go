@@ -85,12 +85,6 @@ func IsUpToDate(ctx context.Context, cr interfaces.RequestResource, localKube cl
 	// Apply response data to secrets and update CR status with response
 	secretConfigs := spec.GetSecretInjectionConfigs()
 	datapatcher.ApplyResponseDataToSecrets(ctx, localKube, logger, &details.HttpResponse, secretConfigs, cr)
-	
-	// Update CR with the response data
-	cr.SetStatusCode(details.HttpResponse.StatusCode)
-	cr.SetHeaders(details.HttpResponse.Headers)
-	cr.SetBody(details.HttpResponse.Body)
-
 	return determineIfUpToDate(ctx, spec, cr, cr, details, responseErr, localKube, logger, httpClient)
 }
 

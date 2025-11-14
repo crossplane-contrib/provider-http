@@ -150,6 +150,21 @@ func (r *Response) GetHeaders() map[string][]string {
 	return r.Headers
 }
 
+// SetStatusCode sets the HTTP status code.
+func (r *Response) SetStatusCode(statusCode int) {
+	r.StatusCode = statusCode
+}
+
+// SetBody sets the response body.
+func (r *Response) SetBody(body string) {
+	r.Body = body
+}
+
+// SetHeaders sets the response headers.
+func (r *Response) SetHeaders(headers map[string][]string) {
+	r.Headers = headers
+}
+
 // Ensure Request implements CachedResponse
 var _ interfaces.CachedResponse = (*Request)(nil)
 

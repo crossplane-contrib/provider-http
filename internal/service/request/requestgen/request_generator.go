@@ -66,6 +66,12 @@ func GenerateRequestContext(forProvider interfaces.MappedHTTPRequestSpec, patche
 	maps.Copy(baseMap, statusMap)
 	json_util.ConvertJSONStringsToMaps(&baseMap)
 
+	if responseMap, ok := baseMap["response"].(map[string]interface{}); ok {
+		if _, exists := responseMap["headers"]; !exists {
+			responseMap["headers"] = nil
+		}
+	}
+
 	return baseMap
 }
 

@@ -3,6 +3,7 @@ package utils
 import (
 	"context"
 
+	"github.com/crossplane-contrib/provider-http/apis/interfaces"
 	httpClient "github.com/crossplane-contrib/provider-http/internal/clients/http"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -25,7 +26,12 @@ type RequestResource struct {
 
 func (rr *RequestResource) SetStatusCode() SetRequestStatusFunc {
 	return func() {
-		if resp, ok := rr.Resource.(ResponseSetter); ok {
+		if resp, ok := rr.Resource.(interfaces.RequestStatusWriter); ok {
+			if rr.HttpResponse.StatusCode != 0 {
+				resp.SetStatusCode(rr.HttpResponse.StatusCode)
+			}
+		}
+		if resp, ok := rr.Resource.(interfaces.DisposableRequestStatusWriter); ok {
 			if rr.HttpResponse.StatusCode != 0 {
 				resp.SetStatusCode(rr.HttpResponse.StatusCode)
 			}
@@ -35,7 +41,12 @@ func (rr *RequestResource) SetStatusCode() SetRequestStatusFunc {
 
 func (rr *RequestResource) SetHeaders() SetRequestStatusFunc {
 	return func() {
-		if resp, ok := rr.Resource.(ResponseSetter); ok {
+		if resp, ok := rr.Resource.(interfaces.RequestStatusWriter); ok {
+			if rr.HttpResponse.Headers != nil {
+				resp.SetHeaders(rr.HttpResponse.Headers)
+			}
+		}
+		if resp, ok := rr.Resource.(interfaces.DisposableRequestStatusWriter); ok {
 			if rr.HttpResponse.Headers != nil {
 				resp.SetHeaders(rr.HttpResponse.Headers)
 			}
@@ -45,7 +56,12 @@ func (rr *RequestResource) SetHeaders() SetRequestStatusFunc {
 
 func (rr *RequestResource) SetBody() SetRequestStatusFunc {
 	return func() {
-		if resp, ok := rr.Resource.(ResponseSetter); ok {
+		if resp, ok := rr.Resource.(interfaces.RequestStatusWriter); ok {
+			if rr.HttpResponse.Body != "" {
+				resp.SetBody(rr.HttpResponse.Body)
+			}
+		}
+		if resp, ok := rr.Resource.(interfaces.DisposableRequestStatusWriter); ok {
 			if rr.HttpResponse.Body != "" {
 				resp.SetBody(rr.HttpResponse.Body)
 			}
@@ -55,7 +71,12 @@ func (rr *RequestResource) SetBody() SetRequestStatusFunc {
 
 func (rr *RequestResource) SetRequestDetails() SetRequestStatusFunc {
 	return func() {
-		if resp, ok := rr.Resource.(RequestDetailsSetter); ok {
+		if resp, ok := rr.Resource.(interfaces.RequestStatusWriter); ok {
+			if rr.HttpRequest.Method != "" {
+				resp.SetRequestDetails(rr.HttpRequest.URL, rr.HttpRequest.Method, rr.HttpRequest.Body, rr.HttpRequest.Headers)
+			}
+		}
+		if resp, ok := rr.Resource.(interfaces.DisposableRequestStatusWriter); ok {
 			if rr.HttpRequest.Method != "" {
 				resp.SetRequestDetails(rr.HttpRequest.URL, rr.HttpRequest.Method, rr.HttpRequest.Body, rr.HttpRequest.Headers)
 			}
@@ -65,7 +86,7 @@ func (rr *RequestResource) SetRequestDetails() SetRequestStatusFunc {
 
 func (rr *RequestResource) SetSynced() SetRequestStatusFunc {
 	return func() {
-		if synced, ok := rr.Resource.(SyncedSetter); ok {
+		if synced, ok := rr.Resource.(interfaces.DisposableRequestStatusWriter); ok {
 			synced.SetSynced(true)
 		}
 	}
@@ -73,7 +94,7 @@ func (rr *RequestResource) SetSynced() SetRequestStatusFunc {
 
 func (rr *RequestResource) SetLastReconcileTime() SetRequestStatusFunc {
 	return func() {
-		if lastReconcileTimeSetter, ok := rr.Resource.(LastReconcileTimeSetter); ok {
+		if lastReconcileTimeSetter, ok := rr.Resource.(interfaces.DisposableRequestStatusWriter); ok {
 			lastReconcileTimeSetter.SetLastReconcileTime()
 		}
 	}
@@ -81,7 +102,7 @@ func (rr *RequestResource) SetLastReconcileTime() SetRequestStatusFunc {
 
 func (rr *RequestResource) SetCache() SetRequestStatusFunc {
 	return func() {
-		if cached, ok := rr.Resource.(CacheSetter); ok {
+		if cached, ok := rr.Resource.(interfaces.RequestStatusWriter); ok {
 			cached.SetCache(rr.HttpResponse.StatusCode, rr.HttpResponse.Headers, rr.HttpResponse.Body)
 		}
 	}
@@ -89,7 +110,10 @@ func (rr *RequestResource) SetCache() SetRequestStatusFunc {
 
 func (rr *RequestResource) SetError(err error) SetRequestStatusFunc {
 	return func() {
-		if resourceSetErr, ok := rr.Resource.(ErrorSetter); ok {
+		if resourceSetErr, ok := rr.Resource.(interfaces.RequestStatusWriter); ok {
+			resourceSetErr.SetError(err)
+		}
+		if resourceSetErr, ok := rr.Resource.(interfaces.DisposableRequestStatusWriter); ok {
 			resourceSetErr.SetError(err)
 		}
 	}
@@ -97,47 +121,10 @@ func (rr *RequestResource) SetError(err error) SetRequestStatusFunc {
 
 func (rr *RequestResource) ResetFailures() SetRequestStatusFunc {
 	return func() {
-		if resetter, ok := rr.Resource.(ResetFailures); ok {
+		if resetter, ok := rr.Resource.(interfaces.RequestStatusWriter); ok {
 			resetter.ResetFailures()
 		}
 	}
-}
-
-// ResponseSetter is an interface that defines the methods to set the status code, headers, and body of a resource.
-type ResponseSetter interface {
-	SetStatusCode(statusCode int)
-	SetHeaders(headers map[string][]string)
-	SetBody(body string)
-}
-
-// CacheSetter is an interface that defines the method to set the cache of a resource.
-type CacheSetter interface {
-	SetCache(statusCode int, headers map[string][]string, body string)
-}
-
-// SyncedSetter is an interface that defines the method to set the synced status of a resource.
-type SyncedSetter interface {
-	SetSynced(synced bool)
-}
-
-// ErrorSetter is an interface that defines the method to set the error of a resource.
-type ErrorSetter interface {
-	SetError(err error)
-}
-
-// ResetFailures is an interface that defines the method to reset the failures of a resource.
-type ResetFailures interface {
-	ResetFailures()
-}
-
-// LastReconcileTimeSetter is an interface that defines the method to set the last reconcile time of a resource.
-type LastReconcileTimeSetter interface {
-	SetLastReconcileTime()
-}
-
-// RequestDetailsSetter is an interface that defines the method to set the request details of a resource.
-type RequestDetailsSetter interface {
-	SetRequestDetails(url, method, body string, headers map[string][]string)
 }
 
 // SetRequestResourceStatus sets the status of a resource.

@@ -42,7 +42,7 @@ func DeployAction(ctx context.Context, spec interfaces.SimpleHTTPRequestSpec, ro
 
 	// Handle HTTP request errors first
 	if httpRequestErr != nil {
-		return handleHttpRequestError(ctx, spec, obj.(metav1.Object), resource, httpRequestErr, localKube, logger)
+		return handleHttpRequestError(resource, httpRequestErr)
 	}
 
 	return handleHttpResponse(ctx, spec, rollbackPolicy, details.HttpResponse, resource, obj.(metav1.Object), localKube, logger)
@@ -89,7 +89,7 @@ func prepareRequestResource(ctx context.Context, obj client.Object, details http
 func handleHttpResponse(ctx context.Context, spec interfaces.SimpleHTTPRequestSpec, rollbackPolicy interfaces.RollbackAware, sensitiveResponse httpClient.HttpResponse, resource *utils.RequestResource, obj metav1.Object, localKube client.Client, logger logging.Logger) error {
 	// Handle HTTP error status codes
 	if utils.IsHTTPError(resource.HttpResponse.StatusCode) {
-		return handleHttpErrorStatus(ctx, spec, resource, obj, localKube, logger)
+		return handleHttpErrorStatus(spec, resource)
 	}
 
 	// Handle response validation
@@ -97,8 +97,7 @@ func handleHttpResponse(ctx context.Context, spec interfaces.SimpleHTTPRequestSp
 }
 
 // handleHttpRequestError handles cases where the HTTP request itself failed
-func handleHttpRequestError(
-	ctx context.Context, spec interfaces.SimpleHTTPRequestSpec, obj metav1.Object, resource *utils.RequestResource, httpRequestErr error, localKube client.Client, logger logging.Logger) error {
+func handleHttpRequestError(resource *utils.RequestResource, httpRequestErr error) error {
 	setErr := resource.SetError(httpRequestErr)
 	if settingError := utils.SetRequestResourceStatus(*resource, setErr, resource.SetLastReconcileTime(), resource.SetRequestDetails()); settingError != nil {
 		return errors.Wrap(settingError, utils.ErrFailedToSetStatus)
@@ -107,7 +106,7 @@ func handleHttpRequestError(
 }
 
 // handleHttpErrorStatus handles HTTP error status codes
-func handleHttpErrorStatus(ctx context.Context, spec interfaces.SimpleHTTPRequestSpec, resource *utils.RequestResource, obj metav1.Object, localKube client.Client, logger logging.Logger) error {
+func handleHttpErrorStatus(spec interfaces.SimpleHTTPRequestSpec, resource *utils.RequestResource) error {
 	if settingError := utils.SetRequestResourceStatus(*resource, resource.SetStatusCode(), resource.SetLastReconcileTime(), resource.SetHeaders(), resource.SetBody(), resource.SetRequestDetails(), resource.SetError(nil)); settingError != nil {
 		return errors.Wrap(settingError, utils.ErrFailedToSetStatus)
 	}

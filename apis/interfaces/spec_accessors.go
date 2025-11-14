@@ -173,6 +173,24 @@ type DisposableRequestStatusWriter interface {
 
 	// SetFailed sets the number of failed attempts.
 	SetFailed(failed int32)
+
+	// SetLastReconcileTime sets the last reconcile time.
+	SetLastReconcileTime()
+
+	// SetStatusCode sets the HTTP status code.
+	SetStatusCode(statusCode int)
+
+	// SetHeaders sets the response headers.
+	SetHeaders(headers map[string][]string)
+
+	// SetBody sets the response body.
+	SetBody(body string)
+
+	// SetError sets the error message.
+	SetError(err error)
+
+	// SetRequestDetails sets the request details.
+	SetRequestDetails(url, method, body string, headers map[string][]string)
 }
 
 // DisposableRequestStatus combines read and write access to DisposableRequest status.
