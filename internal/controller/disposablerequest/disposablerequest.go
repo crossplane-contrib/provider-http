@@ -329,12 +329,12 @@ func (c *external) sendHttpRequest(ctx context.Context, cr *v1alpha2.DisposableR
 			ClientCert:         tlsConfig.ClientCert,
 			ClientKey:          tlsConfig.ClientKey,
 		}
-}
+	}
 
-details, err := c.http.SendRequest(ctx, cr.Spec.ForProvider.Method, cr.Spec.ForProvider.URL, bodyData, headersData, tlsConfig)
+	details, err := c.http.SendRequest(ctx, cr.Spec.ForProvider.Method, cr.Spec.ForProvider.URL, bodyData, headersData, tlsConfig)
 
-return details, err
-}// prepareRequestResource creates and initializes the RequestResource
+	return details, err
+} // prepareRequestResource creates and initializes the RequestResource
 func (c *external) prepareRequestResource(ctx context.Context, cr *v1alpha2.DisposableRequest, details httpClient.HttpDetails) (*utils.RequestResource, error) {
 	resource := &utils.RequestResource{
 		Resource:       cr,

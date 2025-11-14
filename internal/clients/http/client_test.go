@@ -604,35 +604,35 @@ func TestSendRequestIntegration(t *testing.T) {
 			t.Fatalf("NewClient(...): unexpected error: %v", err)
 		}
 
-	tlsConfig := &TLSConfigData{
-		CABundle: caCertPEM,
-	}
+		tlsConfig := &TLSConfigData{
+			CABundle: caCertPEM,
+		}
 
-	result, err := c.SendRequest(
-		context.Background(),
-		http.MethodGet,
-		server.URL,
-		Data{Encrypted: "", Decrypted: ""},
-		Data{Encrypted: map[string][]string{}, Decrypted: map[string][]string{}},
-	tlsConfig,
-)
+		result, err := c.SendRequest(
+			context.Background(),
+			http.MethodGet,
+			server.URL,
+			Data{Encrypted: "", Decrypted: ""},
+			Data{Encrypted: map[string][]string{}, Decrypted: map[string][]string{}},
+			tlsConfig,
+		)
 
-if err != nil {
-	t.Fatalf("SendRequest(...): unexpected error: %v", err)
-}
+		if err != nil {
+			t.Fatalf("SendRequest(...): unexpected error: %v", err)
+		}
 
-if result.HttpResponse.StatusCode != http.StatusOK {
-	t.Errorf("SendRequest(...): statusCode = %v, want %v", result.HttpResponse.StatusCode, http.StatusOK)
-}
+		if result.HttpResponse.StatusCode != http.StatusOK {
+			t.Errorf("SendRequest(...): statusCode = %v, want %v", result.HttpResponse.StatusCode, http.StatusOK)
+		}
 
-if result.HttpResponse.Body != `{"result": "success"}` {
-	t.Errorf("SendRequest(...): body = %v, want %v", result.HttpResponse.Body, `{"result": "success"}`)
-}
+		if result.HttpResponse.Body != `{"result": "success"}` {
+			t.Errorf("SendRequest(...): body = %v, want %v", result.HttpResponse.Body, `{"result": "success"}`)
+		}
 
-if result.HttpResponse.Headers["X-Test-Header"][0] != "test-value" {
-	t.Errorf("SendRequest(...): header = %v, want %v", result.HttpResponse.Headers["X-Test-Header"], "test-value")
-}
-})
+		if result.HttpResponse.Headers["X-Test-Header"][0] != "test-value" {
+			t.Errorf("SendRequest(...): header = %v, want %v", result.HttpResponse.Headers["X-Test-Header"], "test-value")
+		}
+	})
 }
 
 func TestNewClient(t *testing.T) {
@@ -962,34 +962,33 @@ func TestHTTPClientConfiguration(t *testing.T) {
 			w.WriteHeader(http.StatusOK)
 			w.Write([]byte("ok"))
 		}))
-	defer server.Close()
+		defer server.Close()
 
-	c, err := NewClient(logging.NewNopLogger(), 5*time.Second, "")
-	if err != nil {
-		t.Fatalf("NewClient(...): unexpected error: %v", err)
-	}
+		c, err := NewClient(logging.NewNopLogger(), 5*time.Second, "")
+		if err != nil {
+			t.Fatalf("NewClient(...): unexpected error: %v", err)
+		}
 
-	_, err = c.SendRequest(
-		context.Background(),
-		http.MethodGet,
-		server.URL,
-		Data{Encrypted: "", Decrypted: ""},
-		Data{Encrypted: map[string][]string{}, Decrypted: map[string][]string{}},
-		&TLSConfigData{},
-	)
+		_, err = c.SendRequest(
+			context.Background(),
+			http.MethodGet,
+			server.URL,
+			Data{Encrypted: "", Decrypted: ""},
+			Data{Encrypted: map[string][]string{}, Decrypted: map[string][]string{}},
+			&TLSConfigData{},
+		)
 
+		if err != nil {
+			t.Errorf("SendRequest(...): unexpected error: %v", err)
+		}
+	})
 
-if err != nil {
-	t.Errorf("SendRequest(...): unexpected error: %v", err)
-}
-})
-
-t.Run("HTTPClientRespectsTimeout", func(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		time.Sleep(2 * time.Second)
-		w.WriteHeader(http.StatusOK)
-	}))
-	defer server.Close()
+	t.Run("HTTPClientRespectsTimeout", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			time.Sleep(2 * time.Second)
+			w.WriteHeader(http.StatusOK)
+		}))
+		defer server.Close()
 		c, err := NewClient(logging.NewNopLogger(), 500*time.Millisecond, "")
 		if err != nil {
 			t.Fatalf("NewClient(...): unexpected error: %v", err)
