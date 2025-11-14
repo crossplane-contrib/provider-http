@@ -97,33 +97,38 @@ func MergeTLSConfigs(resourceTLS *common.TLSConfig, providerTLS *common.TLSConfi
 		InsecureSkipVerify: resourceTLS.InsecureSkipVerify,
 	}
 
-	// Use resource CA bundle if set, otherwise use provider CA bundle
+	mergeCABundle(merged, resourceTLS, providerTLS)
+	mergeSecretRefs(merged, resourceTLS, providerTLS)
+
+	return merged
+}
+
+// mergeCABundle merges CA bundle configuration
+func mergeCABundle(merged, resourceTLS, providerTLS *common.TLSConfig) {
 	if len(resourceTLS.CABundle) > 0 {
 		merged.CABundle = resourceTLS.CABundle
 	} else if len(providerTLS.CABundle) > 0 {
 		merged.CABundle = providerTLS.CABundle
 	}
 
-	// Use resource CA secret ref if set, otherwise use provider CA secret ref
 	if resourceTLS.CACertSecretRef != nil {
 		merged.CACertSecretRef = resourceTLS.CACertSecretRef
 	} else if providerTLS.CACertSecretRef != nil {
 		merged.CACertSecretRef = providerTLS.CACertSecretRef
 	}
+}
 
-	// Use resource client cert if set, otherwise use provider client cert
+// mergeSecretRefs merges client certificate and key secret references
+func mergeSecretRefs(merged, resourceTLS, providerTLS *common.TLSConfig) {
 	if resourceTLS.ClientCertSecretRef != nil {
 		merged.ClientCertSecretRef = resourceTLS.ClientCertSecretRef
 	} else if providerTLS.ClientCertSecretRef != nil {
 		merged.ClientCertSecretRef = providerTLS.ClientCertSecretRef
 	}
 
-	// Use resource client key if set, otherwise use provider client key
 	if resourceTLS.ClientKeySecretRef != nil {
 		merged.ClientKeySecretRef = resourceTLS.ClientKeySecretRef
 	} else if providerTLS.ClientKeySecretRef != nil {
 		merged.ClientKeySecretRef = providerTLS.ClientKeySecretRef
 	}
-
-	return merged
 }

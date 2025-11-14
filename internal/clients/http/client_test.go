@@ -891,7 +891,7 @@ func TestClientInterfaceImplementation(t *testing.T) {
 			t.Fatalf("NewClient(...): unexpected error: %v", err)
 		}
 
-		var _ Client = c
+		_ = c // Verify c implements Client interface
 	})
 }
 
