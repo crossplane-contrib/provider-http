@@ -105,12 +105,27 @@ type notHttpRequest struct {
 
 type MockSendRequestFn func(ctx context.Context, method string, url string, body httpClient.Data, headers httpClient.Data, tlsConfigData *httpClient.TLSConfigData) (resp httpClient.HttpDetails, err error)
 
+type MockSendRequestWithTLSFn func(ctx context.Context, method string, url string, body httpClient.Data, headers httpClient.Data, tlsConfig *httpClient.TLSConfigData) (resp httpClient.HttpDetails, err error)
+
 type MockHttpClient struct {
-	MockSendRequest MockSendRequestFn
+	MockSendRequest        MockSendRequestFn
+	MockSendRequestWithTLS MockSendRequestWithTLSFn
 }
 
 func (c *MockHttpClient) SendRequest(ctx context.Context, method string, url string, body httpClient.Data, headers httpClient.Data, tlsConfigData *httpClient.TLSConfigData) (resp httpClient.HttpDetails, err error) {
 	return c.MockSendRequest(ctx, method, url, body, headers, tlsConfigData)
+}
+
+func (c *MockHttpClient) SendRequestWithTLS(ctx context.Context, method string, url string, body httpClient.Data, headers httpClient.Data, tlsConfig *httpClient.TLSConfigData) (resp httpClient.HttpDetails, err error) {
+	if c.MockSendRequestWithTLS != nil {
+		return c.MockSendRequestWithTLS(ctx, method, url, body, headers, tlsConfig)
+	}
+	// Fallback to SendRequest for backward compatibility
+	skipTLSVerify := false
+	if tlsConfig != nil {
+		skipTLSVerify = tlsConfig.InsecureSkipVerify
+	}
+	return c.MockSendRequest(ctx, method, url, body, headers, skipTLSVerify)
 }
 
 type MockSetRequestStatusFn func() error
