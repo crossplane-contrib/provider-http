@@ -1,0 +1,66 @@
+# Complete TLS Example - Self-contained example with all required resources
+#
+# This example demonstrates:
+# 1. Creating secrets with certificates
+# 2. Creating a ProviderConfig with TLS settings
+# 3. Using the ProviderConfig in a Request resource
+#
+# Note: Replace certificate placeholders with your actual certificates
+
+---
+# Secret containing CA certificate for server verification
+apiVersion: v1
+kind: Secret
+metadata:
+  name: my-api-ca-cert
+  namespace: crossplane-system
+type: Opaque
+stringData:
+  ca.crt: |
+    -----BEGIN CERTIFICATE-----
+    # Replace with your actual CA certificate
+    # This verifies the server's certificate
+    -----END CERTIFICATE-----
+
+---
+# ProviderConfig with TLS configuration
+apiVersion: http.crossplane.io/v1alpha1
+kind: ProviderConfig
+metadata:
+  name: https-with-tls
+spec:
+  credentials:
+    source: None
+  tlsConfig:
+    # Verify server certificate using custom CA
+    caBundleConfig:
+      source: Secret
+      secretRef:
+        name: my-api-ca-cert
+        namespace: crossplane-system
+        key: ca.crt
+
+---
+# Request using the TLS-enabled ProviderConfig
+apiVersion: http.crossplane.io/v1alpha2
+kind: Request
+metadata:
+  name: https-request-example
+spec:
+  deletionPolicy: Delete
+  providerConfigRef:
+    name: https-with-tls
+  forProvider:
+    payload:
+      baseUrl: https://api.example.com
+    mappings:
+      - method: POST
+        body: |
+          {
+            "name": "test-resource"
+          }
+        url: .payload.baseUrl + "/resources"
+      - method: GET
+        url: .payload.baseUrl + "/resources/" + (.response.body.id | tostring)
+      - method: DELETE
+        url: .payload.baseUrl + "/resources/" + (.response.body.id | tostring)

@@ -138,19 +138,30 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 		return nil, errors.Wrap(err, errNewHttpClient)
 	}
 
+	// Merge TLS configs: resource-level overrides provider-level
+	mergedTLSConfig := httpClient.MergeTLSConfigs(cr.Spec.ForProvider.TLSConfig, pc.Spec.TLSConfig)
+
+	// Load TLS configuration from secrets
+	tlsConfigData, err := httpClient.LoadTLSConfig(ctx, c.kube, mergedTLSConfig)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to load TLS configuration")
+	}
+
 	return &external{
-		localKube: c.kube,
-		logger:    l,
-		http:      h,
+		localKube:     c.kube,
+		logger:        l,
+		http:          h,
+		tlsConfigData: tlsConfigData,
 	}, nil
 }
 
 // An ExternalClient observes, then either creates, updates, or deletes an
 // external resource to ensure it reflects the managed resource's desired state.
 type external struct {
-	localKube client.Client
-	logger    logging.Logger
-	http      httpClient.Client
+	localKube     client.Client
+	logger        logging.Logger
+	http          httpClient.Client
+	tlsConfigData *httpClient.TLSConfigData
 }
 
 func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
@@ -211,7 +222,23 @@ func (c *external) deployAction(ctx context.Context, cr *v1alpha2.Request, actio
 		return err
 	}
 
-	details, err := c.http.SendRequest(ctx, mapping.Method, requestDetails.Url, requestDetails.Body, requestDetails.Headers, cr.Spec.ForProvider.InsecureSkipTLSVerify)
+	// Override InsecureSkipVerify if TLS config is provided
+	tlsConfig := c.tlsConfigData
+	if tlsConfig == nil {
+		tlsConfig = &httpClient.TLSConfigData{
+			InsecureSkipVerify: cr.Spec.ForProvider.InsecureSkipTLSVerify,
+		}
+	} else if cr.Spec.ForProvider.InsecureSkipTLSVerify {
+		// If InsecureSkipTLSVerify is explicitly set to true, override the TLS config
+		tlsConfig = &httpClient.TLSConfigData{
+			InsecureSkipVerify: true,
+			CABundle:           tlsConfig.CABundle,
+			ClientCert:         tlsConfig.ClientCert,
+			ClientKey:          tlsConfig.ClientKey,
+		}
+	}
+
+	details, err := c.http.SendRequest(ctx, mapping.Method, requestDetails.Url, requestDetails.Body, requestDetails.Headers, tlsConfig)
 	datapatcher.ApplyResponseDataToSecrets(ctx, c.localKube, c.logger, &details.HttpResponse, cr.Spec.ForProvider.SecretInjectionConfigs, cr)
 
 	statusHandler, err := statushandler.NewStatusHandler(ctx, cr, details, err, c.localKube, c.logger)

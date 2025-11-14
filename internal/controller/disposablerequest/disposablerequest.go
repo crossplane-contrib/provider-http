@@ -143,17 +143,28 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 		return nil, errors.Wrap(err, errNewHttpClient)
 	}
 
+	// Merge TLS configs: resource-level overrides provider-level
+	mergedTLSConfig := httpClient.MergeTLSConfigs(cr.Spec.ForProvider.TLSConfig, pc.Spec.TLSConfig)
+
+	// Load TLS configuration from secrets
+	tlsConfigData, err := httpClient.LoadTLSConfig(ctx, c.kube, mergedTLSConfig)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to load TLS configuration")
+	}
+
 	return &external{
-		localKube: c.kube,
-		logger:    l,
-		http:      h,
+		localKube:     c.kube,
+		logger:        l,
+		http:          h,
+		tlsConfigData: tlsConfigData,
 	}, nil
 }
 
 type external struct {
-	localKube client.Client
-	logger    logging.Logger
-	http      httpClient.Client
+	localKube     client.Client
+	logger        logging.Logger
+	http          httpClient.Client
+	tlsConfigData *httpClient.TLSConfigData
 }
 
 // Observe checks the state of the DisposableRequest resource and updates its status accordingly.
@@ -303,12 +314,27 @@ func (c *external) sendHttpRequest(ctx context.Context, cr *v1alpha2.DisposableR
 
 	bodyData := httpClient.Data{Encrypted: cr.Spec.ForProvider.Body, Decrypted: sensitiveBody}
 	headersData := httpClient.Data{Encrypted: cr.Spec.ForProvider.Headers, Decrypted: sensitiveHeaders}
-	details, err := c.http.SendRequest(ctx, cr.Spec.ForProvider.Method, cr.Spec.ForProvider.URL, bodyData, headersData, cr.Spec.ForProvider.InsecureSkipTLSVerify)
+
+	// Override InsecureSkipVerify if TLS config is provided
+	tlsConfig := c.tlsConfigData
+	if tlsConfig == nil {
+		tlsConfig = &httpClient.TLSConfigData{
+			InsecureSkipVerify: cr.Spec.ForProvider.InsecureSkipTLSVerify,
+		}
+	} else if cr.Spec.ForProvider.InsecureSkipTLSVerify {
+		// If InsecureSkipTLSVerify is explicitly set to true, override the TLS config
+		tlsConfig = &httpClient.TLSConfigData{
+			InsecureSkipVerify: true,
+			CABundle:           tlsConfig.CABundle,
+			ClientCert:         tlsConfig.ClientCert,
+			ClientKey:          tlsConfig.ClientKey,
+		}
+	}
+
+	details, err := c.http.SendRequest(ctx, cr.Spec.ForProvider.Method, cr.Spec.ForProvider.URL, bodyData, headersData, tlsConfig)
 
 	return details, err
-}
-
-// prepareRequestResource creates and initializes the RequestResource
+} // prepareRequestResource creates and initializes the RequestResource
 func (c *external) prepareRequestResource(ctx context.Context, cr *v1alpha2.DisposableRequest, details httpClient.HttpDetails) (*utils.RequestResource, error) {
 	resource := &utils.RequestResource{
 		Resource:       cr,

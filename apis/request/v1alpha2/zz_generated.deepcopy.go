@@ -194,6 +194,11 @@ func (in *RequestParameters) DeepCopyInto(out *RequestParameters) {
 		*out = new(v1.Duration)
 		**out = **in
 	}
+	if in.TLSConfig != nil {
+		in, out := &in.TLSConfig, &out.TLSConfig
+		*out = new(common.TLSConfig)
+		(*in).DeepCopyInto(*out)
+	}
 	if in.SecretInjectionConfigs != nil {
 		in, out := &in.SecretInjectionConfigs, &out.SecretInjectionConfigs
 		*out = make([]common.SecretInjectionConfig, len(*in))
