@@ -55,6 +55,7 @@ var (
 	}
 
 	testDisposableResource = RequestResource{
+		StatusWriter:   testDisposableCr,
 		Resource:       testDisposableCr,
 		RequestContext: context.Background(),
 		HttpResponse: httpClient.HttpResponse{
@@ -91,6 +92,7 @@ var (
 	}
 
 	testRequestResource = RequestResource{
+		StatusWriter:   testRequestCr,
 		Resource:       testRequestCr,
 		RequestContext: context.Background(),
 		HttpResponse: httpClient.HttpResponse{

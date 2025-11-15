@@ -16,14 +16,14 @@ const (
 
 // isDeletedCheck is an interface for performing isDeleted checks.
 type isDeletedCheck interface {
-	Check(svcCtx *service.ServiceContext, spec interfaces.MappedHTTPRequestSpec, statusReader interfaces.RequestStatusReader, cachedReader interfaces.CachedResponse, details httpClient.HttpDetails, responseErr error) error
+	Check(svcCtx *service.ServiceContext, crCtx *service.RequestCRContext, details httpClient.HttpDetails, responseErr error) error
 }
 
 // defaultIsRemovedResponseCheck performs a default comparison between the response and desired state.
 type defaultIsRemovedResponseCheck struct{}
 
 // Check performs a default comparison between the response and desired state.
-func (d *defaultIsRemovedResponseCheck) Check(svcCtx *service.ServiceContext, spec interfaces.MappedHTTPRequestSpec, statusReader interfaces.RequestStatusReader, cachedReader interfaces.CachedResponse, details httpClient.HttpDetails, responseErr error) error {
+func (d *defaultIsRemovedResponseCheck) Check(svcCtx *service.ServiceContext, crCtx *service.RequestCRContext, details httpClient.HttpDetails, responseErr error) error {
 	if details.HttpResponse.StatusCode == http.StatusNotFound {
 		return errors.New(ErrObjectNotFound)
 	}
@@ -35,7 +35,8 @@ func (d *defaultIsRemovedResponseCheck) Check(svcCtx *service.ServiceContext, sp
 type customIsRemovedResponseCheck struct{}
 
 // Check performs a custom response check using JQ logic.
-func (c *customIsRemovedResponseCheck) Check(svcCtx *service.ServiceContext, spec interfaces.MappedHTTPRequestSpec, statusReader interfaces.RequestStatusReader, cachedReader interfaces.CachedResponse, details httpClient.HttpDetails, responseErr error) error {
+func (c *customIsRemovedResponseCheck) Check(svcCtx *service.ServiceContext, crCtx *service.RequestCRContext, details httpClient.HttpDetails, responseErr error) error {
+	spec := crCtx.Spec()
 	responseCheckAware, ok := spec.(interfaces.ResponseCheckAware)
 	if !ok {
 		return errors.New("spec does not support custom response checks")

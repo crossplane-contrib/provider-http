@@ -9,7 +9,6 @@ import (
 	"github.com/crossplane-contrib/provider-http/internal/service"
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/pkg/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -22,7 +21,10 @@ const (
 )
 
 // ValidateStoredResponse validates the stored response against expected criteria
-func ValidateStoredResponse(svcCtx *service.ServiceContext, spec interfaces.SimpleHTTPRequestSpec, status interfaces.DisposableRequestStatusReader, obj metav1.Object) (bool, httpClient.HttpResponse, error) {
+func ValidateStoredResponse(svcCtx *service.ServiceContext, crCtx *service.DisposableRequestCRContext) (bool, httpClient.HttpResponse, error) {
+	spec := crCtx.Spec()
+	status := crCtx.Status()
+
 	response := status.GetResponse()
 	if response == nil || response.GetStatusCode() == 0 {
 		return false, httpClient.HttpResponse{}, nil
@@ -53,11 +55,17 @@ func ValidateStoredResponse(svcCtx *service.ServiceContext, spec interfaces.Simp
 }
 
 // CalculateUpToDateStatus determines if the resource should be considered up-to-date
-func CalculateUpToDateStatus(reconciliationPolicy interfaces.ReconciliationPolicyAware, rollbackPolicy interfaces.RollbackAware, currentStatus bool) bool {
-	// If shouldLoopInfinitely is true, the resource should never be considered up-to-date
-	if reconciliationPolicy.GetShouldLoopInfinitely() {
-		if rollbackPolicy.GetRollbackRetriesLimit() == nil {
-			return false
+func CalculateUpToDateStatus(crCtx *service.DisposableRequestCRContext, currentStatus bool) bool {
+	reconciliationPolicy := crCtx.Spec()
+	rollbackPolicy := crCtx.RollbackPolicy()
+
+	// Type assert to ReconciliationPolicyAware to access GetShouldLoopInfinitely
+	if reconciliationPolicyAware, ok := reconciliationPolicy.(interfaces.ReconciliationPolicyAware); ok {
+		// If shouldLoopInfinitely is true, the resource should never be considered up-to-date
+		if reconciliationPolicyAware.GetShouldLoopInfinitely() {
+			if rollbackPolicy.GetRollbackRetriesLimit() == nil {
+				return false
+			}
 		}
 	}
 	return currentStatus
@@ -81,7 +89,10 @@ func UpdateResourceStatus(ctx context.Context, obj client.Object, localKube clie
 
 // ApplySecretInjectionsFromStoredResponse applies secret injection configurations using the stored response
 // This is used when the resource is already synced but secret injection configs may have been updated
-func ApplySecretInjectionsFromStoredResponse(svcCtx *service.ServiceContext, spec interfaces.SimpleHTTPRequestSpec, storedResponse httpClient.HttpResponse, obj metav1.Object) {
+func ApplySecretInjectionsFromStoredResponse(svcCtx *service.ServiceContext, crCtx *service.DisposableRequestCRContext, storedResponse httpClient.HttpResponse) {
+	spec := crCtx.Spec()
+	obj := crCtx.GetCR()
+
 	svcCtx.Logger.Debug("Applying secret injections from stored response")
 	datapatcher.ApplyResponseDataToSecrets(svcCtx.Ctx, svcCtx.LocalKube, svcCtx.Logger, &storedResponse, spec.GetSecretInjectionConfigs(), obj)
 }

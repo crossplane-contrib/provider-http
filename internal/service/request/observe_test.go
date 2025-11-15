@@ -408,7 +408,8 @@ func Test_isUpToDate(t *testing.T) {
 
 		t.Run(name, func(t *testing.T) {
 			svcCtx := service.NewServiceContext(context.Background(), tc.args.localKube, logging.NewNopLogger(), tc.args.http)
-			got, gotErr := IsUpToDate(svcCtx, tc.args.mg)
+			crCtx := service.NewRequestCRContext(tc.args.mg)
+			got, gotErr := IsUpToDate(svcCtx, crCtx)
 			if diff := cmp.Diff(tc.want.err, gotErr, test.EquateErrors()); diff != "" {
 				t.Fatalf("isUpToDate(...): -want error, +got error: %s", diff)
 			}
@@ -597,7 +598,8 @@ func Test_determineResponseCheck(t *testing.T) {
 
 		t.Run(name, func(t *testing.T) {
 			svcCtx := service.NewServiceContext(tc.args.ctx, nil, logging.NewNopLogger(), nil)
-			got, gotErr := determineIfUpToDate(svcCtx, &tc.args.cr.Spec.ForProvider, tc.args.cr, tc.args.cr, tc.args.details, tc.args.responseErr)
+			crCtx := service.NewRequestCRContext(tc.args.cr)
+			got, gotErr := determineIfUpToDate(svcCtx, crCtx, tc.args.details, tc.args.responseErr)
 			if diff := cmp.Diff(tc.want.err, gotErr, test.EquateErrors()); diff != "" {
 				t.Fatalf("determineResponseCheck(...): -want error, +got error: %s", diff)
 			}
@@ -697,7 +699,8 @@ func Test_isObjectValidForObservation(t *testing.T) {
 		tc := tc // Create local copies of loop variables
 
 		t.Run(name, func(t *testing.T) {
-			got := isObjectValidForObservation(tc.args.cr)
+			crCtx := service.NewRequestCRContext(tc.args.cr)
+			got := isObjectValidForObservation(crCtx)
 
 			if diff := cmp.Diff(tc.want.valid, got); diff != "" {
 				t.Errorf("isObjectValidForObservation(...): -want valid, +got valid: %s", diff)
@@ -816,7 +819,8 @@ func Test_requestDetails(t *testing.T) {
 				return
 			}
 			svcCtx := service.NewServiceContext(tc.args.ctx, nil, logging.NewNopLogger(), nil)
-			got, gotErr := requestgen.GenerateValidRequestDetails(svcCtx, &tc.args.cr.Spec.ForProvider, mapping, &tc.args.cr.Status.Response, &tc.args.cr.Status.Response)
+			crCtx := service.NewRequestCRContext(tc.args.cr)
+			got, gotErr := requestgen.GenerateValidRequestDetails(svcCtx, crCtx, mapping)
 			if diff := cmp.Diff(tc.want.err, gotErr, test.EquateErrors()); diff != "" {
 				t.Fatalf("requestDetails(...): -want error, +got error: %s", diff)
 			}

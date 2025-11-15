@@ -164,7 +164,8 @@ func Test_DefaultIsUpToDateCheck(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			e := &defaultIsUpToDateResponseCheck{}
 			svcCtx := service.NewServiceContext(tc.args.ctx, nil, logging.NewNopLogger(), nil)
-			got, gotErr := e.Check(svcCtx, &tc.args.cr.Spec.ForProvider, tc.args.cr, tc.args.cr, tc.args.details, tc.args.responseErr)
+			crCtx := service.NewRequestCRContext(tc.args.cr)
+			got, gotErr := e.Check(svcCtx, crCtx, tc.args.details, tc.args.responseErr)
 			if diff := cmp.Diff(tc.want.err, gotErr, test.EquateErrors()); diff != "" {
 				t.Fatalf("Check(...): -want error, +got error: %s", diff)
 			}
@@ -261,7 +262,9 @@ func Test_CustomIsUpToDateCheck(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			e := &customIsUpToDateResponseCheck{}
 			svcCtx := service.NewServiceContext(tc.args.ctx, nil, logging.NewNopLogger(), nil)
-			got, gotErr := e.Check(svcCtx, &tc.args.cr.Spec.ForProvider, tc.args.cr, tc.args.cr, tc.args.details, tc.args.responseErr)
+			crCtx := service.NewRequestCRContext(tc.args.cr)
+			got, gotErr := e.Check(svcCtx, crCtx, tc.args.details, tc.args.responseErr)
+
 			if diff := cmp.Diff(tc.want.err, gotErr, test.EquateErrors()); diff != "" {
 				t.Fatalf("Check(...): -want error, +got error: %s", diff)
 			}

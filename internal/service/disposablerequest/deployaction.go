@@ -1,7 +1,6 @@
 package disposablerequest
 
 import (
-	"context"
 	"fmt"
 	"strconv"
 
@@ -13,7 +12,6 @@ import (
 	"github.com/pkg/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
@@ -21,7 +19,11 @@ const (
 )
 
 // DeployAction sends the HTTP request defined in the DisposableRequest resource and updates its status based on the response.
-func DeployAction(svcCtx *service.ServiceContext, spec interfaces.SimpleHTTPRequestSpec, rollbackPolicy interfaces.RollbackAware, status interfaces.DisposableRequestStatus, obj client.Object) error {
+func DeployAction(svcCtx *service.ServiceContext, crCtx *service.DisposableRequestCRContext) error {
+	spec := crCtx.Spec()
+	status := crCtx.Status()
+	rollbackPolicy := crCtx.RollbackPolicy()
+
 	if status.GetSynced() {
 		svcCtx.Logger.Debug("Resource is already synced, skipping deployment action")
 		return nil
@@ -35,7 +37,7 @@ func DeployAction(svcCtx *service.ServiceContext, spec interfaces.SimpleHTTPRequ
 
 	details, httpRequestErr := sendHttpRequest(svcCtx, spec)
 
-	resource, err := prepareRequestResource(svcCtx.Ctx, obj, details, svcCtx.LocalKube)
+	resource, err := prepareRequestResource(svcCtx, crCtx, details)
 	if err != nil {
 		return err
 	}
@@ -45,7 +47,7 @@ func DeployAction(svcCtx *service.ServiceContext, spec interfaces.SimpleHTTPRequ
 		return handleHttpRequestError(resource, httpRequestErr)
 	}
 
-	return handleHttpResponse(svcCtx, spec, rollbackPolicy, details.HttpResponse, resource, obj.(metav1.Object))
+	return handleHttpResponse(svcCtx, crCtx, details.HttpResponse, resource)
 }
 
 // sendHttpRequest sends the HTTP request with sensitive data patched
@@ -68,17 +70,19 @@ func sendHttpRequest(svcCtx *service.ServiceContext, spec interfaces.SimpleHTTPR
 }
 
 // prepareRequestResource creates and initializes the RequestResource
-func prepareRequestResource(ctx context.Context, obj client.Object, details httpClient.HttpDetails, localKube client.Client) (*utils.RequestResource, error) {
+func prepareRequestResource(svcCtx *service.ServiceContext, crCtx *service.DisposableRequestCRContext, details httpClient.HttpDetails) (*utils.RequestResource, error) {
+	obj := crCtx.GetCR()
 	resource := &utils.RequestResource{
+		StatusWriter:   crCtx.StatusWriter(),
 		Resource:       obj,
-		RequestContext: ctx,
+		RequestContext: svcCtx.Ctx,
 		HttpResponse:   details.HttpResponse,
-		LocalClient:    localKube,
+		LocalClient:    svcCtx.LocalKube,
 		HttpRequest:    details.HttpRequest,
 	}
 
 	// Get the latest version of the resource before updating
-	if err := localKube.Get(ctx, types.NamespacedName{Name: obj.GetName(), Namespace: obj.GetNamespace()}, obj); err != nil {
+	if err := svcCtx.LocalKube.Get(svcCtx.Ctx, types.NamespacedName{Name: obj.GetName(), Namespace: obj.GetNamespace()}, obj); err != nil {
 		return nil, errors.Wrap(err, "failed to get the latest version of the resource")
 	}
 
@@ -86,14 +90,18 @@ func prepareRequestResource(ctx context.Context, obj client.Object, details http
 }
 
 // handleHttpResponse processes the HTTP response and updates resource status accordingly
-func handleHttpResponse(svcCtx *service.ServiceContext, spec interfaces.SimpleHTTPRequestSpec, rollbackPolicy interfaces.RollbackAware, sensitiveResponse httpClient.HttpResponse, resource *utils.RequestResource, obj metav1.Object) error {
+func handleHttpResponse(svcCtx *service.ServiceContext, crCtx *service.DisposableRequestCRContext, sensitiveResponse httpClient.HttpResponse, resource *utils.RequestResource) error {
+	spec := crCtx.Spec()
+	rollbackPolicy := crCtx.RollbackPolicy()
+	obj := crCtx.GetCR()
+
 	// Handle HTTP error status codes
 	if utils.IsHTTPError(resource.HttpResponse.StatusCode) {
 		return handleHttpErrorStatus(spec, resource)
 	}
 
 	// Handle response validation
-	return handleResponseValidation(svcCtx, spec, rollbackPolicy, sensitiveResponse, resource, obj)
+	return handleResponseValidation(svcCtx, spec, rollbackPolicy, sensitiveResponse, resource, obj.(metav1.Object))
 }
 
 // handleHttpRequestError handles cases where the HTTP request itself failed

@@ -26,8 +26,8 @@ var (
 type defaultIsUpToDateResponseCheck struct{}
 
 // Check performs a default comparison between the response and desired state.
-func (d *defaultIsUpToDateResponseCheck) Check(svcCtx *service.ServiceContext, spec interfaces.MappedHTTPRequestSpec, statusReader interfaces.RequestStatusReader, cachedReader interfaces.CachedResponse, details httpClient.HttpDetails, responseErr error) (bool, error) {
-	desiredState, err := d.desiredState(svcCtx, spec, statusReader, cachedReader)
+func (d *defaultIsUpToDateResponseCheck) Check(svcCtx *service.ServiceContext, crCtx *service.RequestCRContext, details httpClient.HttpDetails, responseErr error) (bool, error) {
+	desiredState, err := d.desiredState(svcCtx, crCtx)
 	if err != nil {
 		if isErrorMappingNotFound(err) {
 			return true, nil
@@ -97,23 +97,29 @@ func (d *defaultIsUpToDateResponseCheck) compareJSON(body, desiredState string, 
 }
 
 // desiredState returns the desired state for a given request
-func (d *defaultIsUpToDateResponseCheck) desiredState(svcCtx *service.ServiceContext, spec interfaces.MappedHTTPRequestSpec, statusReader interfaces.RequestStatusReader, cachedReader interfaces.CachedResponse) (string, error) {
-	requestDetails, err := d.requestDetails(svcCtx, spec, statusReader, cachedReader, common.ActionUpdate)
+func (d *defaultIsUpToDateResponseCheck) desiredState(svcCtx *service.ServiceContext, crCtx *service.RequestCRContext) (string, error) {
+	requestDetails, err := d.requestDetails(svcCtx, crCtx, common.ActionUpdate)
 	if err != nil {
 		return "", err
 	}
 
-	return requestDetails.Body.Encrypted.(string), nil
+	if bodyStr, ok := requestDetails.Body.Decrypted.(string); ok {
+		return bodyStr, nil
+	}
+	return "", nil
 }
 
 // customIsUpToDateResponseCheck performs a custom response check using JQ logic.
 type customIsUpToDateResponseCheck struct{}
 
 // Check performs a custom response check using JQ logic.
-func (c *customIsUpToDateResponseCheck) Check(svcCtx *service.ServiceContext, spec interfaces.MappedHTTPRequestSpec, statusReader interfaces.RequestStatusReader, cachedReader interfaces.CachedResponse, details httpClient.HttpDetails, responseErr error) (bool, error) {
+func (c *customIsUpToDateResponseCheck) Check(svcCtx *service.ServiceContext, crCtx *service.RequestCRContext, details httpClient.HttpDetails, responseErr error) (bool, error) {
+	spec := crCtx.Spec()
+
+	// Type assert to ResponseCheckAware to access GetExpectedResponseCheck
 	responseCheckAware, ok := spec.(interfaces.ResponseCheckAware)
 	if !ok {
-		return false, errors.New("spec does not support custom response checks")
+		return false, errors.New("spec does not implement ResponseCheckAware")
 	}
 
 	logic := responseCheckAware.GetExpectedResponseCheck().GetLogic()
@@ -121,7 +127,7 @@ func (c *customIsUpToDateResponseCheck) Check(svcCtx *service.ServiceContext, sp
 
 	isUpToDate, err := customCheck.check(svcCtx, spec, details, logic)
 	if err != nil {
-		return false, errors.Errorf(errExpectedFormat, "expectedResponseCheck", err.Error())
+		return false, errors.Errorf(errExpectedFormat, "ExpectedResponseCheck", err.Error())
 	}
 
 	return isUpToDate, nil
@@ -134,13 +140,14 @@ func isErrorMappingNotFound(err error) bool {
 }
 
 // requestDetails generates the request details for a given method or action.
-func (d *defaultIsUpToDateResponseCheck) requestDetails(svcCtx *service.ServiceContext, spec interfaces.MappedHTTPRequestSpec, statusReader interfaces.RequestStatusReader, cachedReader interfaces.CachedResponse, action string) (requestgen.RequestDetails, error) {
+func (d *defaultIsUpToDateResponseCheck) requestDetails(svcCtx *service.ServiceContext, crCtx *service.RequestCRContext, action string) (requestgen.RequestDetails, error) {
+	spec := crCtx.Spec()
 	mapping, err := requestmapping.GetMapping(spec, action, svcCtx.Logger)
 	if err != nil {
 		return requestgen.RequestDetails{}, err
 	}
 
-	return requestgen.GenerateValidRequestDetails(svcCtx, spec, mapping, statusReader.GetResponse(), cachedReader.GetCachedResponse())
+	return requestgen.GenerateValidRequestDetails(svcCtx, crCtx, mapping)
 }
 
 // isUpToDateChecksFactoryMap is a map that associates each check type with its corresponding factory function.

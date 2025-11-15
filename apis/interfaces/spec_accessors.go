@@ -166,17 +166,9 @@ type DisposableRequestStatusReader interface {
 	GetResponse() HTTPResponse
 }
 
-// DisposableRequestStatusWriter provides write access to DisposableRequest status fields.
-type DisposableRequestStatusWriter interface {
-	// SetSynced sets the synced status.
-	SetSynced(synced bool)
-
-	// SetFailed sets the number of failed attempts.
-	SetFailed(failed int32)
-
-	// SetLastReconcileTime sets the last reconcile time.
-	SetLastReconcileTime()
-
+// BaseStatusWriter provides common status modification methods shared by both Request and DisposableRequest.
+// This interface defines the core status update operations that all resources support.
+type BaseStatusWriter interface {
 	// SetStatusCode sets the HTTP status code.
 	SetStatusCode(statusCode int)
 
@@ -191,6 +183,20 @@ type DisposableRequestStatusWriter interface {
 
 	// SetRequestDetails sets the request details.
 	SetRequestDetails(url, method, body string, headers map[string][]string)
+}
+
+// DisposableRequestStatusWriter provides write access to DisposableRequest status fields.
+type DisposableRequestStatusWriter interface {
+	BaseStatusWriter
+
+	// SetSynced sets the synced status.
+	SetSynced(synced bool)
+
+	// SetFailed sets the number of failed attempts.
+	SetFailed(failed int32)
+
+	// SetLastReconcileTime sets the last reconcile time.
+	SetLastReconcileTime()
 }
 
 // DisposableRequestStatus combines read and write access to DisposableRequest status.
@@ -213,23 +219,10 @@ type RequestStatusReader interface {
 
 // RequestStatusWriter provides write access to Request status fields.
 type RequestStatusWriter interface {
-	// SetStatusCode sets the HTTP status code.
-	SetStatusCode(statusCode int)
-
-	// SetHeaders sets the response headers.
-	SetHeaders(headers map[string][]string)
-
-	// SetBody sets the response body.
-	SetBody(body string)
-
-	// SetError sets the error message.
-	SetError(err error)
+	BaseStatusWriter
 
 	// SetCache sets the cached response.
 	SetCache(statusCode int, headers map[string][]string, body string)
-
-	// SetRequestDetails sets the request details.
-	SetRequestDetails(url, method, body string, headers map[string][]string)
 
 	// ResetFailures resets the failure count.
 	ResetFailures()
@@ -259,4 +252,21 @@ type RequestResource interface {
 
 	// CachedResponse for accessing cached response
 	CachedResponse
+}
+
+// DisposableRequestResource represents a complete DisposableRequest resource with both spec and status.
+// This interface is implemented by DisposableRequest types and provides access to both configuration and state.
+type DisposableRequestResource interface {
+	// Embed client.Object for Kubernetes object access (includes metav1.Object and runtime.Object)
+	client.Object
+
+	// GetSpec returns the request specification (ForProvider parameters).
+	// For DisposableRequest, the spec also serves as the RollbackAware interface.
+	GetSpec() SimpleHTTPRequestSpec
+
+	// DisposableRequestStatusReader for accessing response and status information
+	DisposableRequestStatusReader
+
+	// DisposableRequestStatusWriter for modifying response and status information
+	DisposableRequestStatusWriter
 }

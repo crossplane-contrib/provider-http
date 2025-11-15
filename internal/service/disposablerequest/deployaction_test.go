@@ -306,12 +306,12 @@ func TestDeployAction(t *testing.T) {
 				logging.NewNopLogger(),
 				tc.args.httpClient,
 			)
+			crCtx := service.NewDisposableRequestCRContext(
+				tc.args.dr,
+			)
 			err := DeployAction(
 				svcCtx,
-				&tc.args.dr.Spec.ForProvider,
-				&tc.args.dr.Spec.ForProvider,
-				tc.args.dr,
-				tc.args.dr,
+				crCtx,
 			)
 
 			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
@@ -479,11 +479,18 @@ func TestPrepareRequestResource(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			_, err := prepareRequestResource(
+			dr := tc.args.obj.(*v1alpha2.DisposableRequest)
+			crCtx := service.NewDisposableRequestCRContext(dr)
+			svcCtx := service.NewServiceContext(
 				tc.args.ctx,
-				tc.args.obj,
-				tc.args.details,
 				tc.args.localKube,
+				logging.NewNopLogger(),
+				nil,
+			)
+			_, err := prepareRequestResource(
+				svcCtx,
+				crCtx,
+				tc.args.details,
 			)
 
 			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
@@ -542,26 +549,28 @@ func TestHandleHttpResponse(t *testing.T) {
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 			dr := disposableRequest()
-			resource := &utils.RequestResource{
-				Resource:       dr,
-				RequestContext: tc.args.ctx,
-				HttpResponse:   tc.args.sensitiveResponse,
-				LocalClient:    tc.args.localKube,
-			}
-
 			svcCtx := service.NewServiceContext(
 				tc.args.ctx,
 				tc.args.localKube,
 				logging.NewNopLogger(),
 				nil, // httpClient not needed for handleHttpResponse
 			)
+			crCtx := service.NewDisposableRequestCRContext(
+				dr,
+			)
+			resource := &utils.RequestResource{
+				StatusWriter:   crCtx.StatusWriter(),
+				Resource:       dr,
+				RequestContext: tc.args.ctx,
+				HttpResponse:   tc.args.sensitiveResponse,
+				LocalClient:    tc.args.localKube,
+			}
+
 			err := handleHttpResponse(
 				svcCtx,
-				tc.args.spec,
-				tc.args.rollbackPolicy,
+				crCtx,
 				tc.args.sensitiveResponse,
 				resource,
-				dr,
 			)
 
 			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {

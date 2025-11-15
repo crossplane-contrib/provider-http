@@ -66,6 +66,11 @@ func TestValidateStoredResponse(t *testing.T) {
 						Name:      "test",
 						Namespace: "default",
 					},
+					Spec: v1alpha2.DisposableRequestSpec{
+						ForProvider: v1alpha2.DisposableRequestParameters{
+							ExpectedResponse: ".body.status == \"success\"",
+						},
+					},
 					Status: v1alpha2.DisposableRequestStatus{
 						Response: v1alpha2.Response{
 							StatusCode: 200,
@@ -93,6 +98,11 @@ func TestValidateStoredResponse(t *testing.T) {
 					ObjectMeta: v1.ObjectMeta{
 						Name:      "test",
 						Namespace: "default",
+					},
+					Spec: v1alpha2.DisposableRequestSpec{
+						ForProvider: v1alpha2.DisposableRequestParameters{
+							ExpectedResponse: ".body.status == \"success\"",
+						},
 					},
 					Status: v1alpha2.DisposableRequestStatus{
 						Response: v1alpha2.Response{
@@ -144,13 +154,14 @@ func TestValidateStoredResponse(t *testing.T) {
 				tc.args.ctx,
 				tc.args.localKube,
 				logging.NewNopLogger(),
-				nil, // httpClient not needed for ValidateStoredResponse
+				nil,
+			)
+			crCtx := service.NewDisposableRequestCRContext(
+				tc.args.dr,
 			)
 			valid, response, err := ValidateStoredResponse(
 				svcCtx,
-				tc.args.spec,
-				tc.args.dr,
-				tc.args.dr,
+				crCtx,
 			)
 
 			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
@@ -244,9 +255,19 @@ func TestCalculateUpToDateStatus(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
+			// Merge reconciliationPolicy and rollbackPolicy into a single ForProvider
+			forProvider := *tc.args.reconciliationPolicy
+			if tc.args.rollbackPolicy != nil {
+				forProvider.RollbackRetriesLimit = tc.args.rollbackPolicy.RollbackRetriesLimit
+			}
+			dr := &v1alpha2.DisposableRequest{
+				Spec: v1alpha2.DisposableRequestSpec{
+					ForProvider: forProvider,
+				},
+			}
+			crCtx := service.NewDisposableRequestCRContext(dr)
 			got := CalculateUpToDateStatus(
-				tc.args.reconciliationPolicy,
-				tc.args.rollbackPolicy,
+				crCtx,
 				tc.args.currentStatus,
 			)
 
@@ -379,14 +400,16 @@ func TestApplySecretInjectionsFromStoredResponse(t *testing.T) {
 				tc.args.ctx,
 				tc.args.localKube,
 				logging.NewNopLogger(),
-				nil, // httpClient not needed for ApplySecretInjectionsFromStoredResponse
+				nil,
+			)
+			crCtx := service.NewDisposableRequestCRContext(
+				tc.args.dr,
 			)
 			// This function doesn't return anything, so we just verify it doesn't panic
 			ApplySecretInjectionsFromStoredResponse(
 				svcCtx,
-				tc.args.spec,
+				crCtx,
 				tc.args.storedResponse,
-				tc.args.dr,
 			)
 		})
 	}

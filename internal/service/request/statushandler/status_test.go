@@ -87,7 +87,7 @@ func Test_SetRequestStatus(t *testing.T) {
 		cr             *v1alpha2.Request
 		requestDetails httpClient.HttpDetails
 		err            error
-		isSynced       bool
+		resetFailures  bool
 	}
 	type want struct {
 		err           error
@@ -179,7 +179,7 @@ func Test_SetRequestStatus(t *testing.T) {
 					MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
 					MockGet:          test.NewMockGetFn(nil),
 				},
-				isSynced: true,
+				resetFailures: true,
 				requestDetails: httpClient.HttpDetails{
 					HttpResponse: httpClient.HttpResponse{
 						StatusCode: 200,
@@ -199,8 +199,10 @@ func Test_SetRequestStatus(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			svcCtx := service.NewServiceContext(context.Background(), tc.args.localKube, logging.NewNopLogger(), nil)
-			r, _ := NewStatusHandler(svcCtx, tc.args.cr, &tc.args.cr.Spec.ForProvider, tc.args.requestDetails, tc.args.err)
-			if tc.args.isSynced {
+			crCtx := service.NewRequestCRContext(tc.args.cr)
+			r, _ := NewStatusHandler(svcCtx, crCtx, tc.args.requestDetails, tc.args.err)
+
+			if tc.args.resetFailures {
 				r.ResetFailures()
 			}
 

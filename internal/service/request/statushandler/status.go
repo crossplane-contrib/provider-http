@@ -12,7 +12,6 @@ import (
 	"github.com/crossplane-contrib/provider-http/internal/utils"
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // RequestStatusHandler is the interface to interact with status setting for Request resources
@@ -121,7 +120,10 @@ func (r *requestStatusHandler) ResetFailures() {
 }
 
 // NewStatusHandler returns a new Request statusHandler
-func NewStatusHandler(svcCtx *service.ServiceContext, resource client.Object, forProvider interfaces.MappedHTTPRequestSpec, requestDetails httpClient.HttpDetails, requestErr error) (RequestStatusHandler, error) {
+func NewStatusHandler(svcCtx *service.ServiceContext, crCtx *service.RequestCRContext, requestDetails httpClient.HttpDetails, requestErr error) (RequestStatusHandler, error) {
+	resource := crCtx.GetCR()
+	forProvider := crCtx.Spec()
+
 	// Get the latest version of the resource before updating
 	if err := svcCtx.LocalKube.Get(svcCtx.Ctx, types.NamespacedName{Name: resource.GetName(), Namespace: resource.GetNamespace()}, resource); err != nil {
 		return nil, errors.Wrap(err, "failed to get the latest version of the resource")
@@ -131,6 +133,7 @@ func NewStatusHandler(svcCtx *service.ServiceContext, resource client.Object, fo
 		svcCtx:       svcCtx,
 		extraSetters: &[]utils.SetRequestStatusFunc{},
 		resource: &utils.RequestResource{
+			StatusWriter:   crCtx.StatusWriter(),
 			Resource:       resource,
 			HttpResponse:   requestDetails.HttpResponse,
 			HttpRequest:    requestDetails.HttpRequest,

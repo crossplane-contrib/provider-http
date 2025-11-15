@@ -341,9 +341,10 @@ func TestDeployAction(t *testing.T) {
 				logging.NewNopLogger(),
 				tc.args.httpClient,
 			)
+			crCtx := service.NewRequestCRContext(tc.args.cr)
 			err := DeployAction(
 				svcCtx,
-				tc.args.cr,
+				crCtx,
 				tc.args.action,
 			)
 

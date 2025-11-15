@@ -170,25 +170,6 @@ func TestResponse_Accessors(t *testing.T) {
 	if got := response.GetHeaders(); len(got) != 1 {
 		t.Errorf("GetHeaders() length = %v, want 1", len(got))
 	}
-
-	// Test setters
-	response.SetStatusCode(201)
-	if got := response.GetStatusCode(); got != 201 {
-		t.Errorf("After SetStatusCode(201), GetStatusCode() = %v, want 201", got)
-	}
-
-	response.SetBody(`{"updated":true}`)
-	if got := response.GetBody(); got != `{"updated":true}` {
-		t.Errorf("After SetBody, GetBody() = %v, want {\"updated\":true}", got)
-	}
-
-	newHeaders := map[string][]string{
-		"X-Custom": {"value"},
-	}
-	response.SetHeaders(newHeaders)
-	if got := response.GetHeaders(); len(got) != 1 || got["X-Custom"][0] != "value" {
-		t.Errorf("After SetHeaders, GetHeaders() mismatch")
-	}
 }
 
 func TestRequest_CachedResponse(t *testing.T) {

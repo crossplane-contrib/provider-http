@@ -159,7 +159,9 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		}, nil
 	}
 
-	isExpected, storedResponse, err := disposablerequest.ValidateStoredResponse(service.NewServiceContext(ctx, c.localKube, c.logger, c.http), &cr.Spec.ForProvider, cr, cr)
+	svcCtx := service.NewServiceContext(ctx, c.localKube, c.logger, c.http)
+	crCtx := service.NewDisposableRequestCRContext(cr)
+	isExpected, storedResponse, err := disposablerequest.ValidateStoredResponse(svcCtx, crCtx)
 	if err != nil {
 		return managed.ExternalObservation{}, err
 	}
@@ -167,7 +169,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.New(errResponseDoesntMatchExpectedCriteria)
 	}
 
-	isUpToDate = disposablerequest.CalculateUpToDateStatus(&cr.Spec.ForProvider, &cr.Spec.ForProvider, isUpToDate)
+	isUpToDate = disposablerequest.CalculateUpToDateStatus(crCtx, isUpToDate)
 
 	if isAvailable {
 		if err := disposablerequest.UpdateResourceStatus(ctx, cr, c.localKube); err != nil {
@@ -176,7 +178,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	}
 
 	if len(cr.Spec.ForProvider.SecretInjectionConfigs) > 0 && cr.Status.Response.StatusCode != 0 {
-		disposablerequest.ApplySecretInjectionsFromStoredResponse(service.NewServiceContext(ctx, c.localKube, c.logger, c.http), &cr.Spec.ForProvider, storedResponse, cr)
+		disposablerequest.ApplySecretInjectionsFromStoredResponse(svcCtx, crCtx, storedResponse)
 	}
 
 	return managed.ExternalObservation{
@@ -196,7 +198,9 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalCreation{}, err
 	}
 
-	return managed.ExternalCreation{}, errors.Wrap(disposablerequest.DeployAction(service.NewServiceContext(ctx, c.localKube, c.logger, c.http), &cr.Spec.ForProvider, &cr.Spec.ForProvider, cr, cr), errFailedToSendHttpDisposableRequest)
+	svcCtx := service.NewServiceContext(ctx, c.localKube, c.logger, c.http)
+	crCtx := service.NewDisposableRequestCRContext(cr)
+	return managed.ExternalCreation{}, errors.Wrap(disposablerequest.DeployAction(svcCtx, crCtx), errFailedToSendHttpDisposableRequest)
 }
 
 func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.ExternalUpdate, error) {
@@ -209,7 +213,9 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalUpdate{}, err
 	}
 
-	return managed.ExternalUpdate{}, errors.Wrap(disposablerequest.DeployAction(service.NewServiceContext(ctx, c.localKube, c.logger, c.http), &cr.Spec.ForProvider, &cr.Spec.ForProvider, cr, cr), errFailedToSendHttpDisposableRequest)
+	svcCtx := service.NewServiceContext(ctx, c.localKube, c.logger, c.http)
+	crCtx := service.NewDisposableRequestCRContext(cr)
+	return managed.ExternalUpdate{}, errors.Wrap(disposablerequest.DeployAction(svcCtx, crCtx), errFailedToSendHttpDisposableRequest)
 }
 
 func (c *external) Delete(_ context.Context, _ resource.Managed) (managed.ExternalDelete, error) {

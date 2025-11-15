@@ -14,7 +14,7 @@ import (
 
 // responseCheck is an interface for performing response checks.
 type responseCheck interface {
-	Check(svcCtx *service.ServiceContext, spec interfaces.MappedHTTPRequestSpec, statusReader interfaces.RequestStatusReader, cachedReader interfaces.CachedResponse, details httpClient.HttpDetails, responseErr error) (bool, error)
+	Check(svcCtx *service.ServiceContext, crCtx *service.RequestCRContext, details httpClient.HttpDetails, responseErr error) (bool, error)
 }
 
 // customCheck performs a custom response check using JQ logic.

@@ -138,3 +138,11 @@ func (d *DisposableRequest) SetFailed(failed int32) {
 
 // Ensure DisposableRequest implements DisposableRequestStatus
 var _ interfaces.DisposableRequestStatus = (*DisposableRequest)(nil)
+
+// Ensure DisposableRequest implements DisposableRequestResource
+var _ interfaces.DisposableRequestResource = (*DisposableRequest)(nil)
+
+// GetSpec returns the request specification (ForProvider parameters).
+func (d *DisposableRequest) GetSpec() interfaces.SimpleHTTPRequestSpec {
+	return &d.Spec.ForProvider
+}

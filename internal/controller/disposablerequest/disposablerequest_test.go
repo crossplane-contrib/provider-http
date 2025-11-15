@@ -545,13 +545,10 @@ func Test_deployAction(t *testing.T) {
 				logging.NewNopLogger(),
 				tc.args.http,
 			)
-			gotErr := disposablerequest.DeployAction(
-				svcCtx,
-				&tc.args.cr.Spec.ForProvider,
-				&tc.args.cr.Spec.ForProvider,
-				tc.args.cr,
+			crCtx := service.NewDisposableRequestCRContext(
 				tc.args.cr,
 			)
+			gotErr := disposablerequest.DeployAction(svcCtx, crCtx)
 			if diff := cmp.Diff(tc.want.err, gotErr, test.EquateErrors()); diff != "" {
 				t.Fatalf("deployAction(...): -want error, +got error: %s", diff)
 			}

@@ -77,7 +77,11 @@ func GenerateRequestContext(forProvider interfaces.MappedHTTPRequestSpec, patche
 // details are valid, the function returns them. If not, it falls back to using the cached response in the Request's status
 // and attempts to generate request details again. The function returns the generated request details or an error if the
 // generation process fails.
-func GenerateValidRequestDetails(svcCtx *service.ServiceContext, spec interfaces.MappedHTTPRequestSpec, mapping interfaces.HTTPMapping, response interfaces.HTTPResponse, cachedResponse interfaces.HTTPResponse) (RequestDetails, error) {
+func GenerateValidRequestDetails(svcCtx *service.ServiceContext, crCtx *service.RequestCRContext, mapping interfaces.HTTPMapping) (RequestDetails, error) {
+	spec := crCtx.Spec()
+	response := crCtx.Status().GetResponse()
+	cachedResponse := crCtx.CachedResponse().GetCachedResponse()
+
 	requestDetails, _, ok := GenerateRequestDetails(svcCtx, mapping, spec, response)
 	if IsRequestValid(requestDetails) && ok {
 		return requestDetails, nil
