@@ -8,6 +8,7 @@ import (
 
 	"github.com/crossplane-contrib/provider-http/apis/request/v1alpha2"
 	httpClient "github.com/crossplane-contrib/provider-http/internal/clients/http"
+	"github.com/crossplane-contrib/provider-http/internal/service"
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
 	"github.com/crossplane/crossplane-runtime/pkg/test"
 	"github.com/google/go-cmp/cmp"
@@ -197,7 +198,8 @@ func Test_SetRequestStatus(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			r, _ := NewStatusHandler(context.Background(), tc.args.cr, &tc.args.cr.Spec.ForProvider, tc.args.requestDetails, tc.args.err, tc.args.localKube, logging.NewNopLogger())
+			svcCtx := service.NewServiceContext(context.Background(), tc.args.localKube, logging.NewNopLogger(), nil)
+			r, _ := NewStatusHandler(svcCtx, tc.args.cr, &tc.args.cr.Spec.ForProvider, tc.args.requestDetails, tc.args.err)
 			if tc.args.isSynced {
 				r.ResetFailures()
 			}

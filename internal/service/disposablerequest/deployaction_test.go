@@ -6,6 +6,7 @@ import (
 
 	"github.com/crossplane-contrib/provider-http/apis/disposablerequest/v1alpha2"
 	httpClient "github.com/crossplane-contrib/provider-http/internal/clients/http"
+	"github.com/crossplane-contrib/provider-http/internal/service"
 	"github.com/crossplane-contrib/provider-http/internal/utils"
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
 	"github.com/crossplane/crossplane-runtime/pkg/test"
@@ -299,15 +300,18 @@ func TestDeployAction(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			err := DeployAction(
+			svcCtx := service.NewServiceContext(
 				tc.args.ctx,
-				&tc.args.dr.Spec.ForProvider,
-				&tc.args.dr.Spec.ForProvider,
-				tc.args.dr,
-				tc.args.dr,
 				tc.args.localKube,
 				logging.NewNopLogger(),
 				tc.args.httpClient,
+			)
+			err := DeployAction(
+				svcCtx,
+				&tc.args.dr.Spec.ForProvider,
+				&tc.args.dr.Spec.ForProvider,
+				tc.args.dr,
+				tc.args.dr,
 			)
 
 			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
@@ -387,12 +391,15 @@ func TestSendHttpRequest(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			details, err := sendHttpRequest(
+			svcCtx := service.NewServiceContext(
 				tc.args.ctx,
-				tc.args.spec,
 				tc.args.localKube,
 				logging.NewNopLogger(),
 				tc.args.httpClient,
+			)
+			details, err := sendHttpRequest(
+				svcCtx,
+				tc.args.spec,
 			)
 
 			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
@@ -542,15 +549,19 @@ func TestHandleHttpResponse(t *testing.T) {
 				LocalClient:    tc.args.localKube,
 			}
 
-			err := handleHttpResponse(
+			svcCtx := service.NewServiceContext(
 				tc.args.ctx,
+				tc.args.localKube,
+				logging.NewNopLogger(),
+				nil, // httpClient not needed for handleHttpResponse
+			)
+			err := handleHttpResponse(
+				svcCtx,
 				tc.args.spec,
 				tc.args.rollbackPolicy,
 				tc.args.sensitiveResponse,
 				resource,
 				dr,
-				tc.args.localKube,
-				logging.NewNopLogger(),
 			)
 
 			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {

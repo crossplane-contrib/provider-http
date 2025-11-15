@@ -6,6 +6,7 @@ import (
 
 	"github.com/crossplane-contrib/provider-http/apis/request/v1alpha2"
 	httpClient "github.com/crossplane-contrib/provider-http/internal/clients/http"
+	"github.com/crossplane-contrib/provider-http/internal/service"
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -197,7 +198,8 @@ func Test_GenerateRequestDetails(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			got, gotErr, ok := GenerateRequestDetails(context.Background(), tc.args.localKube, &tc.args.methodMapping, &tc.args.forProvider, &tc.args.response, tc.args.logger)
+			svcCtx := service.NewServiceContext(context.Background(), tc.args.localKube, tc.args.logger, nil)
+			got, gotErr, ok := GenerateRequestDetails(svcCtx, &tc.args.methodMapping, &tc.args.forProvider, &tc.args.response)
 			if diff := cmp.Diff(tc.want.err, gotErr, test.EquateErrors()); diff != "" {
 				t.Fatalf("GenerateRequestDetails(...): -want error, +got error: %s", diff)
 			}

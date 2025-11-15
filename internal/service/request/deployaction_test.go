@@ -6,6 +6,7 @@ import (
 
 	"github.com/crossplane-contrib/provider-http/apis/request/v1alpha2"
 	httpClient "github.com/crossplane-contrib/provider-http/internal/clients/http"
+	"github.com/crossplane-contrib/provider-http/internal/service"
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
 	"github.com/crossplane/crossplane-runtime/pkg/test"
 	"github.com/google/go-cmp/cmp"
@@ -334,13 +335,16 @@ func TestDeployAction(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			err := DeployAction(
+			svcCtx := service.NewServiceContext(
 				tc.args.ctx,
-				tc.args.cr,
-				tc.args.action,
 				tc.args.localKube,
 				logging.NewNopLogger(),
 				tc.args.httpClient,
+			)
+			err := DeployAction(
+				svcCtx,
+				tc.args.cr,
+				tc.args.action,
 			)
 
 			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {

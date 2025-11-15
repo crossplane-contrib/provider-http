@@ -7,6 +7,7 @@ import (
 
 	"github.com/crossplane-contrib/provider-http/apis/request/v1alpha2"
 	httpClient "github.com/crossplane-contrib/provider-http/internal/clients/http"
+	"github.com/crossplane-contrib/provider-http/internal/service"
 	"github.com/crossplane-contrib/provider-http/internal/service/request/observe"
 	"github.com/crossplane-contrib/provider-http/internal/service/request/requestgen"
 	"github.com/crossplane-contrib/provider-http/internal/service/request/requestmapping"
@@ -406,7 +407,8 @@ func Test_isUpToDate(t *testing.T) {
 		tc := tc // Create local copies of loop variables
 
 		t.Run(name, func(t *testing.T) {
-			got, gotErr := IsUpToDate(context.Background(), tc.args.mg, tc.args.localKube, logging.NewNopLogger(), tc.args.http)
+			svcCtx := service.NewServiceContext(context.Background(), tc.args.localKube, logging.NewNopLogger(), tc.args.http)
+			got, gotErr := IsUpToDate(svcCtx, tc.args.mg)
 			if diff := cmp.Diff(tc.want.err, gotErr, test.EquateErrors()); diff != "" {
 				t.Fatalf("isUpToDate(...): -want error, +got error: %s", diff)
 			}
@@ -594,7 +596,8 @@ func Test_determineResponseCheck(t *testing.T) {
 		tc := tc // Create local copies of loop variables
 
 		t.Run(name, func(t *testing.T) {
-			got, gotErr := determineIfUpToDate(tc.args.ctx, &tc.args.cr.Spec.ForProvider, tc.args.cr, tc.args.cr, tc.args.details, tc.args.responseErr, nil, logging.NewNopLogger(), nil)
+			svcCtx := service.NewServiceContext(tc.args.ctx, nil, logging.NewNopLogger(), nil)
+			got, gotErr := determineIfUpToDate(svcCtx, &tc.args.cr.Spec.ForProvider, tc.args.cr, tc.args.cr, tc.args.details, tc.args.responseErr)
 			if diff := cmp.Diff(tc.want.err, gotErr, test.EquateErrors()); diff != "" {
 				t.Fatalf("determineResponseCheck(...): -want error, +got error: %s", diff)
 			}
@@ -812,7 +815,8 @@ func Test_requestDetails(t *testing.T) {
 				}
 				return
 			}
-			got, gotErr := requestgen.GenerateValidRequestDetails(tc.args.ctx, &tc.args.cr.Spec.ForProvider, mapping, &tc.args.cr.Status.Response, &tc.args.cr.Status.Response, nil, logging.NewNopLogger())
+			svcCtx := service.NewServiceContext(tc.args.ctx, nil, logging.NewNopLogger(), nil)
+			got, gotErr := requestgen.GenerateValidRequestDetails(svcCtx, &tc.args.cr.Spec.ForProvider, mapping, &tc.args.cr.Status.Response, &tc.args.cr.Status.Response)
 			if diff := cmp.Diff(tc.want.err, gotErr, test.EquateErrors()); diff != "" {
 				t.Fatalf("requestDetails(...): -want error, +got error: %s", diff)
 			}

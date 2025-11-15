@@ -1,35 +1,29 @@
 package observe
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/crossplane-contrib/provider-http/apis/interfaces"
 	httpClient "github.com/crossplane-contrib/provider-http/internal/clients/http"
 	datapatcher "github.com/crossplane-contrib/provider-http/internal/data-patcher"
 	"github.com/crossplane-contrib/provider-http/internal/jq"
+	"github.com/crossplane-contrib/provider-http/internal/service"
 	"github.com/crossplane-contrib/provider-http/internal/service/request/requestgen"
 	"github.com/crossplane-contrib/provider-http/internal/utils"
-	"github.com/crossplane/crossplane-runtime/pkg/logging"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // responseCheck is an interface for performing response checks.
 type responseCheck interface {
-	Check(ctx context.Context, spec interfaces.MappedHTTPRequestSpec, statusReader interfaces.RequestStatusReader, cachedReader interfaces.CachedResponse, details httpClient.HttpDetails, responseErr error) (bool, error)
+	Check(svcCtx *service.ServiceContext, spec interfaces.MappedHTTPRequestSpec, statusReader interfaces.RequestStatusReader, cachedReader interfaces.CachedResponse, details httpClient.HttpDetails, responseErr error) (bool, error)
 }
 
 // customCheck performs a custom response check using JQ logic.
-type customCheck struct {
-	localKube client.Client
-	logger    logging.Logger
-	http      httpClient.Client
-}
+type customCheck struct{}
 
 // Check performs a custom response check using JQ logic.
-func (c *customCheck) check(ctx context.Context, spec interfaces.MappedHTTPRequestSpec, details httpClient.HttpDetails, logic string) (bool, error) {
+func (c *customCheck) check(svcCtx *service.ServiceContext, spec interfaces.MappedHTTPRequestSpec, details httpClient.HttpDetails, logic string) (bool, error) {
 	// Convert response to a map and apply JQ logic
-	sensitiveResponse, err := datapatcher.PatchSecretsIntoResponse(ctx, c.localKube, &details.HttpResponse, c.logger)
+	sensitiveResponse, err := datapatcher.PatchSecretsIntoResponse(svcCtx.Ctx, svcCtx.LocalKube, &details.HttpResponse, svcCtx.Logger)
 	if err != nil {
 		return false, err
 	}
@@ -37,14 +31,14 @@ func (c *customCheck) check(ctx context.Context, spec interfaces.MappedHTTPReque
 	sensitiveRequestContext := requestgen.GenerateRequestContext(spec, sensitiveResponse)
 
 	jqQuery := utils.NormalizeWhitespace(logic)
-	sensitiveJQQuery, err := datapatcher.PatchSecretsIntoString(ctx, c.localKube, jqQuery, c.logger)
+	sensitiveJQQuery, err := datapatcher.PatchSecretsIntoString(svcCtx.Ctx, svcCtx.LocalKube, jqQuery, svcCtx.Logger)
 	if err != nil {
 		return false, err
 	}
 
 	isExpected, err := jq.ParseBool(sensitiveJQQuery, sensitiveRequestContext)
 
-	c.logger.Debug(fmt.Sprintf("Applying JQ filter %s, result is %v", jqQuery, isExpected))
+	svcCtx.Logger.Debug(fmt.Sprintf("Applying JQ filter %s, result is %v", jqQuery, isExpected))
 	if err != nil {
 		return false, err
 	}

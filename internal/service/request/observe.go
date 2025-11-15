@@ -1,20 +1,18 @@
 package request
 
 import (
-	"context"
 	"net/http"
 
 	"github.com/crossplane-contrib/provider-http/apis/common"
 	"github.com/crossplane-contrib/provider-http/apis/interfaces"
 	httpClient "github.com/crossplane-contrib/provider-http/internal/clients/http"
 	datapatcher "github.com/crossplane-contrib/provider-http/internal/data-patcher"
+	"github.com/crossplane-contrib/provider-http/internal/service"
 	"github.com/crossplane-contrib/provider-http/internal/service/request/observe"
 	"github.com/crossplane-contrib/provider-http/internal/service/request/requestgen"
 	"github.com/crossplane-contrib/provider-http/internal/service/request/requestmapping"
 	"github.com/crossplane-contrib/provider-http/internal/utils"
-	"github.com/crossplane/crossplane-runtime/pkg/logging"
 	"github.com/pkg/errors"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
@@ -48,9 +46,9 @@ func FailedObserve() ObserveRequestDetails {
 }
 
 // IsUpToDate checks whether desired spec up to date with the observed state for a given request
-func IsUpToDate(ctx context.Context, cr interfaces.RequestResource, localKube client.Client, logger logging.Logger, httpClient httpClient.Client) (ObserveRequestDetails, error) {
+func IsUpToDate(svcCtx *service.ServiceContext, cr interfaces.RequestResource) (ObserveRequestDetails, error) {
 	spec := cr.GetSpec()
-	mapping, err := requestmapping.GetMapping(spec, common.ActionObserve, logger)
+	mapping, err := requestmapping.GetMapping(spec, common.ActionObserve, svcCtx.Logger)
 	if err != nil {
 		return FailedObserve(), err
 	}
@@ -59,7 +57,7 @@ func IsUpToDate(ctx context.Context, cr interfaces.RequestResource, localKube cl
 
 	// Evaluate the HTTP request template. If successfully templated, attempt to
 	// observe the resource.
-	requestDetails, err := requestgen.GenerateValidRequestDetails(ctx, spec, mapping, cr.GetResponse(), cr.GetCachedResponse(), localKube, logger)
+	requestDetails, err := requestgen.GenerateValidRequestDetails(svcCtx, spec, mapping, cr.GetResponse(), cr.GetCachedResponse())
 	if err != nil {
 		if objectNotCreated {
 			// The initial request was not successfully templated. Cannot
@@ -70,7 +68,7 @@ func IsUpToDate(ctx context.Context, cr interfaces.RequestResource, localKube cl
 		return FailedObserve(), err
 	}
 
-	details, responseErr := httpClient.SendRequest(ctx, requestmapping.GetEffectiveMethod(mapping), requestDetails.Url, requestDetails.Body, requestDetails.Headers, spec.GetInsecureSkipTLSVerify())
+	details, responseErr := svcCtx.HTTP.SendRequest(svcCtx.Ctx, requestmapping.GetEffectiveMethod(mapping), requestDetails.Url, requestDetails.Body, requestDetails.Headers, spec.GetInsecureSkipTLSVerify())
 	// The initial observation of an object requires a successful HTTP response
 	// to be considered existing.
 	if !utils.IsHTTPSuccess(details.HttpResponse.StatusCode) && objectNotCreated {
@@ -78,24 +76,24 @@ func IsUpToDate(ctx context.Context, cr interfaces.RequestResource, localKube cl
 		// behavior of creating before observing.
 		return FailedObserve(), errors.New(observe.ErrObjectNotFound)
 	}
-	if err := determineIfRemoved(ctx, spec, cr, cr, details, responseErr, localKube, logger, httpClient); err != nil {
+	if err := determineIfRemoved(svcCtx, spec, cr, cr, details, responseErr); err != nil {
 		return FailedObserve(), err
 	}
 
 	// Apply response data to secrets and update CR status with response
 	secretConfigs := spec.GetSecretInjectionConfigs()
-	datapatcher.ApplyResponseDataToSecrets(ctx, localKube, logger, &details.HttpResponse, secretConfigs, cr)
-	return determineIfUpToDate(ctx, spec, cr, cr, details, responseErr, localKube, logger, httpClient)
+	datapatcher.ApplyResponseDataToSecrets(svcCtx.Ctx, svcCtx.LocalKube, svcCtx.Logger, &details.HttpResponse, secretConfigs, cr)
+	return determineIfUpToDate(svcCtx, spec, cr, cr, details, responseErr)
 }
 
 // determineIfUpToDate determines if the object is up to date based on the response check.
-func determineIfUpToDate(ctx context.Context, spec interfaces.MappedHTTPRequestSpec, statusReader interfaces.RequestStatusReader, cachedReader interfaces.CachedResponse, details httpClient.HttpDetails, responseErr error, localKube client.Client, logger logging.Logger, httpClient httpClient.Client) (ObserveRequestDetails, error) {
-	responseChecker := observe.GetIsUpToDateResponseCheck(spec, localKube, logger, httpClient)
+func determineIfUpToDate(svcCtx *service.ServiceContext, spec interfaces.MappedHTTPRequestSpec, statusReader interfaces.RequestStatusReader, cachedReader interfaces.CachedResponse, details httpClient.HttpDetails, responseErr error) (ObserveRequestDetails, error) {
+	responseChecker := observe.GetIsUpToDateResponseCheck(svcCtx, spec)
 	if responseChecker == nil {
 		return FailedObserve(), errors.Errorf(errExpectedResponseCheckType, "expectedResponseCheck")
 	}
 
-	result, err := responseChecker.Check(ctx, spec, statusReader, cachedReader, details, responseErr)
+	result, err := responseChecker.Check(svcCtx, spec, statusReader, cachedReader, details, responseErr)
 	if err != nil {
 		return FailedObserve(), err
 	}
@@ -104,13 +102,13 @@ func determineIfUpToDate(ctx context.Context, spec interfaces.MappedHTTPRequestS
 }
 
 // determineIfRemoved determines if the object is removed based on the response check.
-func determineIfRemoved(ctx context.Context, spec interfaces.MappedHTTPRequestSpec, statusReader interfaces.RequestStatusReader, cachedReader interfaces.CachedResponse, details httpClient.HttpDetails, responseErr error, localKube client.Client, logger logging.Logger, httpClient httpClient.Client) error {
-	responseChecker := observe.GetIsRemovedResponseCheck(spec, localKube, logger, httpClient)
+func determineIfRemoved(svcCtx *service.ServiceContext, spec interfaces.MappedHTTPRequestSpec, statusReader interfaces.RequestStatusReader, cachedReader interfaces.CachedResponse, details httpClient.HttpDetails, responseErr error) error {
+	responseChecker := observe.GetIsRemovedResponseCheck(svcCtx, spec)
 	if responseChecker == nil {
 		return errors.Errorf(errExpectedResponseCheckType, "isRemovedCheck")
 	}
 
-	return responseChecker.Check(ctx, spec, statusReader, cachedReader, details, responseErr)
+	return responseChecker.Check(svcCtx, spec, statusReader, cachedReader, details, responseErr)
 }
 
 // isObjectValidForObservation checks if the object is valid for observation

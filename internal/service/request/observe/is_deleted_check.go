@@ -1,15 +1,13 @@
 package observe
 
 import (
-	"context"
 	"net/http"
 
 	"github.com/crossplane-contrib/provider-http/apis/common"
 	"github.com/crossplane-contrib/provider-http/apis/interfaces"
 	httpClient "github.com/crossplane-contrib/provider-http/internal/clients/http"
-	"github.com/crossplane/crossplane-runtime/pkg/logging"
+	"github.com/crossplane-contrib/provider-http/internal/service"
 	"github.com/pkg/errors"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
@@ -18,18 +16,14 @@ const (
 
 // isDeletedCheck is an interface for performing isDeleted checks.
 type isDeletedCheck interface {
-	Check(ctx context.Context, spec interfaces.MappedHTTPRequestSpec, statusReader interfaces.RequestStatusReader, cachedReader interfaces.CachedResponse, details httpClient.HttpDetails, responseErr error) error
+	Check(svcCtx *service.ServiceContext, spec interfaces.MappedHTTPRequestSpec, statusReader interfaces.RequestStatusReader, cachedReader interfaces.CachedResponse, details httpClient.HttpDetails, responseErr error) error
 }
 
 // defaultIsRemovedResponseCheck performs a default comparison between the response and desired state.
-type defaultIsRemovedResponseCheck struct {
-	localKube client.Client
-	logger    logging.Logger
-	http      httpClient.Client
-}
+type defaultIsRemovedResponseCheck struct{}
 
 // Check performs a default comparison between the response and desired state.
-func (d *defaultIsRemovedResponseCheck) Check(ctx context.Context, spec interfaces.MappedHTTPRequestSpec, statusReader interfaces.RequestStatusReader, cachedReader interfaces.CachedResponse, details httpClient.HttpDetails, responseErr error) error {
+func (d *defaultIsRemovedResponseCheck) Check(svcCtx *service.ServiceContext, spec interfaces.MappedHTTPRequestSpec, statusReader interfaces.RequestStatusReader, cachedReader interfaces.CachedResponse, details httpClient.HttpDetails, responseErr error) error {
 	if details.HttpResponse.StatusCode == http.StatusNotFound {
 		return errors.New(ErrObjectNotFound)
 	}
@@ -37,24 +31,20 @@ func (d *defaultIsRemovedResponseCheck) Check(ctx context.Context, spec interfac
 	return nil
 }
 
-// // customIsRemovedResponseCheck performs a custom response check using JQ logic.
-type customIsRemovedResponseCheck struct {
-	localKube client.Client
-	logger    logging.Logger
-	http      httpClient.Client
-}
+// customIsRemovedResponseCheck performs a custom response check using JQ logic.
+type customIsRemovedResponseCheck struct{}
 
 // Check performs a custom response check using JQ logic.
-func (c *customIsRemovedResponseCheck) Check(ctx context.Context, spec interfaces.MappedHTTPRequestSpec, statusReader interfaces.RequestStatusReader, cachedReader interfaces.CachedResponse, details httpClient.HttpDetails, responseErr error) error {
+func (c *customIsRemovedResponseCheck) Check(svcCtx *service.ServiceContext, spec interfaces.MappedHTTPRequestSpec, statusReader interfaces.RequestStatusReader, cachedReader interfaces.CachedResponse, details httpClient.HttpDetails, responseErr error) error {
 	responseCheckAware, ok := spec.(interfaces.ResponseCheckAware)
 	if !ok {
 		return errors.New("spec does not support custom response checks")
 	}
 
 	logic := responseCheckAware.GetIsRemovedCheck().GetLogic()
-	customCheck := &customCheck{localKube: c.localKube, logger: c.logger, http: c.http}
+	customCheck := &customCheck{}
 
-	isRemoved, err := customCheck.check(ctx, spec, details, logic)
+	isRemoved, err := customCheck.check(svcCtx, spec, details, logic)
 	if err != nil {
 		return errors.Errorf(errExpectedFormat, "isRemovedCheck", err.Error())
 	} else if isRemoved {
@@ -65,24 +55,24 @@ func (c *customIsRemovedResponseCheck) Check(ctx context.Context, spec interface
 }
 
 // isRemovedCheckFactoryMap is a map that associates each check type with its corresponding factory function.
-var isRemovedCheckFactoryMap = map[string]func(localKube client.Client, logger logging.Logger, http httpClient.Client) isDeletedCheck{
-	common.ExpectedResponseCheckTypeDefault: func(localKube client.Client, logger logging.Logger, http httpClient.Client) isDeletedCheck {
-		return &defaultIsRemovedResponseCheck{localKube: localKube, logger: logger, http: http}
+var isRemovedCheckFactoryMap = map[string]func() isDeletedCheck{
+	common.ExpectedResponseCheckTypeDefault: func() isDeletedCheck {
+		return &defaultIsRemovedResponseCheck{}
 	},
-	common.ExpectedResponseCheckTypeCustom: func(localKube client.Client, logger logging.Logger, http httpClient.Client) isDeletedCheck {
-		return &customIsRemovedResponseCheck{localKube: localKube, logger: logger, http: http}
+	common.ExpectedResponseCheckTypeCustom: func() isDeletedCheck {
+		return &customIsRemovedResponseCheck{}
 	},
 }
 
 // GetIsRemovedResponseCheck uses a map to select and return the appropriate ResponseCheck.
-func GetIsRemovedResponseCheck(spec interfaces.MappedHTTPRequestSpec, localKube client.Client, logger logging.Logger, http httpClient.Client) isDeletedCheck {
+func GetIsRemovedResponseCheck(svcCtx *service.ServiceContext, spec interfaces.MappedHTTPRequestSpec) isDeletedCheck {
 	responseCheckAware, ok := spec.(interfaces.ResponseCheckAware)
 	if !ok {
-		return isRemovedCheckFactoryMap[common.ExpectedResponseCheckTypeDefault](localKube, logger, http)
+		return isRemovedCheckFactoryMap[common.ExpectedResponseCheckTypeDefault]()
 	}
 
 	if factory, ok := isRemovedCheckFactoryMap[responseCheckAware.GetIsRemovedCheck().GetType()]; ok {
-		return factory(localKube, logger, http)
+		return factory()
 	}
-	return isRemovedCheckFactoryMap[common.ExpectedResponseCheckTypeDefault](localKube, logger, http)
+	return isRemovedCheckFactoryMap[common.ExpectedResponseCheckTypeDefault]()
 }

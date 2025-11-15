@@ -24,6 +24,7 @@ import (
 
 	"github.com/crossplane-contrib/provider-http/apis/disposablerequest/v1alpha2"
 	httpClient "github.com/crossplane-contrib/provider-http/internal/clients/http"
+	"github.com/crossplane-contrib/provider-http/internal/service"
 	"github.com/crossplane-contrib/provider-http/internal/service/disposablerequest"
 	"github.com/crossplane-contrib/provider-http/internal/utils"
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
@@ -538,7 +539,19 @@ func Test_deployAction(t *testing.T) {
 		tc := tc // Create local copies of loop variables
 
 		t.Run(name, func(t *testing.T) {
-			gotErr := disposablerequest.DeployAction(context.Background(), &tc.args.cr.Spec.ForProvider, &tc.args.cr.Spec.ForProvider, tc.args.cr, tc.args.cr, tc.args.localKube, logging.NewNopLogger(), tc.args.http)
+			svcCtx := service.NewServiceContext(
+				context.Background(),
+				tc.args.localKube,
+				logging.NewNopLogger(),
+				tc.args.http,
+			)
+			gotErr := disposablerequest.DeployAction(
+				svcCtx,
+				&tc.args.cr.Spec.ForProvider,
+				&tc.args.cr.Spec.ForProvider,
+				tc.args.cr,
+				tc.args.cr,
+			)
 			if diff := cmp.Diff(tc.want.err, gotErr, test.EquateErrors()); diff != "" {
 				t.Fatalf("deployAction(...): -want error, +got error: %s", diff)
 			}

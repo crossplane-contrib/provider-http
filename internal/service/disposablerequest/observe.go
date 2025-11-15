@@ -6,8 +6,8 @@ import (
 	"github.com/crossplane-contrib/provider-http/apis/interfaces"
 	httpClient "github.com/crossplane-contrib/provider-http/internal/clients/http"
 	datapatcher "github.com/crossplane-contrib/provider-http/internal/data-patcher"
+	"github.com/crossplane-contrib/provider-http/internal/service"
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
-	"github.com/crossplane/crossplane-runtime/pkg/logging"
 	"github.com/pkg/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -22,13 +22,13 @@ const (
 )
 
 // ValidateStoredResponse validates the stored response against expected criteria
-func ValidateStoredResponse(ctx context.Context, spec interfaces.SimpleHTTPRequestSpec, status interfaces.DisposableRequestStatusReader, obj metav1.Object, localKube client.Client, logger logging.Logger) (bool, httpClient.HttpResponse, error) {
+func ValidateStoredResponse(svcCtx *service.ServiceContext, spec interfaces.SimpleHTTPRequestSpec, status interfaces.DisposableRequestStatusReader, obj metav1.Object) (bool, httpClient.HttpResponse, error) {
 	response := status.GetResponse()
 	if response == nil || response.GetStatusCode() == 0 {
 		return false, httpClient.HttpResponse{}, nil
 	}
 
-	sensitiveBody, err := datapatcher.PatchSecretsIntoString(ctx, localKube, response.GetBody(), logger)
+	sensitiveBody, err := datapatcher.PatchSecretsIntoString(svcCtx.Ctx, svcCtx.LocalKube, response.GetBody(), svcCtx.Logger)
 	if err != nil {
 		return false, httpClient.HttpResponse{}, errors.Wrap(err, errPatchFromReferencedSecret)
 	}
@@ -41,11 +41,11 @@ func ValidateStoredResponse(ctx context.Context, spec interfaces.SimpleHTTPReque
 
 	isExpected, err := IsResponseAsExpected(spec, storedResponse)
 	if err != nil {
-		logger.Debug("Setting error condition due to validation error", "error", err)
+		svcCtx.Logger.Debug("Setting error condition due to validation error", "error", err)
 		return false, httpClient.HttpResponse{}, errors.Wrap(err, errCheckExpectedResponse)
 	}
 	if !isExpected {
-		logger.Debug("Response does not match expected criteria")
+		svcCtx.Logger.Debug("Response does not match expected criteria")
 		return false, httpClient.HttpResponse{}, nil
 	}
 
@@ -81,7 +81,7 @@ func UpdateResourceStatus(ctx context.Context, obj client.Object, localKube clie
 
 // ApplySecretInjectionsFromStoredResponse applies secret injection configurations using the stored response
 // This is used when the resource is already synced but secret injection configs may have been updated
-func ApplySecretInjectionsFromStoredResponse(ctx context.Context, spec interfaces.SimpleHTTPRequestSpec, storedResponse httpClient.HttpResponse, obj metav1.Object, localKube client.Client, logger logging.Logger) {
-	logger.Debug("Applying secret injections from stored response")
-	datapatcher.ApplyResponseDataToSecrets(ctx, localKube, logger, &storedResponse, spec.GetSecretInjectionConfigs(), obj)
+func ApplySecretInjectionsFromStoredResponse(svcCtx *service.ServiceContext, spec interfaces.SimpleHTTPRequestSpec, storedResponse httpClient.HttpResponse, obj metav1.Object) {
+	svcCtx.Logger.Debug("Applying secret injections from stored response")
+	datapatcher.ApplyResponseDataToSecrets(svcCtx.Ctx, svcCtx.LocalKube, svcCtx.Logger, &storedResponse, spec.GetSecretInjectionConfigs(), obj)
 }

@@ -1,7 +1,6 @@
 package observe
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"strings"
@@ -11,12 +10,11 @@ import (
 	httpClient "github.com/crossplane-contrib/provider-http/internal/clients/http"
 	datapatcher "github.com/crossplane-contrib/provider-http/internal/data-patcher"
 	"github.com/crossplane-contrib/provider-http/internal/json"
+	"github.com/crossplane-contrib/provider-http/internal/service"
 	"github.com/crossplane-contrib/provider-http/internal/service/request/requestgen"
 	"github.com/crossplane-contrib/provider-http/internal/service/request/requestmapping"
 	"github.com/crossplane-contrib/provider-http/internal/utils"
-	"github.com/crossplane/crossplane-runtime/pkg/logging"
 	"github.com/pkg/errors"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 var (
@@ -25,15 +23,11 @@ var (
 )
 
 // defaultIsUpToDateResponseCheck performs a default comparison between the response and desired state.
-type defaultIsUpToDateResponseCheck struct {
-	localKube client.Client
-	logger    logging.Logger
-	http      httpClient.Client
-}
+type defaultIsUpToDateResponseCheck struct{}
 
 // Check performs a default comparison between the response and desired state.
-func (d *defaultIsUpToDateResponseCheck) Check(ctx context.Context, spec interfaces.MappedHTTPRequestSpec, statusReader interfaces.RequestStatusReader, cachedReader interfaces.CachedResponse, details httpClient.HttpDetails, responseErr error) (bool, error) {
-	desiredState, err := d.desiredState(ctx, spec, statusReader, cachedReader)
+func (d *defaultIsUpToDateResponseCheck) Check(svcCtx *service.ServiceContext, spec interfaces.MappedHTTPRequestSpec, statusReader interfaces.RequestStatusReader, cachedReader interfaces.CachedResponse, details httpClient.HttpDetails, responseErr error) (bool, error) {
+	desiredState, err := d.desiredState(svcCtx, spec, statusReader, cachedReader)
 	if err != nil {
 		if isErrorMappingNotFound(err) {
 			return true, nil
@@ -41,17 +35,17 @@ func (d *defaultIsUpToDateResponseCheck) Check(ctx context.Context, spec interfa
 		return false, err
 	}
 
-	return d.compareResponseAndDesiredState(ctx, details, desiredState)
+	return d.compareResponseAndDesiredState(svcCtx, details, desiredState)
 }
 
 // compareResponseAndDesiredState compares the response and desired state to determine if they are in sync.
-func (d *defaultIsUpToDateResponseCheck) compareResponseAndDesiredState(ctx context.Context, details httpClient.HttpDetails, desiredState string) (bool, error) {
-	sensitiveBody, err := d.patchAndValidate(ctx, details.HttpResponse.Body)
+func (d *defaultIsUpToDateResponseCheck) compareResponseAndDesiredState(svcCtx *service.ServiceContext, details httpClient.HttpDetails, desiredState string) (bool, error) {
+	sensitiveBody, err := d.patchAndValidate(svcCtx, details.HttpResponse.Body)
 	if err != nil {
 		return false, err
 	}
 
-	sensitiveDesiredState, err := d.patchAndValidate(ctx, desiredState)
+	sensitiveDesiredState, err := d.patchAndValidate(svcCtx, desiredState)
 	if err != nil {
 		return false, err
 	}
@@ -65,8 +59,8 @@ func (d *defaultIsUpToDateResponseCheck) compareResponseAndDesiredState(ctx cont
 }
 
 // patchAndValidate patches secrets into a string and validates the result.
-func (d *defaultIsUpToDateResponseCheck) patchAndValidate(ctx context.Context, content string) (string, error) {
-	patched, err := datapatcher.PatchSecretsIntoString(ctx, d.localKube, content, d.logger)
+func (d *defaultIsUpToDateResponseCheck) patchAndValidate(svcCtx *service.ServiceContext, content string) (string, error) {
+	patched, err := datapatcher.PatchSecretsIntoString(svcCtx.Ctx, svcCtx.LocalKube, content, svcCtx.Logger)
 	if err != nil {
 		return "", err
 	}
@@ -103,8 +97,8 @@ func (d *defaultIsUpToDateResponseCheck) compareJSON(body, desiredState string, 
 }
 
 // desiredState returns the desired state for a given request
-func (d *defaultIsUpToDateResponseCheck) desiredState(ctx context.Context, spec interfaces.MappedHTTPRequestSpec, statusReader interfaces.RequestStatusReader, cachedReader interfaces.CachedResponse) (string, error) {
-	requestDetails, err := d.requestDetails(ctx, spec, statusReader, cachedReader, common.ActionUpdate)
+func (d *defaultIsUpToDateResponseCheck) desiredState(svcCtx *service.ServiceContext, spec interfaces.MappedHTTPRequestSpec, statusReader interfaces.RequestStatusReader, cachedReader interfaces.CachedResponse) (string, error) {
+	requestDetails, err := d.requestDetails(svcCtx, spec, statusReader, cachedReader, common.ActionUpdate)
 	if err != nil {
 		return "", err
 	}
@@ -113,23 +107,19 @@ func (d *defaultIsUpToDateResponseCheck) desiredState(ctx context.Context, spec 
 }
 
 // customIsUpToDateResponseCheck performs a custom response check using JQ logic.
-type customIsUpToDateResponseCheck struct {
-	localKube client.Client
-	logger    logging.Logger
-	http      httpClient.Client
-}
+type customIsUpToDateResponseCheck struct{}
 
 // Check performs a custom response check using JQ logic.
-func (c *customIsUpToDateResponseCheck) Check(ctx context.Context, spec interfaces.MappedHTTPRequestSpec, statusReader interfaces.RequestStatusReader, cachedReader interfaces.CachedResponse, details httpClient.HttpDetails, responseErr error) (bool, error) {
+func (c *customIsUpToDateResponseCheck) Check(svcCtx *service.ServiceContext, spec interfaces.MappedHTTPRequestSpec, statusReader interfaces.RequestStatusReader, cachedReader interfaces.CachedResponse, details httpClient.HttpDetails, responseErr error) (bool, error) {
 	responseCheckAware, ok := spec.(interfaces.ResponseCheckAware)
 	if !ok {
 		return false, errors.New("spec does not support custom response checks")
 	}
 
 	logic := responseCheckAware.GetExpectedResponseCheck().GetLogic()
-	customCheck := &customCheck{localKube: c.localKube, logger: c.logger, http: c.http}
+	customCheck := &customCheck{}
 
-	isUpToDate, err := customCheck.check(ctx, spec, details, logic)
+	isUpToDate, err := customCheck.check(svcCtx, spec, details, logic)
 	if err != nil {
 		return false, errors.Errorf(errExpectedFormat, "expectedResponseCheck", err.Error())
 	}
@@ -144,34 +134,34 @@ func isErrorMappingNotFound(err error) bool {
 }
 
 // requestDetails generates the request details for a given method or action.
-func (d *defaultIsUpToDateResponseCheck) requestDetails(ctx context.Context, spec interfaces.MappedHTTPRequestSpec, statusReader interfaces.RequestStatusReader, cachedReader interfaces.CachedResponse, action string) (requestgen.RequestDetails, error) {
-	mapping, err := requestmapping.GetMapping(spec, action, d.logger)
+func (d *defaultIsUpToDateResponseCheck) requestDetails(svcCtx *service.ServiceContext, spec interfaces.MappedHTTPRequestSpec, statusReader interfaces.RequestStatusReader, cachedReader interfaces.CachedResponse, action string) (requestgen.RequestDetails, error) {
+	mapping, err := requestmapping.GetMapping(spec, action, svcCtx.Logger)
 	if err != nil {
 		return requestgen.RequestDetails{}, err
 	}
 
-	return requestgen.GenerateValidRequestDetails(ctx, spec, mapping, statusReader.GetResponse(), cachedReader.GetCachedResponse(), d.localKube, d.logger)
+	return requestgen.GenerateValidRequestDetails(svcCtx, spec, mapping, statusReader.GetResponse(), cachedReader.GetCachedResponse())
 }
 
 // isUpToDateChecksFactoryMap is a map that associates each check type with its corresponding factory function.
-var isUpToDateChecksFactoryMap = map[string]func(localKube client.Client, logger logging.Logger, http httpClient.Client) responseCheck{
-	common.ExpectedResponseCheckTypeDefault: func(localKube client.Client, logger logging.Logger, http httpClient.Client) responseCheck {
-		return &defaultIsUpToDateResponseCheck{localKube: localKube, logger: logger, http: http}
+var isUpToDateChecksFactoryMap = map[string]func() responseCheck{
+	common.ExpectedResponseCheckTypeDefault: func() responseCheck {
+		return &defaultIsUpToDateResponseCheck{}
 	},
-	common.ExpectedResponseCheckTypeCustom: func(localKube client.Client, logger logging.Logger, http httpClient.Client) responseCheck {
-		return &customIsUpToDateResponseCheck{localKube: localKube, logger: logger, http: http}
+	common.ExpectedResponseCheckTypeCustom: func() responseCheck {
+		return &customIsUpToDateResponseCheck{}
 	},
 }
 
 // GetIsUpToDateResponseCheck uses a map to select and return the appropriate ResponseCheck.
-func GetIsUpToDateResponseCheck(spec interfaces.MappedHTTPRequestSpec, localKube client.Client, logger logging.Logger, http httpClient.Client) responseCheck {
+func GetIsUpToDateResponseCheck(svcCtx *service.ServiceContext, spec interfaces.MappedHTTPRequestSpec) responseCheck {
 	responseCheckAware, ok := spec.(interfaces.ResponseCheckAware)
 	if !ok {
-		return isUpToDateChecksFactoryMap[common.ExpectedResponseCheckTypeDefault](localKube, logger, http)
+		return isUpToDateChecksFactoryMap[common.ExpectedResponseCheckTypeDefault]()
 	}
 
 	if factory, ok := isUpToDateChecksFactoryMap[responseCheckAware.GetExpectedResponseCheck().GetType()]; ok {
-		return factory(localKube, logger, http)
+		return factory()
 	}
-	return isUpToDateChecksFactoryMap[common.ExpectedResponseCheckTypeDefault](localKube, logger, http)
+	return isUpToDateChecksFactoryMap[common.ExpectedResponseCheckTypeDefault]()
 }

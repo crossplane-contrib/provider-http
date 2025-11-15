@@ -6,6 +6,7 @@ import (
 
 	"github.com/crossplane-contrib/provider-http/apis/disposablerequest/v1alpha2"
 	httpClient "github.com/crossplane-contrib/provider-http/internal/clients/http"
+	"github.com/crossplane-contrib/provider-http/internal/service"
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
 	"github.com/crossplane/crossplane-runtime/pkg/test"
 	"github.com/google/go-cmp/cmp"
@@ -139,13 +140,17 @@ func TestValidateStoredResponse(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			valid, response, err := ValidateStoredResponse(
+			svcCtx := service.NewServiceContext(
 				tc.args.ctx,
+				tc.args.localKube,
+				logging.NewNopLogger(),
+				nil, // httpClient not needed for ValidateStoredResponse
+			)
+			valid, response, err := ValidateStoredResponse(
+				svcCtx,
 				tc.args.spec,
 				tc.args.dr,
 				tc.args.dr,
-				tc.args.localKube,
-				logging.NewNopLogger(),
 			)
 
 			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
@@ -370,14 +375,18 @@ func TestApplySecretInjectionsFromStoredResponse(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
+			svcCtx := service.NewServiceContext(
+				tc.args.ctx,
+				tc.args.localKube,
+				logging.NewNopLogger(),
+				nil, // httpClient not needed for ApplySecretInjectionsFromStoredResponse
+			)
 			// This function doesn't return anything, so we just verify it doesn't panic
 			ApplySecretInjectionsFromStoredResponse(
-				tc.args.ctx,
+				svcCtx,
 				tc.args.spec,
 				tc.args.storedResponse,
 				tc.args.dr,
-				tc.args.localKube,
-				logging.NewNopLogger(),
 			)
 		})
 	}

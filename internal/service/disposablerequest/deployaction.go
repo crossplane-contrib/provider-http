@@ -8,8 +8,8 @@ import (
 	"github.com/crossplane-contrib/provider-http/apis/interfaces"
 	httpClient "github.com/crossplane-contrib/provider-http/internal/clients/http"
 	datapatcher "github.com/crossplane-contrib/provider-http/internal/data-patcher"
+	"github.com/crossplane-contrib/provider-http/internal/service"
 	"github.com/crossplane-contrib/provider-http/internal/utils"
-	"github.com/crossplane/crossplane-runtime/pkg/logging"
 	"github.com/pkg/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -21,21 +21,21 @@ const (
 )
 
 // DeployAction sends the HTTP request defined in the DisposableRequest resource and updates its status based on the response.
-func DeployAction(ctx context.Context, spec interfaces.SimpleHTTPRequestSpec, rollbackPolicy interfaces.RollbackAware, status interfaces.DisposableRequestStatus, obj client.Object, localKube client.Client, logger logging.Logger, httpCli httpClient.Client) error {
+func DeployAction(svcCtx *service.ServiceContext, spec interfaces.SimpleHTTPRequestSpec, rollbackPolicy interfaces.RollbackAware, status interfaces.DisposableRequestStatus, obj client.Object) error {
 	if status.GetSynced() {
-		logger.Debug("Resource is already synced, skipping deployment action")
+		svcCtx.Logger.Debug("Resource is already synced, skipping deployment action")
 		return nil
 	}
 
 	// Check if retries limit has been reached
 	if utils.RollBackEnabled(rollbackPolicy.GetRollbackRetriesLimit()) && utils.RetriesLimitReached(status.GetFailed(), rollbackPolicy.GetRollbackRetriesLimit()) {
-		logger.Debug("Retries limit reached, not retrying anymore")
+		svcCtx.Logger.Debug("Retries limit reached, not retrying anymore")
 		return nil
 	}
 
-	details, httpRequestErr := sendHttpRequest(ctx, spec, localKube, logger, httpCli)
+	details, httpRequestErr := sendHttpRequest(svcCtx, spec)
 
-	resource, err := prepareRequestResource(ctx, obj, details, localKube)
+	resource, err := prepareRequestResource(svcCtx.Ctx, obj, details, svcCtx.LocalKube)
 	if err != nil {
 		return err
 	}
@@ -45,24 +45,24 @@ func DeployAction(ctx context.Context, spec interfaces.SimpleHTTPRequestSpec, ro
 		return handleHttpRequestError(resource, httpRequestErr)
 	}
 
-	return handleHttpResponse(ctx, spec, rollbackPolicy, details.HttpResponse, resource, obj.(metav1.Object), localKube, logger)
+	return handleHttpResponse(svcCtx, spec, rollbackPolicy, details.HttpResponse, resource, obj.(metav1.Object))
 }
 
 // sendHttpRequest sends the HTTP request with sensitive data patched
-func sendHttpRequest(ctx context.Context, spec interfaces.SimpleHTTPRequestSpec, localKube client.Client, logger logging.Logger, httpCli httpClient.Client) (httpClient.HttpDetails, error) {
-	sensitiveBody, err := datapatcher.PatchSecretsIntoString(ctx, localKube, spec.GetBody(), logger)
+func sendHttpRequest(svcCtx *service.ServiceContext, spec interfaces.SimpleHTTPRequestSpec) (httpClient.HttpDetails, error) {
+	sensitiveBody, err := datapatcher.PatchSecretsIntoString(svcCtx.Ctx, svcCtx.LocalKube, spec.GetBody(), svcCtx.Logger)
 	if err != nil {
 		return httpClient.HttpDetails{}, err
 	}
 
-	sensitiveHeaders, err := datapatcher.PatchSecretsIntoHeaders(ctx, localKube, spec.GetHeaders(), logger)
+	sensitiveHeaders, err := datapatcher.PatchSecretsIntoHeaders(svcCtx.Ctx, svcCtx.LocalKube, spec.GetHeaders(), svcCtx.Logger)
 	if err != nil {
 		return httpClient.HttpDetails{}, err
 	}
 
 	bodyData := httpClient.Data{Encrypted: spec.GetBody(), Decrypted: sensitiveBody}
 	headersData := httpClient.Data{Encrypted: spec.GetHeaders(), Decrypted: sensitiveHeaders}
-	details, err := httpCli.SendRequest(ctx, spec.GetMethod(), spec.GetURL(), bodyData, headersData, spec.GetInsecureSkipTLSVerify())
+	details, err := svcCtx.HTTP.SendRequest(svcCtx.Ctx, spec.GetMethod(), spec.GetURL(), bodyData, headersData, spec.GetInsecureSkipTLSVerify())
 
 	return details, err
 }
@@ -86,14 +86,14 @@ func prepareRequestResource(ctx context.Context, obj client.Object, details http
 }
 
 // handleHttpResponse processes the HTTP response and updates resource status accordingly
-func handleHttpResponse(ctx context.Context, spec interfaces.SimpleHTTPRequestSpec, rollbackPolicy interfaces.RollbackAware, sensitiveResponse httpClient.HttpResponse, resource *utils.RequestResource, obj metav1.Object, localKube client.Client, logger logging.Logger) error {
+func handleHttpResponse(svcCtx *service.ServiceContext, spec interfaces.SimpleHTTPRequestSpec, rollbackPolicy interfaces.RollbackAware, sensitiveResponse httpClient.HttpResponse, resource *utils.RequestResource, obj metav1.Object) error {
 	// Handle HTTP error status codes
 	if utils.IsHTTPError(resource.HttpResponse.StatusCode) {
 		return handleHttpErrorStatus(spec, resource)
 	}
 
 	// Handle response validation
-	return handleResponseValidation(ctx, spec, rollbackPolicy, sensitiveResponse, resource, obj, localKube, logger)
+	return handleResponseValidation(svcCtx, spec, rollbackPolicy, sensitiveResponse, resource, obj)
 }
 
 // handleHttpRequestError handles cases where the HTTP request itself failed
@@ -115,14 +115,14 @@ func handleHttpErrorStatus(spec interfaces.SimpleHTTPRequestSpec, resource *util
 }
 
 // handleResponseValidation validates the response and updates status accordingly
-func handleResponseValidation(ctx context.Context, spec interfaces.SimpleHTTPRequestSpec, rollbackPolicy interfaces.RollbackAware, sensitiveResponse httpClient.HttpResponse, resource *utils.RequestResource, obj metav1.Object, localKube client.Client, logger logging.Logger) error {
+func handleResponseValidation(svcCtx *service.ServiceContext, spec interfaces.SimpleHTTPRequestSpec, rollbackPolicy interfaces.RollbackAware, sensitiveResponse httpClient.HttpResponse, resource *utils.RequestResource, obj metav1.Object) error {
 	isExpectedResponse, err := IsResponseAsExpected(spec, sensitiveResponse)
 	if err != nil {
 		return err
 	}
 
 	if isExpectedResponse {
-		datapatcher.ApplyResponseDataToSecrets(ctx, localKube, logger, &resource.HttpResponse, spec.GetSecretInjectionConfigs(), obj)
+		datapatcher.ApplyResponseDataToSecrets(svcCtx.Ctx, svcCtx.LocalKube, svcCtx.Logger, &resource.HttpResponse, spec.GetSecretInjectionConfigs(), obj)
 		return utils.SetRequestResourceStatus(*resource, resource.SetStatusCode(), resource.SetLastReconcileTime(), resource.SetHeaders(), resource.SetBody(), resource.SetSynced(), resource.SetRequestDetails())
 	}
 

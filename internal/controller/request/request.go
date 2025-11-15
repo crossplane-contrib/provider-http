@@ -37,6 +37,7 @@ import (
 	"github.com/crossplane-contrib/provider-http/apis/request/v1alpha2"
 	apisv1alpha1 "github.com/crossplane-contrib/provider-http/apis/v1alpha1"
 	httpClient "github.com/crossplane-contrib/provider-http/internal/clients/http"
+	"github.com/crossplane-contrib/provider-http/internal/service"
 	"github.com/crossplane-contrib/provider-http/internal/service/request"
 	"github.com/crossplane-contrib/provider-http/internal/service/request/observe"
 	"github.com/crossplane-contrib/provider-http/internal/service/request/statushandler"
@@ -157,7 +158,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.New(errNotRequest)
 	}
 
-	observeRequestDetails, err := request.IsUpToDate(ctx, cr, c.localKube, c.logger, c.http)
+	observeRequestDetails, err := request.IsUpToDate(service.NewServiceContext(ctx, c.localKube, c.logger, c.http), cr)
 	if err != nil && err.Error() == observe.ErrObjectNotFound {
 		return managed.ExternalObservation{
 			ResourceExists: false,
@@ -168,7 +169,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.Wrap(err, errFailedToCheckIfUpToDate)
 	}
 
-	statusHandler, err := statushandler.NewStatusHandler(ctx, cr, &cr.Spec.ForProvider, observeRequestDetails.Details, observeRequestDetails.ResponseError, c.localKube, c.logger)
+	statusHandler, err := statushandler.NewStatusHandler(service.NewServiceContext(ctx, c.localKube, c.logger, c.http), cr, &cr.Spec.ForProvider, observeRequestDetails.Details, observeRequestDetails.ResponseError)
 	if err != nil {
 		return managed.ExternalObservation{}, err
 	}
@@ -202,7 +203,7 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalCreation{}, errors.Wrap(err, errGetLatestVersion)
 	}
 
-	return managed.ExternalCreation{}, errors.Wrap(request.DeployAction(ctx, cr, v1alpha2.ActionCreate, c.localKube, c.logger, c.http), errFailedToSendHttpRequest)
+	return managed.ExternalCreation{}, errors.Wrap(request.DeployAction(service.NewServiceContext(ctx, c.localKube, c.logger, c.http), cr, v1alpha2.ActionCreate), errFailedToSendHttpRequest)
 }
 
 func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.ExternalUpdate, error) {
@@ -216,7 +217,7 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalUpdate{}, errors.Wrap(err, errGetLatestVersion)
 	}
 
-	return managed.ExternalUpdate{}, errors.Wrap(request.DeployAction(ctx, cr, v1alpha2.ActionUpdate, c.localKube, c.logger, c.http), errFailedToSendHttpRequest)
+	return managed.ExternalUpdate{}, errors.Wrap(request.DeployAction(service.NewServiceContext(ctx, c.localKube, c.logger, c.http), cr, v1alpha2.ActionUpdate), errFailedToSendHttpRequest)
 }
 
 func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.ExternalDelete, error) {
@@ -230,7 +231,7 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalDelete{}, errors.Wrap(err, errGetLatestVersion)
 	}
 
-	return managed.ExternalDelete{}, errors.Wrap(request.DeployAction(ctx, cr, v1alpha2.ActionRemove, c.localKube, c.logger, c.http), errFailedToSendHttpRequest)
+	return managed.ExternalDelete{}, errors.Wrap(request.DeployAction(service.NewServiceContext(ctx, c.localKube, c.logger, c.http), cr, v1alpha2.ActionRemove), errFailedToSendHttpRequest)
 }
 
 // Disconnect does nothing. It never returns an error.

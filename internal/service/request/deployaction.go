@@ -1,39 +1,35 @@
 package request
 
 import (
-	"context"
-
 	"github.com/crossplane-contrib/provider-http/apis/interfaces"
-	httpClient "github.com/crossplane-contrib/provider-http/internal/clients/http"
 	datapatcher "github.com/crossplane-contrib/provider-http/internal/data-patcher"
+	"github.com/crossplane-contrib/provider-http/internal/service"
 	"github.com/crossplane-contrib/provider-http/internal/service/request/requestgen"
 	"github.com/crossplane-contrib/provider-http/internal/service/request/requestmapping"
 	"github.com/crossplane-contrib/provider-http/internal/service/request/statushandler"
-	"github.com/crossplane/crossplane-runtime/pkg/logging"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // DeployAction executes the action based on the given Request resource and Mapping configuration.
-func DeployAction(ctx context.Context, cr interfaces.RequestResource, action string, localKube client.Client, logger logging.Logger, httpClient httpClient.Client) error {
+func DeployAction(svcCtx *service.ServiceContext, cr interfaces.RequestResource, action string) error {
 	spec := cr.GetSpec()
-	mapping, err := requestmapping.GetMapping(spec, action, logger)
+	mapping, err := requestmapping.GetMapping(spec, action, svcCtx.Logger)
 	if err != nil {
-		logger.Info(err.Error())
+		svcCtx.Logger.Info(err.Error())
 		return nil
 	}
 
-	requestDetails, err := requestgen.GenerateValidRequestDetails(ctx, spec, mapping, cr.GetResponse(), cr.GetCachedResponse(), localKube, logger)
+	requestDetails, err := requestgen.GenerateValidRequestDetails(svcCtx, spec, mapping, cr.GetResponse(), cr.GetCachedResponse())
 	if err != nil {
 		return err
 	}
 
-	details, sendErr := httpClient.SendRequest(ctx, requestmapping.GetEffectiveMethod(mapping), requestDetails.Url, requestDetails.Body, requestDetails.Headers, spec.GetInsecureSkipTLSVerify())
+	details, sendErr := svcCtx.HTTP.SendRequest(svcCtx.Ctx, requestmapping.GetEffectiveMethod(mapping), requestDetails.Url, requestDetails.Body, requestDetails.Headers, spec.GetInsecureSkipTLSVerify())
 
 	// Apply response data to secrets and update CR status
 	secretConfigs := spec.GetSecretInjectionConfigs()
-	datapatcher.ApplyResponseDataToSecrets(ctx, localKube, logger, &details.HttpResponse, secretConfigs, cr)
+	datapatcher.ApplyResponseDataToSecrets(svcCtx.Ctx, svcCtx.LocalKube, svcCtx.Logger, &details.HttpResponse, secretConfigs, cr)
 
-	statusHandler, err := statushandler.NewStatusHandler(ctx, cr, spec, details, sendErr, localKube, logger)
+	statusHandler, err := statushandler.NewStatusHandler(svcCtx, cr, spec, details, sendErr)
 	if err != nil {
 		return err
 	}
