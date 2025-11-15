@@ -37,11 +37,10 @@ import (
 	"github.com/crossplane-contrib/provider-http/apis/request/v1alpha2"
 	apisv1alpha1 "github.com/crossplane-contrib/provider-http/apis/v1alpha1"
 	httpClient "github.com/crossplane-contrib/provider-http/internal/clients/http"
-	"github.com/crossplane-contrib/provider-http/internal/controller/request/observe"
-	"github.com/crossplane-contrib/provider-http/internal/controller/request/requestgen"
-	"github.com/crossplane-contrib/provider-http/internal/controller/request/requestmapping"
-	"github.com/crossplane-contrib/provider-http/internal/controller/request/statushandler"
-	datapatcher "github.com/crossplane-contrib/provider-http/internal/data-patcher"
+	"github.com/crossplane-contrib/provider-http/internal/service"
+	"github.com/crossplane-contrib/provider-http/internal/service/request"
+	"github.com/crossplane-contrib/provider-http/internal/service/request/observe"
+	"github.com/crossplane-contrib/provider-http/internal/service/request/statushandler"
 	"github.com/crossplane-contrib/provider-http/internal/utils"
 )
 
@@ -159,7 +158,9 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.New(errNotRequest)
 	}
 
-	observeRequestDetails, err := c.isUpToDate(ctx, cr)
+	svcCtx := service.NewServiceContext(ctx, c.localKube, c.logger, c.http)
+	crCtx := service.NewRequestCRContext(cr)
+	observeRequestDetails, err := request.IsUpToDate(svcCtx, crCtx)
 	if err != nil && err.Error() == observe.ErrObjectNotFound {
 		return managed.ExternalObservation{
 			ResourceExists: false,
@@ -170,12 +171,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.Wrap(err, errFailedToCheckIfUpToDate)
 	}
 
-	// Get the latest version of the resource before updating
-	if err := c.localKube.Get(ctx, types.NamespacedName{Name: cr.Name, Namespace: cr.Namespace}, cr); err != nil {
-		return managed.ExternalObservation{}, errors.Wrap(err, errGetLatestVersion)
-	}
-
-	statusHandler, err := statushandler.NewStatusHandler(ctx, cr, observeRequestDetails.Details, observeRequestDetails.ResponseError, c.localKube, c.logger)
+	statusHandler, err := statushandler.NewStatusHandler(svcCtx, crCtx, observeRequestDetails.Details, observeRequestDetails.ResponseError)
 	if err != nil {
 		return managed.ExternalObservation{}, err
 	}
@@ -198,37 +194,20 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	}, nil
 }
 
-// deployAction executes the action based on the given Request resource and Mapping configuration.
-func (c *external) deployAction(ctx context.Context, cr *v1alpha2.Request, action string) error {
-	mapping, err := requestmapping.GetMapping(&cr.Spec.ForProvider, action, c.logger)
-	if err != nil {
-		c.logger.Info(err.Error())
-		return nil
-	}
-
-	requestDetails, err := requestgen.GenerateValidRequestDetails(ctx, cr, mapping, c.localKube, c.logger)
-	if err != nil {
-		return err
-	}
-
-	details, err := c.http.SendRequest(ctx, mapping.Method, requestDetails.Url, requestDetails.Body, requestDetails.Headers, cr.Spec.ForProvider.InsecureSkipTLSVerify)
-	datapatcher.ApplyResponseDataToSecrets(ctx, c.localKube, c.logger, &details.HttpResponse, cr.Spec.ForProvider.SecretInjectionConfigs, cr)
-
-	statusHandler, err := statushandler.NewStatusHandler(ctx, cr, details, err, c.localKube, c.logger)
-	if err != nil {
-		return err
-	}
-
-	return statusHandler.SetRequestStatus()
-}
-
 func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.ExternalCreation, error) {
 	cr, ok := mg.(*v1alpha2.Request)
 	if !ok {
 		return managed.ExternalCreation{}, errors.New(errNotRequest)
 	}
 
-	return managed.ExternalCreation{}, errors.Wrap(c.deployAction(ctx, cr, v1alpha2.ActionCreate), errFailedToSendHttpRequest)
+	// Get the latest version of the resource before deploying
+	if err := c.localKube.Get(ctx, types.NamespacedName{Name: cr.Name, Namespace: cr.Namespace}, cr); err != nil {
+		return managed.ExternalCreation{}, errors.Wrap(err, errGetLatestVersion)
+	}
+
+	svcCtx := service.NewServiceContext(ctx, c.localKube, c.logger, c.http)
+	crCtx := service.NewRequestCRContext(cr)
+	return managed.ExternalCreation{}, errors.Wrap(request.DeployAction(svcCtx, crCtx, v1alpha2.ActionCreate), errFailedToSendHttpRequest)
 }
 
 func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.ExternalUpdate, error) {
@@ -237,7 +216,14 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalUpdate{}, errors.New(errNotRequest)
 	}
 
-	return managed.ExternalUpdate{}, errors.Wrap(c.deployAction(ctx, cr, v1alpha2.ActionUpdate), errFailedToSendHttpRequest)
+	// Get the latest version of the resource before deploying
+	if err := c.localKube.Get(ctx, types.NamespacedName{Name: cr.Name, Namespace: cr.Namespace}, cr); err != nil {
+		return managed.ExternalUpdate{}, errors.Wrap(err, errGetLatestVersion)
+	}
+
+	svcCtx := service.NewServiceContext(ctx, c.localKube, c.logger, c.http)
+	crCtx := service.NewRequestCRContext(cr)
+	return managed.ExternalUpdate{}, errors.Wrap(request.DeployAction(svcCtx, crCtx, v1alpha2.ActionUpdate), errFailedToSendHttpRequest)
 }
 
 func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.ExternalDelete, error) {
@@ -246,7 +232,14 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalDelete{}, errors.New(errNotRequest)
 	}
 
-	return managed.ExternalDelete{}, errors.Wrap(c.deployAction(ctx, cr, v1alpha2.ActionRemove), errFailedToSendHttpRequest)
+	// Get the latest version of the resource before deploying
+	if err := c.localKube.Get(ctx, types.NamespacedName{Name: cr.Name, Namespace: cr.Namespace}, cr); err != nil {
+		return managed.ExternalDelete{}, errors.Wrap(err, errGetLatestVersion)
+	}
+
+	svcCtx := service.NewServiceContext(ctx, c.localKube, c.logger, c.http)
+	crCtx := service.NewRequestCRContext(cr)
+	return managed.ExternalDelete{}, errors.Wrap(request.DeployAction(svcCtx, crCtx, v1alpha2.ActionRemove), errFailedToSendHttpRequest)
 }
 
 // Disconnect does nothing. It never returns an error.

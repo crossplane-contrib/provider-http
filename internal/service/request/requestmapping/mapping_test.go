@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/crossplane-contrib/provider-http/apis/common"
+	"github.com/crossplane-contrib/provider-http/apis/interfaces"
 	"github.com/crossplane-contrib/provider-http/apis/request/v1alpha2"
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
 	"github.com/crossplane/crossplane-runtime/pkg/test"
@@ -14,27 +16,27 @@ import (
 var (
 	testPostMapping = v1alpha2.Mapping{
 		Method: "POST",
-		Action: v1alpha2.ActionCreate,
+		Action: common.ActionCreate,
 		Body:   "{ username: .payload.body.username, email: .payload.body.email }",
 		URL:    ".payload.baseUrl",
 	}
 
 	testPutMapping = v1alpha2.Mapping{
 		Method: "PUT",
-		Action: v1alpha2.ActionUpdate,
+		Action: common.ActionUpdate,
 		Body:   "{ username: \"john_doe_new_username\" }",
 		URL:    "(.payload.baseUrl + \"/\" + .response.body.id)",
 	}
 
 	testGetMapping = v1alpha2.Mapping{
 		Method: "GET",
-		Action: v1alpha2.ActionObserve,
+		Action: common.ActionObserve,
 		URL:    "(.payload.baseUrl + \"/\" + .response.body.id)",
 	}
 
 	testDeleteMapping = v1alpha2.Mapping{
 		Method: "DELETE",
-		Action: v1alpha2.ActionRemove,
+		Action: common.ActionRemove,
 		URL:    "(.payload.baseUrl + \"/\" + .response.body.id)",
 	}
 )
@@ -97,8 +99,14 @@ func Test_getMappingByMethod(t *testing.T) {
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 			got, ok := getMappingByMethod(tc.args.requestParams, tc.args.method)
-			if diff := cmp.Diff(tc.want.mapping, got); diff != "" {
-				t.Fatalf("getMappingByMethod(...): -want result, +got result: %s", diff)
+			if tc.want.mapping == nil {
+				if got != nil {
+					t.Fatalf("getMappingByMethod(...): want nil, got %v", got)
+				}
+			} else {
+				if diff := cmp.Diff(tc.want.mapping, got); diff != "" {
+					t.Fatalf("getMappingByMethod(...): -want result, +got result: %s", diff)
+				}
 			}
 
 			if diff := cmp.Diff(tc.want.ok, ok); diff != "" {
@@ -134,7 +142,7 @@ func Test_getMappingByAction(t *testing.T) {
 						testDeleteMapping,
 					},
 				},
-				action: v1alpha2.ActionCreate,
+				action: common.ActionCreate,
 			},
 			want: want{
 				mapping: nil,
@@ -155,7 +163,7 @@ func Test_getMappingByAction(t *testing.T) {
 						testDeleteMapping,
 					},
 				},
-				action: v1alpha2.ActionCreate,
+				action: common.ActionCreate,
 			},
 			want: want{
 				mapping: &testPostMapping,
@@ -166,12 +174,18 @@ func Test_getMappingByAction(t *testing.T) {
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 			got, ok := getMappingByAction(tc.args.requestParams, tc.args.action)
-			if diff := cmp.Diff(tc.want.mapping, got); diff != "" {
-				t.Fatalf("getMappingByAction(...): -want result, +got result: %s", diff)
+			if tc.want.mapping == nil {
+				if got != nil {
+					t.Fatalf("getMappingByAction(...): want nil, got %v", got)
+				}
+			} else {
+				if diff := cmp.Diff(tc.want.mapping, got); diff != "" {
+					t.Fatalf("getMappingByAction(...): -want result, +got result: %s", diff)
+				}
 			}
 
 			if diff := cmp.Diff(tc.want.ok, ok); diff != "" {
-				t.Fatalf("getMappingByAction(...): -want result, +got result: %s", diff)
+				t.Fatalf("getMappingByAction(...): -want ok, +got ok: %s", diff)
 			}
 		})
 	}
@@ -203,11 +217,11 @@ func Test_GetMapping(t *testing.T) {
 						testDeleteMapping,
 					},
 				},
-				action: v1alpha2.ActionCreate,
+				action: common.ActionCreate,
 			},
 			want: want{
 				mapping: nil,
-				err:     errors.Errorf(ErrMappingNotFound, v1alpha2.ActionCreate, http.MethodPost),
+				err:     errors.Errorf(ErrMappingNotFound, common.ActionCreate, http.MethodPost),
 			},
 		},
 		"Success": {
@@ -224,7 +238,7 @@ func Test_GetMapping(t *testing.T) {
 						testDeleteMapping,
 					},
 				},
-				action: v1alpha2.ActionCreate,
+				action: common.ActionCreate,
 			},
 			want: want{
 				mapping: &testPostMapping,
@@ -240,7 +254,7 @@ func Test_GetMapping(t *testing.T) {
 					},
 					Mappings: []v1alpha2.Mapping{
 						{
-							Action: v1alpha2.ActionCreate,
+							Action: common.ActionCreate,
 							Body:   "{ username: .payload.body.username, email: .payload.body.email }",
 							URL:    ".payload.baseUrl",
 						},
@@ -249,11 +263,16 @@ func Test_GetMapping(t *testing.T) {
 						testDeleteMapping,
 					},
 				},
-				action: v1alpha2.ActionCreate,
+				action: common.ActionCreate,
 			},
 			want: want{
-				mapping: &testPostMapping,
-				err:     nil,
+				mapping: &v1alpha2.Mapping{
+					Method: http.MethodPost, // Method is set by GetMapping when empty
+					Action: common.ActionCreate,
+					Body:   "{ username: .payload.body.username, email: .payload.body.email }",
+					URL:    ".payload.baseUrl",
+				},
+				err: nil,
 			},
 		},
 		"SuccessWithoutAction": {
@@ -274,7 +293,7 @@ func Test_GetMapping(t *testing.T) {
 						testDeleteMapping,
 					},
 				},
-				action: v1alpha2.ActionCreate,
+				action: common.ActionCreate,
 			},
 			want: want{
 				mapping: &v1alpha2.Mapping{
@@ -292,8 +311,14 @@ func Test_GetMapping(t *testing.T) {
 			if diff := cmp.Diff(tc.want.err, gotErr, test.EquateErrors()); diff != "" {
 				t.Fatalf("isUpToDate(...): -want error, +got error: %s", diff)
 			}
-			if diff := cmp.Diff(tc.want.mapping, got); diff != "" {
-				t.Fatalf("GetMapping(...): -want result, +got result: %s", diff)
+			if tc.want.mapping == nil {
+				if got != nil {
+					t.Fatalf("GetMapping(...): want nil, got %v", got)
+				}
+			} else {
+				if diff := cmp.Diff(tc.want.mapping, got); diff != "" {
+					t.Fatalf("GetMapping(...): -want result, +got result: %s", diff)
+				}
 			}
 		})
 	}
@@ -312,7 +337,7 @@ func Test_getDefaultMethodByAction(t *testing.T) {
 	}{
 		"ShouldReturnPostMethod": {
 			args: args{
-				action: v1alpha2.ActionCreate,
+				action: common.ActionCreate,
 			},
 			want: want{
 				method: http.MethodPost,
@@ -320,7 +345,7 @@ func Test_getDefaultMethodByAction(t *testing.T) {
 		},
 		"ShouldReturnGetMethod": {
 			args: args{
-				action: v1alpha2.ActionObserve,
+				action: common.ActionObserve,
 			},
 			want: want{
 				method: http.MethodGet,
@@ -328,7 +353,7 @@ func Test_getDefaultMethodByAction(t *testing.T) {
 		},
 		"ShouldReturnPutMethod": {
 			args: args{
-				action: v1alpha2.ActionUpdate,
+				action: common.ActionUpdate,
 			},
 			want: want{
 				method: http.MethodPut,
@@ -336,7 +361,7 @@ func Test_getDefaultMethodByAction(t *testing.T) {
 		},
 		"ShouldReturnDeleteMethod": {
 			args: args{
-				action: v1alpha2.ActionRemove,
+				action: common.ActionRemove,
 			},
 			want: want{
 				method: http.MethodDelete,
@@ -356,6 +381,89 @@ func Test_getDefaultMethodByAction(t *testing.T) {
 			got := getDefaultMethodByAction(tc.args.action)
 			if diff := cmp.Diff(tc.want.method, got); diff != "" {
 				t.Fatalf("getDefaultMethodByAction(...): -want result, +got result: %s", diff)
+			}
+		})
+	}
+}
+
+func Test_GetEffectiveMethod(t *testing.T) {
+	type args struct {
+		mapping interfaces.HTTPMapping
+	}
+	type want struct {
+		method string
+	}
+	cases := map[string]struct {
+		args args
+		want want
+	}{
+		"ShouldReturnMethodWhenDefined": {
+			args: args{
+				mapping: &v1alpha2.Mapping{
+					Method: http.MethodPost,
+					Action: common.ActionCreate,
+				},
+			},
+			want: want{
+				method: http.MethodPost,
+			},
+		},
+		"ShouldDeriveMethodFromActionWhenMethodEmpty": {
+			args: args{
+				mapping: &v1alpha2.Mapping{
+					Action: common.ActionCreate,
+				},
+			},
+			want: want{
+				method: http.MethodPost,
+			},
+		},
+		"ShouldDeriveMethodFromActionObserve": {
+			args: args{
+				mapping: &v1alpha2.Mapping{
+					Action: common.ActionObserve,
+				},
+			},
+			want: want{
+				method: http.MethodGet,
+			},
+		},
+		"ShouldDeriveMethodFromActionUpdate": {
+			args: args{
+				mapping: &v1alpha2.Mapping{
+					Action: common.ActionUpdate,
+				},
+			},
+			want: want{
+				method: http.MethodPut,
+			},
+		},
+		"ShouldDeriveMethodFromActionRemove": {
+			args: args{
+				mapping: &v1alpha2.Mapping{
+					Action: common.ActionRemove,
+				},
+			},
+			want: want{
+				method: http.MethodDelete,
+			},
+		},
+		"ShouldReturnGetByDefaultWhenNoMethodAndUnknownAction": {
+			args: args{
+				mapping: &v1alpha2.Mapping{
+					Action: "UNKNOWN",
+				},
+			},
+			want: want{
+				method: http.MethodGet,
+			},
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			got := GetEffectiveMethod(tc.args.mapping)
+			if diff := cmp.Diff(tc.want.method, got); diff != "" {
+				t.Fatalf("GetEffectiveMethod(...): -want result, +got result: %s", diff)
 			}
 		})
 	}

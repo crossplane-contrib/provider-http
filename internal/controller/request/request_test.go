@@ -12,6 +12,7 @@ import (
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/pkg/feature"
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
+	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
 	"github.com/crossplane/crossplane-runtime/pkg/test"
 	"github.com/google/go-cmp/cmp"
@@ -26,6 +27,30 @@ const (
 	providerName    = "http-test"
 	testRequestName = "test-request"
 	testNamespace   = "testns"
+)
+
+var (
+	testPostMapping = v1alpha2.Mapping{
+		Method: "POST",
+		Body:   "{ username: .payload.body.username, email: .payload.body.email }",
+		URL:    ".payload.baseUrl",
+	}
+
+	testPutMapping = v1alpha2.Mapping{
+		Method: "PUT",
+		Body:   "{ username: \"john_doe_new_username\" }",
+		URL:    "(.payload.baseUrl + \"/\" + .response.body.id)",
+	}
+
+	testGetMapping = v1alpha2.Mapping{
+		Method: "GET",
+		URL:    "(.payload.baseUrl + \"/\" + .response.body.id)",
+	}
+
+	testDeleteMapping = v1alpha2.Mapping{
+		Method: "DELETE",
+		URL:    "(.payload.baseUrl + \"/\" + .response.body.id)",
+	}
 )
 
 var (
@@ -59,7 +84,12 @@ func httpRequest(rm ...httpRequestModifier) *v1alpha2.Request {
 			},
 			ForProvider: testForProvider,
 		},
-		Status: v1alpha2.RequestStatus{},
+		Status: v1alpha2.RequestStatus{
+			Response: v1alpha2.Response{
+				Body:       `{"id": "123"}`,
+				StatusCode: 200,
+			},
+		},
 	}
 
 	for _, m := range rm {
@@ -334,6 +364,103 @@ func Test_httpExternal_Delete(t *testing.T) {
 			_, gotErr := e.Delete(context.Background(), tc.args.mg)
 			if diff := cmp.Diff(tc.want.err, gotErr, test.EquateErrors()); diff != "" {
 				t.Fatalf("e.Delete(...): -want error, +got error: %s", diff)
+			}
+		})
+	}
+}
+
+func Test_httpExternal_Observe(t *testing.T) {
+	type args struct {
+		http      httpClient.Client
+		localKube client.Client
+		mg        resource.Managed
+	}
+	type want struct {
+		observation managed.ExternalObservation
+		err         error
+	}
+
+	cases := []struct {
+		name string
+		args args
+		want want
+	}{
+		{
+			name: "NotRequestResource",
+			args: args{
+				mg: notHttpRequest{},
+			},
+			want: want{
+				err: errors.New(errNotRequest),
+			},
+		},
+		{
+			name: "ResourceUpToDate",
+			args: args{
+				http: &MockHttpClient{
+					MockSendRequest: func(ctx context.Context, method string, url string, body httpClient.Data, headers httpClient.Data, skipTLSVerify bool) (resp httpClient.HttpDetails, err error) {
+						return httpClient.HttpDetails{
+							HttpResponse: httpClient.HttpResponse{
+								StatusCode: 200,
+								Body:       `{"id": "123"}`,
+							},
+						}, nil
+					},
+				},
+				localKube: &test.MockClient{
+					MockGet:          test.NewMockGetFn(nil),
+					MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
+				},
+				mg: &v1alpha2.Request{
+					Spec: v1alpha2.RequestSpec{
+						ForProvider: v1alpha2.RequestParameters{
+							Payload: v1alpha2.Payload{
+								BaseUrl: "https://api.example.com/users/123",
+							},
+							Mappings: []v1alpha2.Mapping{
+								{
+									Method: "GET",
+									URL:    ".payload.baseUrl",
+								},
+							},
+						},
+					},
+					Status: v1alpha2.RequestStatus{
+						Response: v1alpha2.Response{
+							StatusCode: 200,
+							Body:       `{"id": "123"}`,
+						},
+					},
+				},
+			},
+			want: want{
+				observation: managed.ExternalObservation{
+					ResourceExists:   true,
+					ResourceUpToDate: true,
+				},
+				err: nil,
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			e := &external{
+				localKube: tc.args.localKube,
+				logger:    logging.NewNopLogger(),
+				http:      tc.args.http,
+			}
+			got, gotErr := e.Observe(context.Background(), tc.args.mg)
+			if diff := cmp.Diff(tc.want.err, gotErr, test.EquateErrors()); diff != "" {
+				t.Fatalf("e.Observe(...): -want error, +got error: %s", diff)
+			}
+			if tc.want.err == nil {
+				if diff := cmp.Diff(tc.want.observation.ResourceExists, got.ResourceExists); diff != "" {
+					t.Fatalf("e.Observe(...): -want ResourceExists, +got ResourceExists: %s", diff)
+				}
+				if diff := cmp.Diff(tc.want.observation.ResourceUpToDate, got.ResourceUpToDate); diff != "" {
+					t.Fatalf("e.Observe(...): -want ResourceUpToDate, +got ResourceUpToDate: %s", diff)
+				}
 			}
 		})
 	}

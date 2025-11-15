@@ -1,22 +1,19 @@
 package requestgen
 
 import (
-	"context"
 	"fmt"
 	"strings"
 
-	"github.com/crossplane/crossplane-runtime/pkg/logging"
 	"github.com/pkg/errors"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	"golang.org/x/exp/maps"
 
-	"github.com/crossplane-contrib/provider-http/apis/request/v1alpha2"
+	"github.com/crossplane-contrib/provider-http/apis/interfaces"
 	httpClient "github.com/crossplane-contrib/provider-http/internal/clients/http"
-	"github.com/crossplane-contrib/provider-http/internal/controller/request/requestprocessing"
 	datapatcher "github.com/crossplane-contrib/provider-http/internal/data-patcher"
 	json_util "github.com/crossplane-contrib/provider-http/internal/json"
+	"github.com/crossplane-contrib/provider-http/internal/service"
+	"github.com/crossplane-contrib/provider-http/internal/service/request/requestprocessing"
 	"github.com/crossplane-contrib/provider-http/internal/utils"
-
-	"golang.org/x/exp/maps"
 )
 
 type RequestDetails struct {
@@ -26,14 +23,14 @@ type RequestDetails struct {
 }
 
 // GenerateRequestDetails generates request details.
-func GenerateRequestDetails(ctx context.Context, localKube client.Client, methodMapping v1alpha2.Mapping, forProvider v1alpha2.RequestParameters, response v1alpha2.Response, logger logging.Logger) (RequestDetails, error, bool) {
-	patchedResponse, err := datapatcher.PatchSecretsIntoResponse(ctx, localKube, response, logger)
+func GenerateRequestDetails(svcCtx *service.ServiceContext, methodMapping interfaces.HTTPMapping, forProvider interfaces.MappedHTTPRequestSpec, response interfaces.HTTPResponse) (RequestDetails, error, bool) {
+	patchedResponse, err := datapatcher.PatchSecretsIntoResponse(svcCtx.Ctx, svcCtx.LocalKube, response, svcCtx.Logger)
 	if err != nil {
 		return RequestDetails{}, err, false
 	}
 
 	jqObject := GenerateRequestContext(forProvider, patchedResponse)
-	url, err := generateURL(methodMapping.URL, jqObject)
+	url, err := generateURL(methodMapping.GetURL(), jqObject)
 	if err != nil {
 		return RequestDetails{}, err, false
 	}
@@ -42,22 +39,22 @@ func GenerateRequestDetails(ctx context.Context, localKube client.Client, method
 		return RequestDetails{}, errors.Errorf(utils.ErrInvalidURL, url), false
 	}
 
-	bodyData, err := generateBody(ctx, localKube, methodMapping.Body, jqObject, logger)
+	body, err := generateBody(svcCtx, methodMapping.GetBody(), jqObject)
 	if err != nil {
 		return RequestDetails{}, err, false
 	}
 
-	headersData, err := generateHeaders(ctx, localKube, coalesceHeaders(methodMapping.Headers, forProvider.Headers), jqObject, logger)
+	headersData, err := generateHeaders(svcCtx, coalesceHeaders(methodMapping, forProvider), jqObject)
 	if err != nil {
 		return RequestDetails{}, err, false
 	}
 
-	return RequestDetails{Body: bodyData, Url: url, Headers: headersData}, nil, true
+	return RequestDetails{Body: body, Url: url, Headers: headersData}, nil, true
 }
 
 // GenerateRequestContext creates a JSON-compatible map from the specified Request's ForProvider and Response fields.
 // It merges the two maps, converts JSON strings to nested maps, and returns the resulting map.
-func GenerateRequestContext(forProvider v1alpha2.RequestParameters, patchedResponse v1alpha2.Response) map[string]interface{} {
+func GenerateRequestContext(forProvider interfaces.MappedHTTPRequestSpec, patchedResponse interfaces.HTTPResponse) map[string]interface{} {
 	baseMap, _ := json_util.StructToMap(forProvider)
 	statusMap, _ := json_util.StructToMap(map[string]interface{}{
 		"response": patchedResponse,
@@ -65,6 +62,12 @@ func GenerateRequestContext(forProvider v1alpha2.RequestParameters, patchedRespo
 
 	maps.Copy(baseMap, statusMap)
 	json_util.ConvertJSONStringsToMaps(&baseMap)
+
+	if responseMap, ok := baseMap["response"].(map[string]interface{}); ok {
+		if _, exists := responseMap["headers"]; !exists {
+			responseMap["headers"] = nil
+		}
+	}
 
 	return baseMap
 }
@@ -74,13 +77,17 @@ func GenerateRequestContext(forProvider v1alpha2.RequestParameters, patchedRespo
 // details are valid, the function returns them. If not, it falls back to using the cached response in the Request's status
 // and attempts to generate request details again. The function returns the generated request details or an error if the
 // generation process fails.
-func GenerateValidRequestDetails(ctx context.Context, cr *v1alpha2.Request, mapping *v1alpha2.Mapping, localKube client.Client, logger logging.Logger) (RequestDetails, error) {
-	requestDetails, _, ok := GenerateRequestDetails(ctx, localKube, *mapping, cr.Spec.ForProvider, cr.Status.Response, logger)
+func GenerateValidRequestDetails(svcCtx *service.ServiceContext, crCtx *service.RequestCRContext, mapping interfaces.HTTPMapping) (RequestDetails, error) {
+	spec := crCtx.Spec()
+	response := crCtx.Status().GetResponse()
+	cachedResponse := crCtx.CachedResponse().GetCachedResponse()
+
+	requestDetails, _, ok := GenerateRequestDetails(svcCtx, mapping, spec, response)
 	if IsRequestValid(requestDetails) && ok {
 		return requestDetails, nil
 	}
 
-	requestDetails, err, _ := GenerateRequestDetails(ctx, localKube, *mapping, cr.Spec.ForProvider, cr.Status.Cache.Response, logger)
+	requestDetails, err, _ := GenerateRequestDetails(svcCtx, mapping, spec, cachedResponse)
 	if err != nil {
 		return RequestDetails{}, err
 	}
@@ -94,11 +101,11 @@ func IsRequestValid(requestDetails RequestDetails) bool {
 }
 
 // coalesceHeaders returns the non-nil headers, or the default headers if both are nil.
-func coalesceHeaders(mappingHeaders, defaultHeaders map[string][]string) map[string][]string {
-	if mappingHeaders != nil {
-		return mappingHeaders
+func coalesceHeaders(mapping interfaces.HTTPMapping, spec interfaces.HTTPRequestSpec) map[string][]string {
+	if headers := mapping.GetHeaders(); headers != nil {
+		return headers
 	}
-	return defaultHeaders
+	return spec.GetHeaders()
 }
 
 // generateURL applies a JQ filter to generate a URL.
@@ -112,7 +119,7 @@ func generateURL(urlJQFilter string, jqObject map[string]interface{}) (string, e
 }
 
 // generateBody applies a mapping body to generate the request body.
-func generateBody(ctx context.Context, localKube client.Client, mappingBody string, jqObject map[string]interface{}, logger logging.Logger) (httpClient.Data, error) {
+func generateBody(svcCtx *service.ServiceContext, mappingBody string, jqObject map[string]interface{}) (httpClient.Data, error) {
 	if mappingBody == "" {
 		return httpClient.Data{
 			Encrypted: "",
@@ -126,7 +133,7 @@ func generateBody(ctx context.Context, localKube client.Client, mappingBody stri
 		return httpClient.Data{}, err
 	}
 
-	sensitiveBody, err := datapatcher.PatchSecretsIntoString(ctx, localKube, body, logger)
+	sensitiveBody, err := datapatcher.PatchSecretsIntoString(svcCtx.Ctx, svcCtx.LocalKube, body, svcCtx.Logger)
 	if err != nil {
 		return httpClient.Data{}, err
 	}
@@ -138,13 +145,13 @@ func generateBody(ctx context.Context, localKube client.Client, mappingBody stri
 }
 
 // generateHeaders applies JQ queries to generate headers.
-func generateHeaders(ctx context.Context, localKube client.Client, headers map[string][]string, jqObject map[string]interface{}, logger logging.Logger) (httpClient.Data, error) {
+func generateHeaders(svcCtx *service.ServiceContext, headers map[string][]string, jqObject map[string]interface{}) (httpClient.Data, error) {
 	generatedHeaders, err := requestprocessing.ApplyJQOnMapStrings(headers, jqObject)
 	if err != nil {
 		return httpClient.Data{}, err
 	}
 
-	sensitiveHeaders, err := datapatcher.PatchSecretsIntoHeaders(ctx, localKube, generatedHeaders, logger)
+	sensitiveHeaders, err := datapatcher.PatchSecretsIntoHeaders(svcCtx.Ctx, svcCtx.LocalKube, generatedHeaders, svcCtx.Logger)
 	if err != nil {
 		return httpClient.Data{}, err
 	}

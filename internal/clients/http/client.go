@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/crossplane-contrib/provider-http/apis/interfaces"
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
 )
 
@@ -32,6 +33,24 @@ type HttpResponse struct {
 	Body       string              `json:"body"`
 	Headers    map[string][]string `json:"headers"`
 	StatusCode int                 `json:"statusCode"`
+}
+
+// Ensure HttpResponse implements interfaces.HTTPResponse
+var _ interfaces.HTTPResponse = (*HttpResponse)(nil)
+
+// GetStatusCode returns the HTTP status code.
+func (r *HttpResponse) GetStatusCode() int {
+	return r.StatusCode
+}
+
+// GetBody returns the response body.
+func (r *HttpResponse) GetBody() string {
+	return r.Body
+}
+
+// GetHeaders returns the response headers.
+func (r *HttpResponse) GetHeaders() map[string][]string {
+	return r.Headers
 }
 
 type Data struct {

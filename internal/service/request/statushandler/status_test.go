@@ -8,6 +8,7 @@ import (
 
 	"github.com/crossplane-contrib/provider-http/apis/request/v1alpha2"
 	httpClient "github.com/crossplane-contrib/provider-http/internal/clients/http"
+	"github.com/crossplane-contrib/provider-http/internal/service"
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
 	"github.com/crossplane/crossplane-runtime/pkg/test"
 	"github.com/google/go-cmp/cmp"
@@ -86,7 +87,7 @@ func Test_SetRequestStatus(t *testing.T) {
 		cr             *v1alpha2.Request
 		requestDetails httpClient.HttpDetails
 		err            error
-		isSynced       bool
+		resetFailures  bool
 	}
 	type want struct {
 		err           error
@@ -178,7 +179,7 @@ func Test_SetRequestStatus(t *testing.T) {
 					MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
 					MockGet:          test.NewMockGetFn(nil),
 				},
-				isSynced: true,
+				resetFailures: true,
 				requestDetails: httpClient.HttpDetails{
 					HttpResponse: httpClient.HttpResponse{
 						StatusCode: 200,
@@ -197,8 +198,11 @@ func Test_SetRequestStatus(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			r, _ := NewStatusHandler(context.Background(), tc.args.cr, tc.args.requestDetails, tc.args.err, tc.args.localKube, logging.NewNopLogger())
-			if tc.args.isSynced {
+			svcCtx := service.NewServiceContext(context.Background(), tc.args.localKube, logging.NewNopLogger(), nil)
+			crCtx := service.NewRequestCRContext(tc.args.cr)
+			r, _ := NewStatusHandler(svcCtx, crCtx, tc.args.requestDetails, tc.args.err)
+
+			if tc.args.resetFailures {
 				r.ResetFailures()
 			}
 

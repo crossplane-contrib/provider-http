@@ -4,8 +4,10 @@ import (
 	"context"
 	"testing"
 
+	"github.com/crossplane-contrib/provider-http/apis/common"
 	"github.com/crossplane-contrib/provider-http/apis/request/v1alpha2"
 	httpClient "github.com/crossplane-contrib/provider-http/internal/clients/http"
+	"github.com/crossplane-contrib/provider-http/internal/service"
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
 	"github.com/crossplane/crossplane-runtime/pkg/test"
 	"github.com/google/go-cmp/cmp"
@@ -38,7 +40,7 @@ func Test_CustomCheck(t *testing.T) {
 								Body: `{"password": "password"}`,
 							},
 							ExpectedResponseCheck: v1alpha2.ExpectedResponseCheck{
-								Type:  v1alpha2.ExpectedResponseCheckTypeCustom,
+								Type:  common.ExpectedResponseCheckTypeCustom,
 								Logic: `.response.body.password == .payload.body.password`,
 							},
 						},
@@ -68,11 +70,11 @@ func Test_CustomCheck(t *testing.T) {
 								Body: `{"password": "password"}`,
 							},
 							ExpectedResponseCheck: v1alpha2.ExpectedResponseCheck{
-								Type:  v1alpha2.ExpectedResponseCheckTypeCustom,
+								Type:  common.ExpectedResponseCheckTypeCustom,
 								Logic: `.response.body.password == .payload.body.password`,
 							},
 							IsRemovedCheck: v1alpha2.ExpectedResponseCheck{
-								Type:  v1alpha2.ExpectedResponseCheckTypeCustom,
+								Type:  common.ExpectedResponseCheckTypeCustom,
 								Logic: `.response.body.password == .payload.body.password`,
 							},
 						},
@@ -98,12 +100,9 @@ func Test_CustomCheck(t *testing.T) {
 		tc := tc // Create local copies of loop variables
 
 		t.Run(name, func(t *testing.T) {
-			e := &customCheck{
-				localKube: nil,
-				http:      nil,
-				logger:    logging.NewNopLogger(),
-			}
-			got, gotErr := e.check(tc.args.ctx, tc.args.cr, tc.args.details, tc.args.logic)
+			e := &customCheck{}
+			svcCtx := service.NewServiceContext(tc.args.ctx, nil, logging.NewNopLogger(), nil)
+			got, gotErr := e.check(svcCtx, &tc.args.cr.Spec.ForProvider, tc.args.details, tc.args.logic)
 			if diff := cmp.Diff(tc.want.err, gotErr, test.EquateErrors()); diff != "" {
 				t.Fatalf("Check(...): -want error, +got error: %s", diff)
 			}
