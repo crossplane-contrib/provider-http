@@ -1,15 +1,15 @@
 package request
 
 import (
-	"context"
 	"net/http"
 
-	"github.com/crossplane-contrib/provider-http/apis/request/v1alpha2"
+	"github.com/crossplane-contrib/provider-http/apis/common"
 	httpClient "github.com/crossplane-contrib/provider-http/internal/clients/http"
-	"github.com/crossplane-contrib/provider-http/internal/controller/request/observe"
-	"github.com/crossplane-contrib/provider-http/internal/controller/request/requestgen"
-	"github.com/crossplane-contrib/provider-http/internal/controller/request/requestmapping"
 	datapatcher "github.com/crossplane-contrib/provider-http/internal/data-patcher"
+	"github.com/crossplane-contrib/provider-http/internal/service"
+	"github.com/crossplane-contrib/provider-http/internal/service/request/observe"
+	"github.com/crossplane-contrib/provider-http/internal/service/request/requestgen"
+	"github.com/crossplane-contrib/provider-http/internal/service/request/requestmapping"
 	"github.com/crossplane-contrib/provider-http/internal/utils"
 	"github.com/pkg/errors"
 )
@@ -44,18 +44,19 @@ func FailedObserve() ObserveRequestDetails {
 	}
 }
 
-// isUpToDate checks whether desired spec up to date with the observed state for a given request
-func (c *external) isUpToDate(ctx context.Context, cr *v1alpha2.Request) (ObserveRequestDetails, error) {
-	mapping, err := requestmapping.GetMapping(&cr.Spec.ForProvider, v1alpha2.ActionObserve, c.logger)
+// IsUpToDate checks whether desired spec up to date with the observed state for a given request
+func IsUpToDate(svcCtx *service.ServiceContext, crCtx *service.RequestCRContext) (ObserveRequestDetails, error) {
+	spec := crCtx.Spec()
+	mapping, err := requestmapping.GetMapping(spec, common.ActionObserve, svcCtx.Logger)
 	if err != nil {
 		return FailedObserve(), err
 	}
 
-	objectNotCreated := !c.isObjectValidForObservation(cr)
+	objectNotCreated := !isObjectValidForObservation(crCtx)
 
 	// Evaluate the HTTP request template. If successfully templated, attempt to
 	// observe the resource.
-	requestDetails, err := requestgen.GenerateValidRequestDetails(ctx, cr, mapping, c.localKube, c.logger)
+	requestDetails, err := requestgen.GenerateValidRequestDetails(svcCtx, crCtx, mapping)
 	if err != nil {
 		if objectNotCreated {
 			// The initial request was not successfully templated. Cannot
@@ -66,7 +67,7 @@ func (c *external) isUpToDate(ctx context.Context, cr *v1alpha2.Request) (Observ
 		return FailedObserve(), err
 	}
 
-	details, responseErr := c.http.SendRequest(ctx, mapping.Method, requestDetails.Url, requestDetails.Body, requestDetails.Headers, cr.Spec.ForProvider.InsecureSkipTLSVerify)
+	details, responseErr := svcCtx.HTTP.SendRequest(svcCtx.Ctx, requestmapping.GetEffectiveMethod(mapping), requestDetails.Url, requestDetails.Body, requestDetails.Headers, spec.GetInsecureSkipTLSVerify())
 	// The initial observation of an object requires a successful HTTP response
 	// to be considered existing.
 	if !utils.IsHTTPSuccess(details.HttpResponse.StatusCode) && objectNotCreated {
@@ -74,22 +75,24 @@ func (c *external) isUpToDate(ctx context.Context, cr *v1alpha2.Request) (Observ
 		// behavior of creating before observing.
 		return FailedObserve(), errors.New(observe.ErrObjectNotFound)
 	}
-	if err := c.determineIfRemoved(ctx, cr, details, responseErr); err != nil {
+	if err := determineIfRemoved(svcCtx, crCtx, details, responseErr); err != nil {
 		return FailedObserve(), err
 	}
 
-	datapatcher.ApplyResponseDataToSecrets(ctx, c.localKube, c.logger, &details.HttpResponse, cr.Spec.ForProvider.SecretInjectionConfigs, cr)
-	return c.determineIfUpToDate(ctx, cr, details, responseErr)
+	// Apply response data to secrets and update CR status with response
+	secretConfigs := spec.GetSecretInjectionConfigs()
+	datapatcher.ApplyResponseDataToSecrets(svcCtx.Ctx, svcCtx.LocalKube, svcCtx.Logger, &details.HttpResponse, secretConfigs, crCtx.GetCR())
+	return determineIfUpToDate(svcCtx, crCtx, details, responseErr)
 }
 
 // determineIfUpToDate determines if the object is up to date based on the response check.
-func (c *external) determineIfUpToDate(ctx context.Context, cr *v1alpha2.Request, details httpClient.HttpDetails, responseErr error) (ObserveRequestDetails, error) {
-	responseChecker := observe.GetIsUpToDateResponseCheck(cr, c.localKube, c.logger, c.http)
+func determineIfUpToDate(svcCtx *service.ServiceContext, crCtx *service.RequestCRContext, details httpClient.HttpDetails, responseErr error) (ObserveRequestDetails, error) {
+	responseChecker := observe.GetIsUpToDateResponseCheck(svcCtx, crCtx.Spec())
 	if responseChecker == nil {
 		return FailedObserve(), errors.Errorf(errExpectedResponseCheckType, "expectedResponseCheck")
 	}
 
-	result, err := responseChecker.Check(ctx, cr, details, responseErr)
+	result, err := responseChecker.Check(svcCtx, crCtx, details, responseErr)
 	if err != nil {
 		return FailedObserve(), err
 	}
@@ -98,27 +101,20 @@ func (c *external) determineIfUpToDate(ctx context.Context, cr *v1alpha2.Request
 }
 
 // determineIfRemoved determines if the object is removed based on the response check.
-func (c *external) determineIfRemoved(ctx context.Context, cr *v1alpha2.Request, details httpClient.HttpDetails, responseErr error) error {
-	responseChecker := observe.GetIsRemovedResponseCheck(cr, c.localKube, c.logger, c.http)
+func determineIfRemoved(svcCtx *service.ServiceContext, crCtx *service.RequestCRContext, details httpClient.HttpDetails, responseErr error) error {
+	responseChecker := observe.GetIsRemovedResponseCheck(svcCtx, crCtx.Spec())
 	if responseChecker == nil {
 		return errors.Errorf(errExpectedResponseCheckType, "isRemovedCheck")
 	}
 
-	return responseChecker.Check(ctx, cr, details, responseErr)
+	return responseChecker.Check(svcCtx, crCtx, details, responseErr)
 }
 
 // isObjectValidForObservation checks if the object is valid for observation
-func (c *external) isObjectValidForObservation(cr *v1alpha2.Request) bool {
-	return cr.Status.Response.StatusCode != 0 &&
-		!(cr.Status.RequestDetails.Method == http.MethodPost && utils.IsHTTPError(cr.Status.Response.StatusCode))
-}
+func isObjectValidForObservation(crCtx *service.RequestCRContext) bool {
+	response := crCtx.Status().GetResponse()
+	requestDetails := crCtx.Status().GetRequestDetails()
 
-// requestDetails generates the request details for a given method or action.
-func (c *external) requestDetails(ctx context.Context, cr *v1alpha2.Request, action string) (requestgen.RequestDetails, error) {
-	mapping, err := requestmapping.GetMapping(&cr.Spec.ForProvider, action, c.logger)
-	if err != nil {
-		return requestgen.RequestDetails{}, err
-	}
-
-	return requestgen.GenerateValidRequestDetails(ctx, cr, mapping, c.localKube, c.logger)
+	return response.GetStatusCode() != 0 &&
+		!(requestDetails.GetMethod() == http.MethodPost && utils.IsHTTPError(response.GetStatusCode()))
 }

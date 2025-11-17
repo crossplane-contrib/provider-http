@@ -7,18 +7,42 @@ import (
 
 	"github.com/crossplane-contrib/provider-http/apis/request/v1alpha2"
 	httpClient "github.com/crossplane-contrib/provider-http/internal/clients/http"
-	"github.com/crossplane-contrib/provider-http/internal/controller/request/observe"
-	"github.com/crossplane-contrib/provider-http/internal/controller/request/requestgen"
-	"github.com/crossplane-contrib/provider-http/internal/controller/request/requestmapping"
+	"github.com/crossplane-contrib/provider-http/internal/service"
+	"github.com/crossplane-contrib/provider-http/internal/service/request/observe"
+	"github.com/crossplane-contrib/provider-http/internal/service/request/requestgen"
+	"github.com/crossplane-contrib/provider-http/internal/service/request/requestmapping"
+	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
 	"github.com/crossplane/crossplane-runtime/pkg/test"
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+)
+
+const (
+	providerName    = "http-test"
+	testRequestName = "test-request"
+	testNamespace   = "testns"
 )
 
 var (
 	errNotFound = errors.New(observe.ErrObjectNotFound)
+)
+
+var (
+	testForProvider = v1alpha2.RequestParameters{
+		Payload: v1alpha2.Payload{
+			Body:    "{\"username\": \"john_doe\", \"email\": \"john.doe@example.com\"}",
+			BaseUrl: "https://api.example.com/users",
+		},
+		Mappings: []v1alpha2.Mapping{
+			testPostMapping,
+			testGetMapping,
+			testPutMapping,
+			testDeleteMapping,
+		},
+	}
 )
 
 var (
@@ -44,6 +68,42 @@ var (
 		URL:    "(.payload.baseUrl + \"/\" + .response.body.id)",
 	}
 )
+
+type httpRequestModifier func(request *v1alpha2.Request)
+
+func httpRequest(rm ...httpRequestModifier) *v1alpha2.Request {
+	r := &v1alpha2.Request{
+		ObjectMeta: v1.ObjectMeta{
+			Name:      testRequestName,
+			Namespace: testNamespace,
+		},
+		Spec: v1alpha2.RequestSpec{
+			ResourceSpec: xpv1.ResourceSpec{
+				ProviderConfigReference: &xpv1.Reference{
+					Name: providerName,
+				},
+			},
+			ForProvider: testForProvider,
+		},
+		Status: v1alpha2.RequestStatus{},
+	}
+
+	for _, m := range rm {
+		m(r)
+	}
+
+	return r
+}
+
+type MockSendRequestFn func(ctx context.Context, method string, url string, body httpClient.Data, headers httpClient.Data, skipTLSVerify bool) (resp httpClient.HttpDetails, err error)
+
+type MockHttpClient struct {
+	MockSendRequest MockSendRequestFn
+}
+
+func (c *MockHttpClient) SendRequest(ctx context.Context, method string, url string, body httpClient.Data, headers httpClient.Data, skipTLSVerify bool) (resp httpClient.HttpDetails, err error) {
+	return c.MockSendRequest(ctx, method, url, body, headers, skipTLSVerify)
+}
 
 func Test_isUpToDate(t *testing.T) {
 	type args struct {
@@ -291,17 +351,65 @@ func Test_isUpToDate(t *testing.T) {
 				},
 			},
 		},
+		"MissingMappingObjectNotCreated": {
+			args: args{
+				http: &MockHttpClient{
+					MockSendRequest: func(ctx context.Context, method string, url string, body, headers httpClient.Data, skipTLSVerify bool) (resp httpClient.HttpDetails, err error) {
+						return httpClient.HttpDetails{}, nil
+					},
+				},
+				localKube: &test.MockClient{
+					MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
+				},
+				mg: httpRequest(func(r *v1alpha2.Request) {
+					r.Status.Response.Body = ""
+					r.Status.Response.StatusCode = 0
+					r.Spec.ForProvider.Mappings = []v1alpha2.Mapping{
+						testPostMapping,
+						testPutMapping,
+						testDeleteMapping,
+						// No GET or OBSERVE mapping
+					}
+				}),
+			},
+			want: want{
+				err: errors.New("OBSERVE or GET mapping doesn't exist in request, skipping operation"),
+			},
+		},
+		"MissingMappingObjectCreated": {
+			args: args{
+				http: &MockHttpClient{
+					MockSendRequest: func(ctx context.Context, method string, url string, body, headers httpClient.Data, skipTLSVerify bool) (resp httpClient.HttpDetails, err error) {
+						return httpClient.HttpDetails{}, nil
+					},
+				},
+				localKube: &test.MockClient{
+					MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
+				},
+				mg: httpRequest(func(r *v1alpha2.Request) {
+					r.Status.Response.Body = `{"id": "123"}`
+					r.Status.Response.StatusCode = 201
+					r.Status.RequestDetails.Method = http.MethodPost
+					r.Spec.ForProvider.Mappings = []v1alpha2.Mapping{
+						testPostMapping,
+						testPutMapping,
+						testDeleteMapping,
+						// No GET or OBSERVE mapping
+					}
+				}),
+			},
+			want: want{
+				err: errors.New("OBSERVE or GET mapping doesn't exist in request, skipping operation"),
+			},
+		},
 	}
 	for name, tc := range cases {
 		tc := tc // Create local copies of loop variables
 
 		t.Run(name, func(t *testing.T) {
-			e := &external{
-				localKube: tc.args.localKube,
-				logger:    logging.NewNopLogger(),
-				http:      tc.args.http,
-			}
-			got, gotErr := e.isUpToDate(context.Background(), tc.args.mg)
+			svcCtx := service.NewServiceContext(context.Background(), tc.args.localKube, logging.NewNopLogger(), tc.args.http)
+			crCtx := service.NewRequestCRContext(tc.args.mg)
+			got, gotErr := IsUpToDate(svcCtx, crCtx)
 			if diff := cmp.Diff(tc.want.err, gotErr, test.EquateErrors()); diff != "" {
 				t.Fatalf("isUpToDate(...): -want error, +got error: %s", diff)
 			}
@@ -489,13 +597,9 @@ func Test_determineResponseCheck(t *testing.T) {
 		tc := tc // Create local copies of loop variables
 
 		t.Run(name, func(t *testing.T) {
-			e := &external{
-				localKube: nil,
-				logger:    logging.NewNopLogger(),
-				http:      nil,
-			}
-
-			got, gotErr := e.determineIfUpToDate(tc.args.ctx, tc.args.cr, tc.args.details, tc.args.responseErr)
+			svcCtx := service.NewServiceContext(tc.args.ctx, nil, logging.NewNopLogger(), nil)
+			crCtx := service.NewRequestCRContext(tc.args.cr)
+			got, gotErr := determineIfUpToDate(svcCtx, crCtx, tc.args.details, tc.args.responseErr)
 			if diff := cmp.Diff(tc.want.err, gotErr, test.EquateErrors()); diff != "" {
 				t.Fatalf("determineResponseCheck(...): -want error, +got error: %s", diff)
 			}
@@ -595,9 +699,8 @@ func Test_isObjectValidForObservation(t *testing.T) {
 		tc := tc // Create local copies of loop variables
 
 		t.Run(name, func(t *testing.T) {
-			e := &external{}
-
-			got := e.isObjectValidForObservation(tc.args.cr)
+			crCtx := service.NewRequestCRContext(tc.args.cr)
+			got := isObjectValidForObservation(crCtx)
 
 			if diff := cmp.Diff(tc.want.valid, got); diff != "" {
 				t.Errorf("isObjectValidForObservation(...): -want valid, +got valid: %s", diff)
@@ -708,11 +811,16 @@ func Test_requestDetails(t *testing.T) {
 		tc := tc
 
 		t.Run(name, func(t *testing.T) {
-			e := &external{
-				logger: logging.NewNopLogger(),
+			mapping, err := requestmapping.GetMapping(&tc.args.cr.Spec.ForProvider, tc.args.action, logging.NewNopLogger())
+			if err != nil {
+				if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
+					t.Fatalf("requestDetails(...): -want error, +got error: %s", diff)
+				}
+				return
 			}
-
-			got, gotErr := e.requestDetails(tc.args.ctx, tc.args.cr, tc.args.action)
+			svcCtx := service.NewServiceContext(tc.args.ctx, nil, logging.NewNopLogger(), nil)
+			crCtx := service.NewRequestCRContext(tc.args.cr)
+			got, gotErr := requestgen.GenerateValidRequestDetails(svcCtx, crCtx, mapping)
 			if diff := cmp.Diff(tc.want.err, gotErr, test.EquateErrors()); diff != "" {
 				t.Fatalf("requestDetails(...): -want error, +got error: %s", diff)
 			}
