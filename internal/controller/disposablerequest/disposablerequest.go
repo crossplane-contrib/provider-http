@@ -34,6 +34,7 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
 
+	"github.com/crossplane-contrib/provider-http/apis/common"
 	"github.com/crossplane-contrib/provider-http/apis/disposablerequest/v1alpha2"
 	apisv1alpha1 "github.com/crossplane-contrib/provider-http/apis/v1alpha1"
 	httpClient "github.com/crossplane-contrib/provider-http/internal/clients/http"
@@ -132,6 +133,14 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 
 	// Merge TLS configs: resource-level overrides provider-level
 	mergedTLSConfig := httpClient.MergeTLSConfigs(cr.Spec.ForProvider.TLSConfig, pc.Spec.TLS)
+
+	// Apply InsecureSkipTLSVerify from DisposableRequest spec if set
+	if cr.Spec.ForProvider.InsecureSkipTLSVerify {
+		if mergedTLSConfig == nil {
+			mergedTLSConfig = &common.TLSConfig{}
+		}
+		mergedTLSConfig.InsecureSkipVerify = true
+	}
 
 	// Load TLS configuration from secrets
 	tlsConfigData, err := httpClient.LoadTLSConfig(ctx, c.kube, mergedTLSConfig)
