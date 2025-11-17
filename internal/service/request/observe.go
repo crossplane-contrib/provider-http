@@ -67,7 +67,7 @@ func IsUpToDate(svcCtx *service.ServiceContext, crCtx *service.RequestCRContext)
 		return FailedObserve(), err
 	}
 
-	details, responseErr := svcCtx.HTTP.SendRequest(svcCtx.Ctx, requestmapping.GetEffectiveMethod(mapping), requestDetails.Url, requestDetails.Body, requestDetails.Headers, spec.GetInsecureSkipTLSVerify())
+	details, responseErr := svcCtx.HTTP.SendRequest(svcCtx.Ctx, requestmapping.GetEffectiveMethod(mapping), requestDetails.Url, requestDetails.Body, requestDetails.Headers, svcCtx.TLSConfigData)
 	// The initial observation of an object requires a successful HTTP response
 	// to be considered existing.
 	if !utils.IsHTTPSuccess(details.HttpResponse.StatusCode) && objectNotCreated {

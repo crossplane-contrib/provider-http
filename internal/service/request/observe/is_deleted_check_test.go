@@ -106,7 +106,7 @@ func Test_DefaultIsRemovedCheck(t *testing.T) {
 
 		t.Run(name, func(t *testing.T) {
 			e := &defaultIsRemovedResponseCheck{}
-			svcCtx := service.NewServiceContext(tc.args.ctx, nil, logging.NewNopLogger(), nil)
+			svcCtx := service.NewServiceContext(tc.args.ctx, nil, logging.NewNopLogger(), nil, nil)
 			crCtx := service.NewRequestCRContext(tc.args.cr)
 			gotErr := e.Check(svcCtx, crCtx, tc.args.details, tc.args.responseErr)
 
@@ -231,7 +231,7 @@ func Test_CustomIsRemovedCheck(t *testing.T) {
 
 		t.Run(name, func(t *testing.T) {
 			e := &customIsRemovedResponseCheck{}
-			svcCtx := service.NewServiceContext(tc.args.ctx, nil, logging.NewNopLogger(), nil)
+			svcCtx := service.NewServiceContext(tc.args.ctx, nil, logging.NewNopLogger(), nil, nil)
 			crCtx := service.NewRequestCRContext(tc.args.cr)
 			gotErr := e.Check(svcCtx, crCtx, tc.args.details, tc.args.responseErr)
 
