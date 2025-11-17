@@ -20,7 +20,7 @@ package v1alpha2
 import xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 
 // GetProviderConfigReference of this ClusterProviderConfigUsage.
-func (p *ClusterProviderConfigUsage) GetProviderConfigReference() xpv1.Reference {
+func (p *ClusterProviderConfigUsage) GetProviderConfigReference() xpv1.ProviderConfigReference {
 	return p.ProviderConfigReference
 }
 
@@ -30,7 +30,7 @@ func (p *ClusterProviderConfigUsage) GetResourceReference() xpv1.TypedReference 
 }
 
 // SetProviderConfigReference of this ClusterProviderConfigUsage.
-func (p *ClusterProviderConfigUsage) SetProviderConfigReference(r xpv1.Reference) {
+func (p *ClusterProviderConfigUsage) SetProviderConfigReference(r xpv1.ProviderConfigReference) {
 	p.ProviderConfigReference = r
 }
 
@@ -40,11 +40,11 @@ func (p *ClusterProviderConfigUsage) SetResourceReference(r xpv1.TypedReference)
 }
 
 // GetProviderConfigReference of this ProviderConfigUsage.
-func (p *ProviderConfigUsage) GetProviderConfigReference() xpv1.Reference {
+func (p *ProviderConfigUsage) GetProviderConfigReference() xpv1.ProviderConfigReference {
 	return p.ProviderConfigReference
 }
 
 // SetProviderConfigReference of this ProviderConfigUsage.
-func (p *ProviderConfigUsage) SetProviderConfigReference(r xpv1.Reference) {
+func (p *ProviderConfigUsage) SetProviderConfigReference(r xpv1.ProviderConfigReference) {
 	p.ProviderConfigReference = r
 }

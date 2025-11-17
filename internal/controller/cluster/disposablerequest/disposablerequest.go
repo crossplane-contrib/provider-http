@@ -59,10 +59,9 @@ func Setup(mgr ctrl.Manager, o controller.Options, timeout time.Duration) error 
 
 	reconcilerOptions := []managed.ReconcilerOption{
 		managed.WithExternalConnecter(&connector{
-			logger: o.Logger,
-			kube:   mgr.GetClient(),
-			// FIXME
-			//usage:           resource.NewProviderConfigUsageTracker(mgr.GetClient(), &apisv1alpha1.ProviderConfigUsage{}),
+			logger:          o.Logger,
+			kube:            mgr.GetClient(),
+			usage:           resource.NewLegacyProviderConfigUsageTracker(mgr.GetClient(), &apisv1alpha1.ProviderConfigUsage{}),
 			newHttpClientFn: httpClient.NewClient,
 		}),
 		managed.WithLogger(o.Logger.WithValues("controller", name)),
@@ -92,7 +91,7 @@ func Setup(mgr ctrl.Manager, o controller.Options, timeout time.Duration) error 
 type connector struct {
 	logger          logging.Logger
 	kube            client.Client
-	usage           resource.Tracker
+	usage           *resource.LegacyProviderConfigUsageTracker
 	newHttpClientFn func(log logging.Logger, timeout time.Duration, creds string) (httpClient.Client, error)
 }
 

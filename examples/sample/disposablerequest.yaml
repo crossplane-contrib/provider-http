@@ -3,7 +3,6 @@ kind: DisposableRequest
 metadata:
   name: send-notification
 spec:
-  deletionPolicy: Orphan
   forProvider:
     # Injecting data from secrets is possible, simply use the following syntax: {{ name:namespace:key }} (supported for body and headers only)
     url:  http://test-server.default.svc.cluster.local/v1/notify

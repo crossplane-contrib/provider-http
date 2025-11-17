@@ -7,7 +7,7 @@ spec:
   forProvider:
     # This example demonstrates using ClusterProviderConfig with namespaced DisposableRequest
     # ClusterProviderConfig allows cross-namespace access to secrets and configurations
-    url: http://flask-api.default.svc.cluster.local/v1/notify
+    url: http://test-server.default.svc.cluster.local/v1/notify
     method: POST
     body: |
       {

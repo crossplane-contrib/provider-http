@@ -11,7 +11,7 @@ spec:
     headers:
       Authorization:
         - "Basic {{ basic-auth:default:token }}"
-    url: http://flask-api.default.svc.cluster.local/v1/login
+    url: http://test-server.default.svc.cluster.local/v1/login
     method: POST
     
     # Indicates whether the reconciliation should loop indefinitely. If `rollbackRetriesLimit` is set and the request returns an error, it will stop reconciliation once the limit is reached.

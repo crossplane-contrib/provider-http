@@ -6,7 +6,7 @@ metadata:
 spec:
   forProvider:
     # Injecting data from secrets is possible, simply use the following syntax: {{ name:namespace:key }} (supported for body and headers only)
-    url:  http://flask-api.default.svc.cluster.local/v1/notify
+    url:  http://test-server.default.svc.cluster.local/v1/notify
     method: POST
     body: |
       {

@@ -18,12 +18,9 @@ package disposablerequest
 
 import (
 	"context"
-	"fmt"
-	"strconv"
 	"time"
 
-	datapatcher "github.com/crossplane-contrib/provider-http/internal/data-patcher"
-	"github.com/crossplane-contrib/provider-http/internal/jq"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/feature"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/logging"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
 	"github.com/pkg/errors"
@@ -31,7 +28,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	json_util "github.com/crossplane-contrib/provider-http/internal/json"
 	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/controller"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/event"
@@ -42,6 +38,8 @@ import (
 	"github.com/crossplane-contrib/provider-http/apis/namespaced/disposablerequest/v1alpha2"
 	apisv1alpha2 "github.com/crossplane-contrib/provider-http/apis/namespaced/v1alpha2"
 	httpClient "github.com/crossplane-contrib/provider-http/internal/clients/http"
+	"github.com/crossplane-contrib/provider-http/internal/service"
+	"github.com/crossplane-contrib/provider-http/internal/service/disposablerequest"
 	"github.com/crossplane-contrib/provider-http/internal/utils"
 )
 
@@ -49,42 +47,40 @@ const (
 	errNotNamespacedDisposableRequest      = "managed resource is not a namespaced DisposableRequest custom resource"
 	errTrackPCUsage                        = "cannot track ProviderConfig usage"
 	errNewHttpClient                       = "cannot create new Http client"
-	errProviderNotRetrieved                = "provider could not be retrieved"
 	errFailedToSendHttpDisposableRequest   = "failed to send http request"
-	errFailedUpdateStatusConditions        = "failed updating status conditions"
-	ErrExpectedFormat                      = "JQ filter should return a boolean, but returned error: %s"
-	errPatchFromReferencedSecret           = "cannot patch from referenced secret"
-	errGetReferencedSecret                 = "cannot get referenced secret"
-	errCreateReferencedSecret              = "cannot create referenced secret"
-	errPatchDataToSecret                   = "Warning, couldn't patch data from request to secret %s:%s:%s, error: %s"
-	errConvertResToMap                     = "failed to convert response to map"
-	errGetLatestVersion                    = "failed to get the latest version of the resource"
-	errResponseFormat                      = "Response does not match the expected format, retries limit "
 	errExtractCredentials                  = "cannot extract credentials"
-	errCheckExpectedResponse               = "failed to check if response is as expected"
 	errResponseDoesntMatchExpectedCriteria = "response does not match expected criteria"
 
-	errGetPC    = "cannot get ProviderConfig"
-	errGetCPC   = "cannot get ClusterProviderConfig"
-	errGetCreds = "cannot get credentials"
+	errGetPC  = "cannot get ProviderConfig"
+	errGetCPC = "cannot get ClusterProviderConfig"
 )
 
 // Setup adds a controller that reconciles namespaced DisposableRequest managed resources.
 func Setup(mgr ctrl.Manager, o controller.Options, timeout time.Duration) error {
 	name := managed.ControllerName(v1alpha2.DisposableRequestGroupKind)
 
-	r := managed.NewReconciler(mgr,
-		resource.ManagedKind(v1alpha2.DisposableRequestGroupVersionKind),
+	reconcilerOptions := []managed.ReconcilerOption{
 		managed.WithExternalConnecter(&connector{
 			logger:          o.Logger,
 			kube:            mgr.GetClient(),
+			usage:           resource.NewProviderConfigUsageTracker(mgr.GetClient(), &apisv1alpha2.ProviderConfigUsage{}),
 			newHttpClientFn: httpClient.NewClient,
 		}),
 		managed.WithLogger(o.Logger.WithValues("controller", name)),
 		managed.WithPollInterval(o.PollInterval),
 		WithCustomPollIntervalHook(),
 		managed.WithTimeout(timeout),
-		managed.WithRecorder(event.NewAPIRecorder(mgr.GetEventRecorderFor(name))))
+		managed.WithRecorder(event.NewAPIRecorder(mgr.GetEventRecorderFor(name))),
+	}
+
+	if o.Features.Enabled(feature.EnableBetaManagementPolicies) {
+		reconcilerOptions = append(reconcilerOptions, managed.WithManagementPolicies())
+	}
+
+	r := managed.NewReconciler(mgr,
+		resource.ManagedKind(v1alpha2.DisposableRequestGroupVersionKind),
+		reconcilerOptions...,
+	)
 
 	return ctrl.NewControllerManagedBy(mgr).
 		Named(name).
@@ -97,6 +93,7 @@ func Setup(mgr ctrl.Manager, o controller.Options, timeout time.Duration) error 
 type connector struct {
 	logger          logging.Logger
 	kube            client.Client
+	usage           *resource.ProviderConfigUsageTracker
 	newHttpClientFn func(log logging.Logger, timeout time.Duration, creds string) (httpClient.Client, error)
 }
 
@@ -108,6 +105,10 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 	}
 
 	l := c.logger.WithValues("namespacedDisposableRequest", cr.Name)
+
+	if err := c.usage.Track(ctx, cr); err != nil {
+		return nil, errors.Wrap(err, errTrackPCUsage)
+	}
 
 	// Set default providerConfigRef if not specified
 	if cr.GetProviderConfigReference() == nil {
@@ -141,12 +142,16 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 		return nil, errors.Errorf("unsupported provider config kind: %s", ref.Kind)
 	}
 
-	data, err := resource.CommonCredentialExtractor(ctx, cd.Source, c.kube, cd.CommonCredentialSelectors)
-	if err != nil {
-		return nil, errors.Wrap(err, errExtractCredentials)
+	creds := ""
+	if cd.Source == xpv1.CredentialsSourceSecret {
+		data, err := resource.CommonCredentialExtractor(ctx, cd.Source, c.kube, cd.CommonCredentialSelectors)
+		if err != nil {
+			return nil, errors.Wrap(err, errExtractCredentials)
+		}
+		creds = string(data)
 	}
 
-	h, err := c.newHttpClientFn(l, utils.WaitTimeout(cr.Spec.ForProvider.WaitTimeout), string(data))
+	h, err := c.newHttpClientFn(l, utils.WaitTimeout(cr.Spec.ForProvider.WaitTimeout), creds)
 	if err != nil {
 		return nil, errors.Wrap(err, errNewHttpClient)
 	}
@@ -189,7 +194,9 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		}, nil
 	}
 
-	isExpected, storedResponse, err := c.validateStoredResponse(ctx, cr)
+	svcCtx := service.NewServiceContext(ctx, c.localKube, c.logger, c.http)
+	crCtx := service.NewDisposableRequestCRContext(cr)
+	isExpected, storedResponse, err := disposablerequest.ValidateStoredResponse(svcCtx, crCtx)
 	if err != nil {
 		return managed.ExternalObservation{}, err
 	}
@@ -197,16 +204,16 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.New(errResponseDoesntMatchExpectedCriteria)
 	}
 
-	isUpToDate = c.calculateUpToDateStatus(cr, isUpToDate)
+	isUpToDate = disposablerequest.CalculateUpToDateStatus(crCtx, isUpToDate)
 
 	if isAvailable {
-		if err := c.updateResourceStatus(ctx, cr); err != nil {
+		if err := disposablerequest.UpdateResourceStatus(ctx, cr, c.localKube); err != nil {
 			return managed.ExternalObservation{}, err
 		}
 	}
 
 	if len(cr.Spec.ForProvider.SecretInjectionConfigs) > 0 && cr.Status.Response.StatusCode != 0 {
-		c.applySecretInjectionsFromStoredResponse(ctx, cr, storedResponse, isExpected)
+		disposablerequest.ApplySecretInjectionsFromStoredResponse(svcCtx, crCtx, storedResponse)
 	}
 
 	return managed.ExternalObservation{
@@ -214,207 +221,6 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		ResourceUpToDate:  isUpToDate,
 		ConnectionDetails: nil,
 	}, nil
-}
-
-// validateStoredResponse validates the stored response against expected criteria
-func (c *external) validateStoredResponse(ctx context.Context, cr *v1alpha2.DisposableRequest) (bool, httpClient.HttpResponse, error) {
-	sensitiveBody, err := datapatcher.PatchSecretsIntoString(ctx, c.localKube, cr.Status.Response.Body, c.logger)
-	if err != nil {
-		return false, httpClient.HttpResponse{}, errors.Wrap(err, errPatchFromReferencedSecret)
-	}
-
-	storedResponse := httpClient.HttpResponse{
-		StatusCode: cr.Status.Response.StatusCode,
-		Headers:    cr.Status.Response.Headers,
-		Body:       sensitiveBody,
-	}
-
-	isExpected, err := c.isResponseAsExpected(cr, storedResponse)
-	if err != nil {
-		c.logger.Debug("Setting error condition due to validation error", "error", err)
-		return false, httpClient.HttpResponse{}, errors.Wrap(err, errCheckExpectedResponse)
-	}
-	if !isExpected {
-		c.logger.Debug("Response does not match expected criteria")
-		return false, httpClient.HttpResponse{}, nil
-	}
-
-	return true, storedResponse, nil
-}
-
-// calculateUpToDateStatus determines if the resource should be considered up-to-date
-func (c *external) calculateUpToDateStatus(cr *v1alpha2.DisposableRequest, currentStatus bool) bool {
-	// If shouldLoopInfinitely is true, the resource should never be considered up-to-date
-	if cr.Spec.ForProvider.ShouldLoopInfinitely {
-		if cr.Spec.ForProvider.RollbackRetriesLimit == nil {
-			return false
-		}
-	}
-	return currentStatus
-}
-
-// updateResourceStatus updates the resource status to Available
-func (c *external) updateResourceStatus(ctx context.Context, cr *v1alpha2.DisposableRequest) error {
-	if err := c.localKube.Get(ctx, types.NamespacedName{Name: cr.Name, Namespace: cr.Namespace}, cr); err != nil {
-		return errors.Wrap(err, errGetLatestVersion)
-	}
-
-	cr.Status.SetConditions(xpv1.Available())
-	if err := c.localKube.Status().Update(ctx, cr); err != nil {
-		return errors.New(errFailedUpdateStatusConditions)
-	}
-	return nil
-}
-
-// deployAction sends the HTTP request defined in the DisposableRequest resource and updates its status based on the response.
-func (c *external) deployAction(ctx context.Context, cr *v1alpha2.DisposableRequest) error {
-	if cr.Status.Synced {
-		c.logger.Debug("Resource is already synced, skipping deployment action")
-		return nil
-	}
-
-	// Check if retries limit has been reached
-	if utils.RollBackEnabled(cr.Spec.ForProvider.RollbackRetriesLimit) && utils.RetriesLimitReached(cr.Status.Failed, cr.Spec.ForProvider.RollbackRetriesLimit) {
-		c.logger.Debug("Retries limit reached, not retrying anymore")
-		return nil
-	}
-
-	details, httpRequestErr := c.sendHttpRequest(ctx, cr)
-
-	resource, err := c.prepareRequestResource(ctx, cr, details)
-	if err != nil {
-		return err
-	}
-
-	// Handle HTTP request errors first
-	if httpRequestErr != nil {
-		return c.handleHttpRequestError(ctx, cr, resource, httpRequestErr)
-	}
-
-	return c.handleHttpResponse(ctx, cr, details.HttpResponse, resource)
-}
-
-// applySecretInjectionsFromStoredResponse applies secret injection configurations using the stored response
-// This is used when the resource is already synced but secret injection configs may have been updated
-func (c *external) applySecretInjectionsFromStoredResponse(ctx context.Context, cr *v1alpha2.DisposableRequest, storedResponse httpClient.HttpResponse, isExpectedResponse bool) {
-	if isExpectedResponse {
-		c.logger.Debug("Applying secret injections from stored response")
-		datapatcher.ApplyResponseDataToSecrets(ctx, c.localKube, c.logger, &storedResponse, cr.Spec.ForProvider.SecretInjectionConfigs, cr)
-		return
-	}
-
-	c.logger.Debug("Skipping secret injections as response does not match expected criteria")
-}
-
-// sendHttpRequest sends the HTTP request with sensitive data patched
-func (c *external) sendHttpRequest(ctx context.Context, cr *v1alpha2.DisposableRequest) (httpClient.HttpDetails, error) {
-	sensitiveBody, err := datapatcher.PatchSecretsIntoString(ctx, c.localKube, cr.Spec.ForProvider.Body, c.logger)
-	if err != nil {
-		return httpClient.HttpDetails{}, err
-	}
-
-	sensitiveHeaders, err := datapatcher.PatchSecretsIntoHeaders(ctx, c.localKube, cr.Spec.ForProvider.Headers, c.logger)
-	if err != nil {
-		return httpClient.HttpDetails{}, err
-	}
-
-	bodyData := httpClient.Data{Encrypted: cr.Spec.ForProvider.Body, Decrypted: sensitiveBody}
-	headersData := httpClient.Data{Encrypted: cr.Spec.ForProvider.Headers, Decrypted: sensitiveHeaders}
-	details, err := c.http.SendRequest(ctx, cr.Spec.ForProvider.Method, cr.Spec.ForProvider.URL, bodyData, headersData, cr.Spec.ForProvider.InsecureSkipTLSVerify)
-
-	return details, err
-}
-
-// prepareRequestResource creates and initializes the RequestResource
-func (c *external) prepareRequestResource(ctx context.Context, cr *v1alpha2.DisposableRequest, details httpClient.HttpDetails) (*utils.RequestResource, error) {
-	// Get the latest version of the resource before updating
-	if err := c.localKube.Get(ctx, types.NamespacedName{Name: cr.Name, Namespace: cr.Namespace}, cr); err != nil {
-		return nil, errors.Wrap(err, errGetLatestVersion)
-	}
-
-	resource := &utils.RequestResource{
-		StatusWriter:   cr, // DisposableRequest implements interfaces.BaseStatusWriter
-		Resource:       cr,
-		RequestContext: ctx,
-		HttpResponse:   details.HttpResponse,
-		LocalClient:    c.localKube,
-		HttpRequest:    details.HttpRequest,
-	}
-
-	return resource, nil
-}
-
-// handleHttpResponse processes the HTTP response and updates resource status accordingly
-func (c *external) handleHttpResponse(ctx context.Context, cr *v1alpha2.DisposableRequest, sensitiveResponse httpClient.HttpResponse, resource *utils.RequestResource) error {
-	// Handle HTTP error status codes
-	if utils.IsHTTPError(resource.HttpResponse.StatusCode) {
-		return c.handleHttpErrorStatus(ctx, cr, resource)
-	}
-
-	// Handle response validation
-	return c.handleResponseValidation(ctx, cr, sensitiveResponse, resource)
-}
-
-// handleHttpRequestError handles cases where the HTTP request itself failed
-func (c *external) handleHttpRequestError(ctx context.Context, cr *v1alpha2.DisposableRequest, resource *utils.RequestResource, httpRequestErr error) error {
-	setErr := resource.SetError(httpRequestErr)
-	c.applySecretInjectionsFromStoredResponse(ctx, cr, resource.HttpResponse, false)
-	if settingError := utils.SetRequestResourceStatus(*resource, setErr, resource.SetLastReconcileTime(), resource.SetRequestDetails()); settingError != nil {
-		return errors.Wrap(settingError, utils.ErrFailedToSetStatus)
-	}
-	return httpRequestErr
-}
-
-// handleHttpErrorStatus handles HTTP error status codes
-func (c *external) handleHttpErrorStatus(ctx context.Context, cr *v1alpha2.DisposableRequest, resource *utils.RequestResource) error {
-	c.applySecretInjectionsFromStoredResponse(ctx, cr, resource.HttpResponse, false)
-	if settingError := utils.SetRequestResourceStatus(*resource, resource.SetStatusCode(), resource.SetLastReconcileTime(), resource.SetHeaders(), resource.SetBody(), resource.SetRequestDetails(), resource.SetError(nil)); settingError != nil {
-		return errors.Wrap(settingError, utils.ErrFailedToSetStatus)
-	}
-
-	return errors.Errorf(utils.ErrStatusCode, cr.Spec.ForProvider.Method, strconv.Itoa(resource.HttpResponse.StatusCode))
-}
-
-// handleResponseValidation validates the response and updates status accordingly
-func (c *external) handleResponseValidation(ctx context.Context, cr *v1alpha2.DisposableRequest, sensitiveResponse httpClient.HttpResponse, resource *utils.RequestResource) error {
-	isExpectedResponse, err := c.isResponseAsExpected(cr, sensitiveResponse)
-	if err != nil {
-		return err
-	}
-
-	if isExpectedResponse {
-		c.applySecretInjectionsFromStoredResponse(ctx, cr, resource.HttpResponse, true)
-		return utils.SetRequestResourceStatus(*resource, resource.SetStatusCode(), resource.SetLastReconcileTime(), resource.SetHeaders(), resource.SetBody(), resource.SetSynced(), resource.SetRequestDetails())
-	}
-
-	limit := utils.GetRollbackRetriesLimit(cr.Spec.ForProvider.RollbackRetriesLimit)
-	return utils.SetRequestResourceStatus(*resource, resource.SetStatusCode(), resource.SetLastReconcileTime(), resource.SetHeaders(), resource.SetBody(),
-		resource.SetError(errors.New(errResponseFormat+fmt.Sprint(limit))), resource.SetRequestDetails())
-}
-
-func (c *external) isResponseAsExpected(cr *v1alpha2.DisposableRequest, res httpClient.HttpResponse) (bool, error) {
-	// If no expected response is defined, consider it as expected.
-	if cr.Spec.ForProvider.ExpectedResponse == "" {
-		return true, nil
-	}
-
-	if res.StatusCode == 0 {
-		return false, nil
-	}
-
-	responseMap, err := json_util.StructToMap(res)
-	if err != nil {
-		return false, errors.Wrap(err, errConvertResToMap)
-	}
-
-	json_util.ConvertJSONStringsToMaps(&responseMap)
-
-	isExpected, err := jq.ParseBool(cr.Spec.ForProvider.ExpectedResponse, responseMap)
-	if err != nil {
-		return false, errors.Errorf(ErrExpectedFormat, err.Error())
-	}
-
-	return isExpected, nil
 }
 
 func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.ExternalCreation, error) {
@@ -427,7 +233,9 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalCreation{}, err
 	}
 
-	return managed.ExternalCreation{}, errors.Wrap(c.deployAction(ctx, cr), errFailedToSendHttpDisposableRequest)
+	svcCtx := service.NewServiceContext(ctx, c.localKube, c.logger, c.http)
+	crCtx := service.NewDisposableRequestCRContext(cr)
+	return managed.ExternalCreation{}, errors.Wrap(disposablerequest.DeployAction(svcCtx, crCtx), errFailedToSendHttpDisposableRequest)
 }
 
 func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.ExternalUpdate, error) {
@@ -440,7 +248,9 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalUpdate{}, err
 	}
 
-	return managed.ExternalUpdate{}, errors.Wrap(c.deployAction(ctx, cr), errFailedToSendHttpDisposableRequest)
+	svcCtx := service.NewServiceContext(ctx, c.localKube, c.logger, c.http)
+	crCtx := service.NewDisposableRequestCRContext(cr)
+	return managed.ExternalUpdate{}, errors.Wrap(disposablerequest.DeployAction(svcCtx, crCtx), errFailedToSendHttpDisposableRequest)
 }
 
 func (c *external) Delete(_ context.Context, _ resource.Managed) (managed.ExternalDelete, error) {

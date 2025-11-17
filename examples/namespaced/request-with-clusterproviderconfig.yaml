@@ -15,7 +15,7 @@ spec:
       Authorization:
         - "Bearer {{ auth:crossplane-system:token }}"
     payload:
-      baseUrl: http://flask-api.default.svc.cluster.local/v1/users
+      baseUrl: http://test-server.default.svc.cluster.local/v1/users
       body: |
         {
           "username": "cluster_config_user", 

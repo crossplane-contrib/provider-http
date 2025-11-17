@@ -47,6 +47,7 @@ import (
 
 const (
 	errNotRequest              = "managed resource is not a Request custom resource"
+	errTrackPCUsage            = "cannot track ProviderConfig usage"
 	errNewHttpClient           = "cannot create new Http client"
 	errProviderNotRetrieved    = "provider could not be retrieved"
 	errFailedToSendHttpRequest = "something went wrong"
@@ -61,10 +62,9 @@ func Setup(mgr ctrl.Manager, o controller.Options, timeout time.Duration) error 
 
 	reconcilerOptions := []managed.ReconcilerOption{
 		managed.WithExternalConnecter(&connector{
-			logger: o.Logger,
-			kube:   mgr.GetClient(),
-			// FIXME
-			//usage:           resource.NewProviderConfigUsageTracker(mgr.GetClient(), &apisv1alpha1.ProviderConfigUsage{}),
+			logger:          o.Logger,
+			kube:            mgr.GetClient(),
+			usage:           resource.NewLegacyProviderConfigUsageTracker(mgr.GetClient(), &apisv1alpha1.ProviderConfigUsage{}),
 			newHttpClientFn: httpClient.NewClient,
 		}),
 		managed.WithLogger(o.Logger.WithValues("controller", name)),
@@ -95,6 +95,7 @@ func Setup(mgr ctrl.Manager, o controller.Options, timeout time.Duration) error 
 type connector struct {
 	logger          logging.Logger
 	kube            client.Client
+	usage           *resource.LegacyProviderConfigUsageTracker
 	newHttpClientFn func(log logging.Logger, timeout time.Duration, creds string) (httpClient.Client, error)
 }
 
@@ -106,6 +107,10 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 	}
 
 	l := c.logger.WithValues("request", cr.Name)
+
+	if err := c.usage.Track(ctx, cr); err != nil {
+		return nil, errors.Wrap(err, errTrackPCUsage)
+	}
 
 	// Set default providerConfigRef if not specified
 	if cr.GetProviderConfigReference() == nil {
