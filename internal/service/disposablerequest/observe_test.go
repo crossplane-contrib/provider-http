@@ -155,7 +155,7 @@ func TestValidateStoredResponse(t *testing.T) {
 				tc.args.localKube,
 				logging.NewNopLogger(),
 				nil,
-			nil,
+				nil,
 			)
 			crCtx := service.NewDisposableRequestCRContext(
 				tc.args.dr,
@@ -402,7 +402,7 @@ func TestApplySecretInjectionsFromStoredResponse(t *testing.T) {
 				tc.args.localKube,
 				logging.NewNopLogger(),
 				nil,
-			nil,
+				nil,
 			)
 			crCtx := service.NewDisposableRequestCRContext(
 				tc.args.dr,
