@@ -466,8 +466,9 @@ spec:
                     - message: Field 'forProvider.headers' is immutable
                       rule: self == oldSelf
                   insecureSkipTLSVerify:
-                    description: InsecureSkipTLSVerify, when set to true, skips TLS
-                      certificate checks for the HTTP request
+                    description: |-
+                      InsecureSkipTLSVerify, when set to true, skips TLS certificate checks for the HTTP request.
+                      This field is mutually exclusive with TLSConfig.
                     type: boolean
                   method:
                     type: string
@@ -579,6 +580,80 @@ spec:
                     description: ShouldLoopInfinitely specifies whether the reconciliation
                       should loop indefinitely.
                     type: boolean
+                  tlsConfig:
+                    description: |-
+                      TLSConfig allows overriding the TLS configuration from ProviderConfig for this specific request.
+                      This field is mutually exclusive with InsecureSkipTLSVerify.
+                    properties:
+                      caBundle:
+                        description: |-
+                          CABundle is a PEM encoded CA bundle which will be used to validate the server certificate.
+                          If empty, system root CAs will be used.
+                        format: byte
+                        type: string
+                      caCertSecretRef:
+                        description: |-
+                          CACertSecretRef is a reference to a secret containing the CA certificate(s).
+                          The secret must contain a key specified in the SecretKeySelector.
+                        properties:
+                          key:
+                            description: The key to select.
+                            type: string
+                          name:
+                            description: Name of the secret.
+                            type: string
+                          namespace:
+                            description: Namespace of the secret.
+                            type: string
+                        required:
+                        - key
+                        - name
+                        - namespace
+                        type: object
+                      clientCertSecretRef:
+                        description: |-
+                          ClientCertSecretRef is a reference to a secret containing the client certificate.
+                          The secret must contain a key specified in the SecretKeySelector.
+                        properties:
+                          key:
+                            description: The key to select.
+                            type: string
+                          name:
+                            description: Name of the secret.
+                            type: string
+                          namespace:
+                            description: Namespace of the secret.
+                            type: string
+                        required:
+                        - key
+                        - name
+                        - namespace
+                        type: object
+                      clientKeySecretRef:
+                        description: |-
+                          ClientKeySecretRef is a reference to a secret containing the client private key.
+                          The secret must contain a key specified in the SecretKeySelector.
+                        properties:
+                          key:
+                            description: The key to select.
+                            type: string
+                          name:
+                            description: Name of the secret.
+                            type: string
+                          namespace:
+                            description: Namespace of the secret.
+                            type: string
+                        required:
+                        - key
+                        - name
+                        - namespace
+                        type: object
+                      insecureSkipVerify:
+                        description: |-
+                          InsecureSkipVerify controls whether the client verifies the server's certificate chain and host name.
+                          If true, any certificate presented by the server and any host name in that certificate is accepted.
+                        type: boolean
+                    type: object
                   url:
                     type: string
                     x-kubernetes-validations:
@@ -592,6 +667,9 @@ spec:
                 - method
                 - url
                 type: object
+                x-kubernetes-validations:
+                - message: insecureSkipTLSVerify and tlsConfig are mutually exclusive
+                  rule: '!(self.insecureSkipTLSVerify == true && has(self.tlsConfig))'
               managementPolicies:
                 default:
                 - '*'
