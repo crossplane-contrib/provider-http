@@ -114,6 +114,11 @@ func (in *DisposableRequestParameters) DeepCopyInto(out *DisposableRequestParame
 		*out = new(int32)
 		**out = **in
 	}
+	if in.TLSConfig != nil {
+		in, out := &in.TLSConfig, &out.TLSConfig
+		*out = new(common.TLSConfig)
+		(*in).DeepCopyInto(*out)
+	}
 	if in.NextReconcile != nil {
 		in, out := &in.NextReconcile, &out.NextReconcile
 		*out = new(v1.Duration)

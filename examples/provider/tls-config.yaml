@@ -1,0 +1,37 @@
+---
+# Example: ProviderConfig with TLS certificate authentication using secrets
+apiVersion: http.crossplane.io/v1alpha1
+kind: ProviderConfig
+metadata:
+  name: provider-http-tls
+spec:
+  credentials:
+    source: None
+  tls:
+    caCertSecretRef:
+      name: ca-certificates
+      namespace: crossplane-system
+      key: ca-bundle.crt
+    clientCertSecretRef:
+      name: client-certificates
+      namespace: crossplane-system
+      key: tls.crt
+    clientKeySecretRef:
+      name: client-certificates
+      namespace: crossplane-system
+      key: tls.key
+    insecureSkipVerify: false
+---
+# Example: ProviderConfig with just CA certificates (no client certs)
+apiVersion: http.crossplane.io/v1alpha1
+kind: ProviderConfig
+metadata:
+  name: provider-http-ca-only
+spec:
+  credentials:
+    source: None
+  tls:
+    caCertSecretRef:
+      name: ca-certificates
+      namespace: crossplane-system
+      key: ca-bundle.crt

@@ -1,0 +1,54 @@
+---
+# Example ProviderConfig with TLS CA certificate verification
+# This configuration uses a custom CA bundle to verify HTTPS server certificates
+apiVersion: http.crossplane.io/v1alpha1
+kind: ProviderConfig
+metadata:
+  name: example-with-tls
+spec:
+  credentials:
+    source: None
+  tls:
+    # Custom CA certificate for verifying server certificates
+    caCertSecretRef:
+      name: my-ca-cert-secret
+      namespace: crossplane-system
+      key: ca.crt
+---
+# Example ProviderConfig with mTLS (mutual TLS authentication)
+# This configuration provides both CA bundle and client certificates
+apiVersion: http.crossplane.io/v1alpha1
+kind: ProviderConfig
+metadata:
+  name: example-with-mtls
+spec:
+  credentials:
+    source: None
+  tls:
+    # CA certificate for verifying server
+    caCertSecretRef:
+      name: my-ca-cert-secret
+      namespace: crossplane-system
+      key: ca.crt
+    # Client certificate for mTLS authentication
+    clientCertSecretRef:
+      name: my-client-cert-secret
+      namespace: crossplane-system
+      key: tls.crt
+    # Client private key for mTLS authentication
+    clientKeySecretRef:
+      name: my-client-cert-secret
+      namespace: crossplane-system
+      key: tls.key
+---
+# Example ProviderConfig with insecureSkipVerify (not recommended for production)
+# Use only for testing with self-signed certificates
+apiVersion: http.crossplane.io/v1alpha1
+kind: ProviderConfig
+metadata:
+  name: example-insecure
+spec:
+  credentials:
+    source: None
+  tls:
+    insecureSkipVerify: true
