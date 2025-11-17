@@ -6,6 +6,7 @@ import (
 
 	"github.com/crossplane-contrib/provider-http/apis/request/v1alpha2"
 	httpClient "github.com/crossplane-contrib/provider-http/internal/clients/http"
+	"github.com/crossplane-contrib/provider-http/internal/service"
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -197,7 +198,8 @@ func Test_GenerateRequestDetails(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			got, gotErr, ok := GenerateRequestDetails(context.Background(), tc.args.localKube, tc.args.methodMapping, tc.args.forProvider, tc.args.response, tc.args.logger)
+			svcCtx := service.NewServiceContext(context.Background(), tc.args.localKube, tc.args.logger, nil)
+			got, gotErr, ok := GenerateRequestDetails(svcCtx, &tc.args.methodMapping, &tc.args.forProvider, &tc.args.response)
 			if diff := cmp.Diff(tc.want.err, gotErr, test.EquateErrors()); diff != "" {
 				t.Fatalf("GenerateRequestDetails(...): -want error, +got error: %s", diff)
 			}
@@ -311,8 +313,8 @@ func Test_IsRequestValid(t *testing.T) {
 
 func Test_coalesceHeaders(t *testing.T) {
 	type args struct {
-		mappingHeaders,
-		defaultHeaders map[string][]string
+		mapping v1alpha2.Mapping
+		spec    v1alpha2.RequestParameters
 	}
 	type want struct {
 		headers map[string][]string
@@ -323,8 +325,8 @@ func Test_coalesceHeaders(t *testing.T) {
 	}{
 		"NonNilMappingHeaders": {
 			args: args{
-				mappingHeaders: testHeaders,
-				defaultHeaders: testHeaders2,
+				mapping: v1alpha2.Mapping{Headers: testHeaders},
+				spec:    v1alpha2.RequestParameters{Headers: testHeaders2},
 			},
 			want: want{
 				headers: testHeaders,
@@ -332,8 +334,8 @@ func Test_coalesceHeaders(t *testing.T) {
 		},
 		"NilMappingHeaders": {
 			args: args{
-				mappingHeaders: nil,
-				defaultHeaders: testHeaders2,
+				mapping: v1alpha2.Mapping{Headers: nil},
+				spec:    v1alpha2.RequestParameters{Headers: testHeaders2},
 			},
 			want: want{
 				headers: testHeaders2,
@@ -341,8 +343,8 @@ func Test_coalesceHeaders(t *testing.T) {
 		},
 		"NilDefaultHeaders": {
 			args: args{
-				mappingHeaders: testHeaders,
-				defaultHeaders: nil,
+				mapping: v1alpha2.Mapping{Headers: testHeaders},
+				spec:    v1alpha2.RequestParameters{Headers: nil},
 			},
 			want: want{
 				headers: testHeaders,
@@ -350,8 +352,8 @@ func Test_coalesceHeaders(t *testing.T) {
 		},
 		"NilHeaders": {
 			args: args{
-				mappingHeaders: nil,
-				defaultHeaders: nil,
+				mapping: v1alpha2.Mapping{Headers: nil},
+				spec:    v1alpha2.RequestParameters{Headers: nil},
 			},
 			want: want{
 				headers: nil,
@@ -361,7 +363,7 @@ func Test_coalesceHeaders(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			got := coalesceHeaders(tc.args.mappingHeaders, tc.args.defaultHeaders)
+			got := coalesceHeaders(&tc.args.mapping, &tc.args.spec)
 			if diff := cmp.Diff(tc.want.headers, got); diff != "" {
 				t.Fatalf("coalesceHeaders(...): -want headers, +got headers: %s", diff)
 			}
@@ -438,6 +440,7 @@ func Test_generateRequestObject(t *testing.T) {
 					},
 					"response": map[string]any{
 						"body":       map[string]any{"id": "123"},
+						"headers":    nil,
 						"statusCode": float64(200),
 					},
 				},
@@ -447,7 +450,7 @@ func Test_generateRequestObject(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			got := GenerateRequestContext(tc.args.forProvider, tc.args.response)
+			got := GenerateRequestContext(&tc.args.forProvider, &tc.args.response)
 			if diff := cmp.Diff(tc.want.result, got); diff != "" {
 				t.Fatalf("generateRequestObject(...): -want result, +got result: %s", diff)
 			}

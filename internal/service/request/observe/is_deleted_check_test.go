@@ -5,8 +5,10 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/crossplane-contrib/provider-http/apis/common"
 	"github.com/crossplane-contrib/provider-http/apis/request/v1alpha2"
 	httpClient "github.com/crossplane-contrib/provider-http/internal/clients/http"
+	"github.com/crossplane-contrib/provider-http/internal/service"
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
 	"github.com/crossplane/crossplane-runtime/pkg/test"
 	"github.com/google/go-cmp/cmp"
@@ -63,7 +65,7 @@ func Test_DefaultIsRemovedCheck(t *testing.T) {
 								testDeleteMapping,
 							},
 							ExpectedResponseCheck: v1alpha2.ExpectedResponseCheck{
-								Type: v1alpha2.ExpectedResponseCheckTypeDefault,
+								Type: common.ExpectedResponseCheckTypeDefault,
 							},
 						},
 					},
@@ -103,12 +105,11 @@ func Test_DefaultIsRemovedCheck(t *testing.T) {
 		tc := tc
 
 		t.Run(name, func(t *testing.T) {
-			e := &defaultIsRemovedResponseCheck{
-				localKube: nil,
-				http:      nil,
-				logger:    logging.NewNopLogger(),
-			}
-			gotErr := e.Check(tc.args.ctx, tc.args.cr, tc.args.details, tc.args.responseErr)
+			e := &defaultIsRemovedResponseCheck{}
+			svcCtx := service.NewServiceContext(tc.args.ctx, nil, logging.NewNopLogger(), nil)
+			crCtx := service.NewRequestCRContext(tc.args.cr)
+			gotErr := e.Check(svcCtx, crCtx, tc.args.details, tc.args.responseErr)
+
 			if diff := cmp.Diff(tc.want.err, gotErr, test.EquateErrors()); diff != "" {
 				t.Fatalf("Check(...): -want error, +got error: %s", diff)
 			}
@@ -142,11 +143,11 @@ func Test_CustomIsRemovedCheck(t *testing.T) {
 								Body: `{"password": "password"}`,
 							},
 							ExpectedResponseCheck: v1alpha2.ExpectedResponseCheck{
-								Type:  v1alpha2.ExpectedResponseCheckTypeCustom,
+								Type:  common.ExpectedResponseCheckTypeCustom,
 								Logic: `.response.body.password == .payload.body.password`,
 							},
 							IsRemovedCheck: v1alpha2.ExpectedResponseCheck{
-								Type:  v1alpha2.ExpectedResponseCheckTypeCustom,
+								Type:  common.ExpectedResponseCheckTypeCustom,
 								Logic: `.response.body.password == .payload.body.password`,
 							},
 						},
@@ -175,11 +176,11 @@ func Test_CustomIsRemovedCheck(t *testing.T) {
 								Body: `{"password": "password"}`,
 							},
 							ExpectedResponseCheck: v1alpha2.ExpectedResponseCheck{
-								Type:  v1alpha2.ExpectedResponseCheckTypeCustom,
+								Type:  common.ExpectedResponseCheckTypeCustom,
 								Logic: `.response.body.password == .payload.body.password`,
 							},
 							IsRemovedCheck: v1alpha2.ExpectedResponseCheck{
-								Type:  v1alpha2.ExpectedResponseCheckTypeCustom,
+								Type:  common.ExpectedResponseCheckTypeCustom,
 								Logic: `.response.body.password == .payload.body.password`,
 							},
 						},
@@ -229,12 +230,11 @@ func Test_CustomIsRemovedCheck(t *testing.T) {
 		tc := tc // Create local copies of loop variables
 
 		t.Run(name, func(t *testing.T) {
-			e := &customIsRemovedResponseCheck{
-				localKube: nil,
-				http:      nil,
-				logger:    logging.NewNopLogger(),
-			}
-			gotErr := e.Check(tc.args.ctx, tc.args.cr, tc.args.details, tc.args.responseErr)
+			e := &customIsRemovedResponseCheck{}
+			svcCtx := service.NewServiceContext(tc.args.ctx, nil, logging.NewNopLogger(), nil)
+			crCtx := service.NewRequestCRContext(tc.args.cr)
+			gotErr := e.Check(svcCtx, crCtx, tc.args.details, tc.args.responseErr)
+
 			if diff := cmp.Diff(tc.want.err, gotErr, test.EquateErrors()); diff != "" {
 				t.Fatalf("Check(...): -want error, +got error: %s", diff)
 			}
