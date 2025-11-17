@@ -1,0 +1,52 @@
+---
+# Example: Request resource with TLS configuration override
+apiVersion: http.crossplane.io/v1alpha2
+kind: Request
+metadata:
+  name: example-request-tls
+spec:
+  providerConfigRef:
+    name: provider-http-tls
+  forProvider:
+    payload:
+      baseUrl: https://api.example.com
+    mappings:
+      - method: POST
+        body: '{ "name": "example", "value": "test" }'
+        url: .payload.baseUrl + "/resource"
+      - method: GET
+        url: .payload.baseUrl + "/resource/" + (.response.body.id | tostring)
+      - method: PUT
+        body: '{ "name": "example-updated", "value": "updated" }'
+        url: .payload.baseUrl + "/resource/" + (.response.body.id | tostring)
+      - method: DELETE
+        url: .payload.baseUrl + "/resource/" + (.response.body.id | tostring)
+    headers:
+      Content-Type:
+        - application/json
+    # Override TLS configuration for this specific request (optional)
+    tlsConfig:
+      caCertSecretRef:
+        name: api-specific-ca
+        namespace: crossplane-system
+        key: ca.crt
+---
+# Example: Request without TLS config override (uses ProviderConfig TLS)
+apiVersion: http.crossplane.io/v1alpha2
+kind: Request
+metadata:
+  name: example-request-provider-tls
+spec:
+  providerConfigRef:
+    name: provider-http-tls
+  forProvider:
+    payload:
+      baseUrl: https://api.example.com
+    mappings:
+      - method: POST
+        body: '{ "name": "example", "value": "test" }'
+        url: .payload.baseUrl + "/resource"
+      - method: GET
+        url: .payload.baseUrl + "/resource/" + (.response.body.id | tostring)
+      - method: DELETE
+        url: .payload.baseUrl + "/resource/" + (.response.body.id | tostring)

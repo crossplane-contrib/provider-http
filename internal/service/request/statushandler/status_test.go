@@ -198,7 +198,7 @@ func Test_SetRequestStatus(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			svcCtx := service.NewServiceContext(context.Background(), tc.args.localKube, logging.NewNopLogger(), nil)
+			svcCtx := service.NewServiceContext(context.Background(), tc.args.localKube, logging.NewNopLogger(), nil, nil)
 			crCtx := service.NewRequestCRContext(tc.args.cr)
 			r, _ := NewStatusHandler(svcCtx, crCtx, tc.args.requestDetails, tc.args.err)
 

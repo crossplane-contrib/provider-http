@@ -34,6 +34,7 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
 
+	"github.com/crossplane-contrib/provider-http/apis/common"
 	"github.com/crossplane-contrib/provider-http/apis/request/v1alpha2"
 	apisv1alpha1 "github.com/crossplane-contrib/provider-http/apis/v1alpha1"
 	httpClient "github.com/crossplane-contrib/provider-http/internal/clients/http"
@@ -137,19 +138,38 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 		return nil, errors.Wrap(err, errNewHttpClient)
 	}
 
+	// Merge TLS configs: resource-level overrides provider-level
+	mergedTLSConfig := httpClient.MergeTLSConfigs(cr.Spec.ForProvider.TLSConfig, pc.Spec.TLS)
+
+	// Apply InsecureSkipTLSVerify from Request spec if set
+	if cr.Spec.ForProvider.InsecureSkipTLSVerify {
+		if mergedTLSConfig == nil {
+			mergedTLSConfig = &common.TLSConfig{}
+		}
+		mergedTLSConfig.InsecureSkipVerify = true
+	}
+
+	// Load TLS configuration from secrets
+	tlsConfigData, err := httpClient.LoadTLSConfig(ctx, c.kube, mergedTLSConfig)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to load TLS configuration")
+	}
+
 	return &external{
-		localKube: c.kube,
-		logger:    l,
-		http:      h,
+		localKube:     c.kube,
+		logger:        l,
+		http:          h,
+		tlsConfigData: tlsConfigData,
 	}, nil
 }
 
 // An ExternalClient observes, then either creates, updates, or deletes an
 // external resource to ensure it reflects the managed resource's desired state.
 type external struct {
-	localKube client.Client
-	logger    logging.Logger
-	http      httpClient.Client
+	localKube     client.Client
+	logger        logging.Logger
+	http          httpClient.Client
+	tlsConfigData *httpClient.TLSConfigData
 }
 
 func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
@@ -158,7 +178,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.New(errNotRequest)
 	}
 
-	svcCtx := service.NewServiceContext(ctx, c.localKube, c.logger, c.http)
+	svcCtx := service.NewServiceContext(ctx, c.localKube, c.logger, c.http, c.tlsConfigData)
 	crCtx := service.NewRequestCRContext(cr)
 	observeRequestDetails, err := request.IsUpToDate(svcCtx, crCtx)
 	if err != nil && err.Error() == observe.ErrObjectNotFound {
@@ -205,7 +225,7 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalCreation{}, errors.Wrap(err, errGetLatestVersion)
 	}
 
-	svcCtx := service.NewServiceContext(ctx, c.localKube, c.logger, c.http)
+	svcCtx := service.NewServiceContext(ctx, c.localKube, c.logger, c.http, c.tlsConfigData)
 	crCtx := service.NewRequestCRContext(cr)
 	return managed.ExternalCreation{}, errors.Wrap(request.DeployAction(svcCtx, crCtx, v1alpha2.ActionCreate), errFailedToSendHttpRequest)
 }
@@ -221,7 +241,7 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalUpdate{}, errors.Wrap(err, errGetLatestVersion)
 	}
 
-	svcCtx := service.NewServiceContext(ctx, c.localKube, c.logger, c.http)
+	svcCtx := service.NewServiceContext(ctx, c.localKube, c.logger, c.http, c.tlsConfigData)
 	crCtx := service.NewRequestCRContext(cr)
 	return managed.ExternalUpdate{}, errors.Wrap(request.DeployAction(svcCtx, crCtx, v1alpha2.ActionUpdate), errFailedToSendHttpRequest)
 }
@@ -237,7 +257,7 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalDelete{}, errors.Wrap(err, errGetLatestVersion)
 	}
 
-	svcCtx := service.NewServiceContext(ctx, c.localKube, c.logger, c.http)
+	svcCtx := service.NewServiceContext(ctx, c.localKube, c.logger, c.http, c.tlsConfigData)
 	crCtx := service.NewRequestCRContext(cr)
 	return managed.ExternalDelete{}, errors.Wrap(request.DeployAction(svcCtx, crCtx, v1alpha2.ActionRemove), errFailedToSendHttpRequest)
 }

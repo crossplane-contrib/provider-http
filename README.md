@@ -30,6 +30,74 @@ To install `provider-http`, you have two options:
 - **DisposableRequest:** Initiates a one-time HTTP request. See [DisposableRequest CRD documentation](resources-docs/disposablerequest_docs.md).
 - **Request:** Manages a resource through HTTP requests. See [Request CRD documentation](resources-docs/request_docs.md).
 
+## TLS Certificate Authentication
+
+The provider supports TLS certificate-based authentication for secure API communication:
+
+- **CA Certificates:** Trust custom certificate authorities
+- **Client Certificates:** Mutual TLS (mTLS) authentication  
+- **Flexible Configuration:** Set TLS at provider or resource level
+- **Secret References:** Load certificates from Kubernetes secrets
+
+### Quick Start
+
+1. **Create certificate secrets:**
+
+```bash
+# CA certificate
+kubectl create secret generic ca-certs \
+  --from-file=ca.crt=./ca-cert.pem \
+  --namespace=crossplane-system
+
+# Client certificate for mTLS
+kubectl create secret tls client-certs \
+  --cert=./client.crt \
+  --key=./client.key \
+  --namespace=crossplane-system
+```
+
+2. **Configure ProviderConfig:**
+
+```yaml
+apiVersion: http.crossplane.io/v1alpha1
+kind: ProviderConfig
+metadata:
+  name: secure-http
+spec:
+  credentials:
+    source: None
+  tls:
+    caCertSecretRef:
+      name: ca-certs
+      namespace: crossplane-system
+      key: ca.crt
+    clientCertSecretRef:
+      name: client-certs
+      namespace: crossplane-system
+      key: tls.crt
+    clientKeySecretRef:
+      name: client-certs
+      namespace: crossplane-system
+      key: tls.key
+```
+
+3. **Use in requests:**
+
+```yaml
+apiVersion: http.crossplane.io/v1alpha2
+kind: Request
+metadata:
+  name: secure-api-call
+spec:
+  providerConfigRef:
+    name: secure-http
+  forProvider:
+    url: https://api.example.com/resource
+    method: GET
+```
+
+See [examples/provider/tls-config.yaml](examples/provider/tls-config.yaml) for more configuration options.
+
 ## Usage
 
 ### DisposableRequest

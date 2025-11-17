@@ -27,6 +27,7 @@ import (
 )
 
 // DisposableRequestParameters are the configurable fields of a DisposableRequest.
+// +kubebuilder:validation:XValidation:rule="!(self.insecureSkipTLSVerify == true && has(self.tlsConfig))",message="insecureSkipTLSVerify and tlsConfig are mutually exclusive"
 type DisposableRequestParameters struct {
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="Field 'forProvider.url' is immutable"
 	URL string `json:"url"`
@@ -43,8 +44,15 @@ type DisposableRequestParameters struct {
 	// RollbackRetriesLimit is max number of attempts to retry HTTP request by sending again the request.
 	RollbackRetriesLimit *int32 `json:"rollbackRetriesLimit,omitempty"`
 
-	// InsecureSkipTLSVerify, when set to true, skips TLS certificate checks for the HTTP request
+	// InsecureSkipTLSVerify, when set to true, skips TLS certificate checks for the HTTP request.
+	// This field is mutually exclusive with TLSConfig.
+	// +optional
 	InsecureSkipTLSVerify bool `json:"insecureSkipTLSVerify,omitempty"`
+
+	// TLSConfig allows overriding the TLS configuration from ProviderConfig for this specific request.
+	// This field is mutually exclusive with InsecureSkipTLSVerify.
+	// +optional
+	TLSConfig *common.TLSConfig `json:"tlsConfig,omitempty"`
 
 	// ExpectedResponse is a jq filter expression used to evaluate the HTTP response and determine if it matches the expected criteria.
 	// The expression should return a boolean; if true, the response is considered expected.

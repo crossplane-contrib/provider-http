@@ -23,14 +23,14 @@ const (
 	testBody           = `{"username": "john_doe"}`
 )
 
-type MockSendRequestFn func(ctx context.Context, method string, url string, body httpClient.Data, headers httpClient.Data, skipTLSVerify bool) (resp httpClient.HttpDetails, err error)
+type MockSendRequestFn func(ctx context.Context, method string, url string, body httpClient.Data, headers httpClient.Data, tlsConfigData *httpClient.TLSConfigData) (resp httpClient.HttpDetails, err error)
 
 type MockHttpClient struct {
 	MockSendRequest MockSendRequestFn
 }
 
-func (c *MockHttpClient) SendRequest(ctx context.Context, method string, url string, body httpClient.Data, headers httpClient.Data, skipTLSVerify bool) (resp httpClient.HttpDetails, err error) {
-	return c.MockSendRequest(ctx, method, url, body, headers, skipTLSVerify)
+func (c *MockHttpClient) SendRequest(ctx context.Context, method string, url string, body httpClient.Data, headers httpClient.Data, tlsConfigData *httpClient.TLSConfigData) (resp httpClient.HttpDetails, err error) {
+	return c.MockSendRequest(ctx, method, url, body, headers, tlsConfigData)
 }
 
 func disposableRequest(modifiers ...func(*v1alpha2.DisposableRequest)) *v1alpha2.DisposableRequest {
@@ -127,7 +127,7 @@ func TestDeployAction(t *testing.T) {
 					MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
 				},
 				httpClient: &MockHttpClient{
-					MockSendRequest: func(ctx context.Context, method string, url string, body httpClient.Data, headers httpClient.Data, skipTLSVerify bool) (resp httpClient.HttpDetails, err error) {
+					MockSendRequest: func(ctx context.Context, method string, url string, body httpClient.Data, headers httpClient.Data, tlsConfigData *httpClient.TLSConfigData) (resp httpClient.HttpDetails, err error) {
 						return httpClient.HttpDetails{}, errBoom
 					},
 				},
@@ -152,7 +152,7 @@ func TestDeployAction(t *testing.T) {
 					MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
 				},
 				httpClient: &MockHttpClient{
-					MockSendRequest: func(ctx context.Context, method string, url string, body httpClient.Data, headers httpClient.Data, skipTLSVerify bool) (resp httpClient.HttpDetails, err error) {
+					MockSendRequest: func(ctx context.Context, method string, url string, body httpClient.Data, headers httpClient.Data, tlsConfigData *httpClient.TLSConfigData) (resp httpClient.HttpDetails, err error) {
 						return httpClient.HttpDetails{
 							HttpResponse: httpClient.HttpResponse{
 								StatusCode: 500,
@@ -190,7 +190,7 @@ func TestDeployAction(t *testing.T) {
 					MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
 				},
 				httpClient: &MockHttpClient{
-					MockSendRequest: func(ctx context.Context, method string, url string, body httpClient.Data, headers httpClient.Data, skipTLSVerify bool) (resp httpClient.HttpDetails, err error) {
+					MockSendRequest: func(ctx context.Context, method string, url string, body httpClient.Data, headers httpClient.Data, tlsConfigData *httpClient.TLSConfigData) (resp httpClient.HttpDetails, err error) {
 						return httpClient.HttpDetails{
 							HttpResponse: httpClient.HttpResponse{
 								StatusCode: 200,
@@ -238,7 +238,7 @@ func TestDeployAction(t *testing.T) {
 					}),
 				},
 				httpClient: &MockHttpClient{
-					MockSendRequest: func(ctx context.Context, method string, url string, body httpClient.Data, headers httpClient.Data, skipTLSVerify bool) (resp httpClient.HttpDetails, err error) {
+					MockSendRequest: func(ctx context.Context, method string, url string, body httpClient.Data, headers httpClient.Data, tlsConfigData *httpClient.TLSConfigData) (resp httpClient.HttpDetails, err error) {
 						return httpClient.HttpDetails{
 							HttpResponse: httpClient.HttpResponse{
 								StatusCode: 200,
@@ -275,7 +275,7 @@ func TestDeployAction(t *testing.T) {
 					MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
 				},
 				httpClient: &MockHttpClient{
-					MockSendRequest: func(ctx context.Context, method string, url string, body httpClient.Data, headers httpClient.Data, skipTLSVerify bool) (resp httpClient.HttpDetails, err error) {
+					MockSendRequest: func(ctx context.Context, method string, url string, body httpClient.Data, headers httpClient.Data, tlsConfigData *httpClient.TLSConfigData) (resp httpClient.HttpDetails, err error) {
 						return httpClient.HttpDetails{
 							HttpResponse: httpClient.HttpResponse{
 								StatusCode: 201,
@@ -305,6 +305,7 @@ func TestDeployAction(t *testing.T) {
 				tc.args.localKube,
 				logging.NewNopLogger(),
 				tc.args.httpClient,
+				nil,
 			)
 			crCtx := service.NewDisposableRequestCRContext(
 				tc.args.dr,
@@ -352,7 +353,7 @@ func TestSendHttpRequest(t *testing.T) {
 				},
 				localKube: &test.MockClient{},
 				httpClient: &MockHttpClient{
-					MockSendRequest: func(ctx context.Context, method string, url string, body httpClient.Data, headers httpClient.Data, skipTLSVerify bool) (resp httpClient.HttpDetails, err error) {
+					MockSendRequest: func(ctx context.Context, method string, url string, body httpClient.Data, headers httpClient.Data, tlsConfigData *httpClient.TLSConfigData) (resp httpClient.HttpDetails, err error) {
 						return httpClient.HttpDetails{
 							HttpResponse: httpClient.HttpResponse{
 								StatusCode: 200,
@@ -378,7 +379,7 @@ func TestSendHttpRequest(t *testing.T) {
 				},
 				localKube: &test.MockClient{},
 				httpClient: &MockHttpClient{
-					MockSendRequest: func(ctx context.Context, method string, url string, body httpClient.Data, headers httpClient.Data, skipTLSVerify bool) (resp httpClient.HttpDetails, err error) {
+					MockSendRequest: func(ctx context.Context, method string, url string, body httpClient.Data, headers httpClient.Data, tlsConfigData *httpClient.TLSConfigData) (resp httpClient.HttpDetails, err error) {
 						return httpClient.HttpDetails{}, errBoom
 					},
 				},
@@ -396,6 +397,7 @@ func TestSendHttpRequest(t *testing.T) {
 				tc.args.localKube,
 				logging.NewNopLogger(),
 				tc.args.httpClient,
+				nil,
 			)
 			details, err := sendHttpRequest(
 				svcCtx,
@@ -486,6 +488,7 @@ func TestPrepareRequestResource(t *testing.T) {
 				tc.args.localKube,
 				logging.NewNopLogger(),
 				nil,
+				nil,
 			)
 			_, err := prepareRequestResource(
 				svcCtx,
@@ -554,6 +557,7 @@ func TestHandleHttpResponse(t *testing.T) {
 				tc.args.localKube,
 				logging.NewNopLogger(),
 				nil, // httpClient not needed for handleHttpResponse
+				nil,
 			)
 			crCtx := service.NewDisposableRequestCRContext(
 				dr,
