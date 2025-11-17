@@ -305,6 +305,7 @@ func TestDeployAction(t *testing.T) {
 				tc.args.localKube,
 				logging.NewNopLogger(),
 				tc.args.httpClient,
+				nil,
 			)
 			crCtx := service.NewDisposableRequestCRContext(
 				tc.args.dr,
@@ -396,7 +397,8 @@ func TestSendHttpRequest(t *testing.T) {
 				tc.args.localKube,
 				logging.NewNopLogger(),
 				tc.args.httpClient,
-			)
+			nil,
+		)
 			details, err := sendHttpRequest(
 				svcCtx,
 				tc.args.spec,
@@ -486,7 +488,8 @@ func TestPrepareRequestResource(t *testing.T) {
 				tc.args.localKube,
 				logging.NewNopLogger(),
 				nil,
-			)
+			nil,
+		)
 			_, err := prepareRequestResource(
 				svcCtx,
 				crCtx,
@@ -554,7 +557,8 @@ func TestHandleHttpResponse(t *testing.T) {
 				tc.args.localKube,
 				logging.NewNopLogger(),
 				nil, // httpClient not needed for handleHttpResponse
-			)
+			nil,
+		)
 			crCtx := service.NewDisposableRequestCRContext(
 				dr,
 			)

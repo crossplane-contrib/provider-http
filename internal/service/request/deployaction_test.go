@@ -340,6 +340,7 @@ func TestDeployAction(t *testing.T) {
 				tc.args.localKube,
 				logging.NewNopLogger(),
 				tc.args.httpClient,
+				nil,
 			)
 			crCtx := service.NewRequestCRContext(tc.args.cr)
 			err := DeployAction(

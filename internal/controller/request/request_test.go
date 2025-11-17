@@ -121,11 +121,7 @@ func (c *MockHttpClient) SendRequestWithTLS(ctx context.Context, method string, 
 		return c.MockSendRequestWithTLS(ctx, method, url, body, headers, tlsConfig)
 	}
 	// Fallback to SendRequest for backward compatibility
-	skipTLSVerify := false
-	if tlsConfig != nil {
-		skipTLSVerify = tlsConfig.InsecureSkipVerify
-	}
-	return c.MockSendRequest(ctx, method, url, body, headers, skipTLSVerify)
+	return c.MockSendRequest(ctx, method, url, body, headers, tlsConfig)
 }
 
 type MockSetRequestStatusFn func() error

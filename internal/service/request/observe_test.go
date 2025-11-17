@@ -407,7 +407,7 @@ func Test_isUpToDate(t *testing.T) {
 		tc := tc // Create local copies of loop variables
 
 		t.Run(name, func(t *testing.T) {
-			svcCtx := service.NewServiceContext(context.Background(, nil), tc.args.localKube, logging.NewNopLogger(), tc.args.http)
+			svcCtx := service.NewServiceContext(context.Background(), tc.args.localKube, logging.NewNopLogger(), tc.args.http, nil)
 			crCtx := service.NewRequestCRContext(tc.args.mg)
 			got, gotErr := IsUpToDate(svcCtx, crCtx)
 			if diff := cmp.Diff(tc.want.err, gotErr, test.EquateErrors()); diff != "" {
@@ -597,7 +597,7 @@ func Test_determineResponseCheck(t *testing.T) {
 		tc := tc // Create local copies of loop variables
 
 		t.Run(name, func(t *testing.T) {
-			svcCtx := service.NewServiceContext(tc.args.ctx, nil, logging.NewNopLogger(, nil), nil)
+			svcCtx := service.NewServiceContext(tc.args.ctx, nil, logging.NewNopLogger(), nil, nil)
 			crCtx := service.NewRequestCRContext(tc.args.cr)
 			got, gotErr := determineIfUpToDate(svcCtx, crCtx, tc.args.details, tc.args.responseErr)
 			if diff := cmp.Diff(tc.want.err, gotErr, test.EquateErrors()); diff != "" {
@@ -818,7 +818,7 @@ func Test_requestDetails(t *testing.T) {
 				}
 				return
 			}
-			svcCtx := service.NewServiceContext(tc.args.ctx, nil, logging.NewNopLogger(, nil), nil)
+			svcCtx := service.NewServiceContext(tc.args.ctx, nil, logging.NewNopLogger(), nil, nil)
 			crCtx := service.NewRequestCRContext(tc.args.cr)
 			got, gotErr := requestgen.GenerateValidRequestDetails(svcCtx, crCtx, mapping)
 			if diff := cmp.Diff(tc.want.err, gotErr, test.EquateErrors()); diff != "" {

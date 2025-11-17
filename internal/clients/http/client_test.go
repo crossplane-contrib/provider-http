@@ -15,7 +15,6 @@ import (
 
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
 	"github.com/google/go-cmp/cmp"
-	"github.com/google/go-cmp/cmp/cmpopts"
 )
 
 const (
@@ -634,130 +633,6 @@ func TestSendRequestIntegration(t *testing.T) {
 			t.Errorf("SendRequest(...): header = %v, want %v", result.HttpResponse.Headers["X-Test-Header"], "test-value")
 		}
 	})
-}
-
-func TestSendRequest(t *testing.T) {
-	type args struct {
-		method        string
-		body          Data
-		headers       Data
-		tlsConfigData *TLSConfigData
-	}
-	type want struct {
-		statusCode  int
-		bodyContent string
-		err         error
-	}
-
-	cases := map[string]struct {
-		args        args
-		want        want
-		setupServer func() *httptest.Server
-	}{
-		"SuccessfulRequestWithSkipTLSVerifyFalse": {
-			args: args{
-				method: http.MethodGet,
-				body: Data{
-					Encrypted: "",
-					Decrypted: "",
-				},
-				headers: Data{
-					Encrypted: map[string][]string{},
-					Decrypted: map[string][]string{},
-				},
-				tlsConfigData: nil,
-			},
-			want: want{
-				statusCode:  http.StatusOK,
-				bodyContent: "success",
-				err:         nil,
-			},
-			setupServer: func() *httptest.Server {
-				return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					w.WriteHeader(http.StatusOK)
-					w.Write([]byte("success"))
-				}))
-			},
-		},
-		"SuccessfulRequestWithSkipTLSVerifyTrue": {
-			args: args{
-				method: http.MethodGet,
-				body: Data{
-					Encrypted: "",
-					Decrypted: "",
-				},
-				headers: Data{
-					Encrypted: map[string][]string{},
-					Decrypted: map[string][]string{},
-				},
-				tlsConfigData: &TLSConfigData{InsecureSkipVerify: true},
-			},
-			want: want{
-				statusCode:  http.StatusOK,
-				bodyContent: "success-insecure",
-				err:         nil,
-			},
-			setupServer: func() *httptest.Server {
-				return httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					w.WriteHeader(http.StatusOK)
-					w.Write([]byte("success-insecure"))
-				}))
-			},
-		},
-		"VerifyDelegationToSendRequest": {
-			args: args{
-				method: http.MethodPost,
-				body: Data{
-					Encrypted: "encrypted",
-					Decrypted: `{"test":"data"}`,
-				},
-				headers: Data{
-					Encrypted: map[string][]string{"Content-Type": {"application/json"}},
-					Decrypted: map[string][]string{"Content-Type": {"application/json"}},
-				},
-				tlsConfigData: nil,
-			},
-			want: want{
-				statusCode:  http.StatusCreated,
-				bodyContent: "created",
-				err:         nil,
-			},
-			setupServer: func() *httptest.Server {
-				return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					w.WriteHeader(http.StatusCreated)
-					w.Write([]byte("created"))
-				}))
-			},
-		},
-	}
-
-	for name, tc := range cases {
-		t.Run(name, func(t *testing.T) {
-			server := tc.setupServer()
-			defer server.Close()
-
-			c, err := NewClient(logging.NewNopLogger(), 30*time.Second, "")
-			if err != nil {
-				t.Fatalf("NewClient(...): unexpected error: %v", err)
-			}
-
-			got, gotErr := c.SendRequest(context.Background(), tc.args.method, server.URL, tc.args.body, tc.args.headers, tc.args.tlsConfigData)
-
-			if diff := cmp.Diff(tc.want.err, gotErr, cmpopts.EquateErrors()); diff != "" {
-				t.Fatalf("SendRequest(...): -want error, +got error: %s", diff)
-			}
-
-			if tc.want.err == nil {
-				if got.HttpResponse.StatusCode != tc.want.statusCode {
-					t.Errorf("SendRequest(...): statusCode = %v, want %v", got.HttpResponse.StatusCode, tc.want.statusCode)
-				}
-
-				if got.HttpResponse.Body != tc.want.bodyContent {
-					t.Errorf("SendRequest(...): body = %v, want %v", got.HttpResponse.Body, tc.want.bodyContent)
-				}
-			}
-		})
-	}
 }
 
 func TestNewClient(t *testing.T) {
