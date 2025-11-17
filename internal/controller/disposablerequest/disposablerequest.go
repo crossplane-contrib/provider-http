@@ -34,8 +34,8 @@ import (
 	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
 
-	"github.com/crossplane-contrib/provider-http/apis/disposablerequest/v1alpha2"
-	apisv1alpha1 "github.com/crossplane-contrib/provider-http/apis/v1alpha1"
+	"github.com/crossplane-contrib/provider-http/apis/cluster/disposablerequest/v1alpha2"
+	apisv1alpha1 "github.com/crossplane-contrib/provider-http/apis/cluster/v1alpha1"
 	httpClient "github.com/crossplane-contrib/provider-http/internal/clients/http"
 	"github.com/crossplane-contrib/provider-http/internal/service"
 	"github.com/crossplane-contrib/provider-http/internal/service/disposablerequest"

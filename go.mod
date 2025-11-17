@@ -4,22 +4,25 @@ go 1.24.0
 
 toolchain go1.24.6
 
+tool sigs.k8s.io/controller-tools/cmd/controller-gen
+
+tool github.com/crossplane/crossplane-tools/cmd/angryjet
+
 require (
 	github.com/crossplane/crossplane-runtime/v2 v2.0.0
-	github.com/crossplane/crossplane-tools v0.0.0-20240522174801-1ad3d4c87f21
 	github.com/google/go-cmp v0.7.0
 	github.com/pkg/errors v0.9.1
 	gopkg.in/alecthomas/kingpin.v2 v2.2.6
 	k8s.io/apimachinery v0.34.1
 	k8s.io/client-go v0.34.1
 	sigs.k8s.io/controller-runtime v0.21.0
-	sigs.k8s.io/controller-tools v0.18.0
 )
 
 require (
 	dario.cat/mergo v1.0.1 // indirect
 	github.com/alecthomas/kingpin/v2 v2.4.0 // indirect
 	github.com/blang/semver/v4 v4.0.0 // indirect
+	github.com/crossplane/crossplane-tools v0.0.0-20240522174801-1ad3d4c87f21 // indirect
 	github.com/evanphx/json-patch v5.9.11+incompatible // indirect
 	github.com/fxamacker/cbor/v2 v2.9.0 // indirect
 	github.com/google/btree v1.1.3 // indirect
@@ -38,6 +41,7 @@ require (
 	gopkg.in/evanphx/json-patch.v4 v4.12.0 // indirect
 	k8s.io/code-generator v0.33.0 // indirect
 	k8s.io/gengo/v2 v2.0.0-20250604051438-85fd79dbfd9f // indirect
+	sigs.k8s.io/controller-tools v0.18.0 // indirect
 	sigs.k8s.io/randfill v1.0.0 // indirect
 	sigs.k8s.io/structured-merge-diff/v6 v6.3.0 // indirect
 )

@@ -6,7 +6,7 @@ import (
 
 	"github.com/crossplane-contrib/provider-http/apis/common"
 	"github.com/crossplane-contrib/provider-http/apis/interfaces"
-	"github.com/crossplane-contrib/provider-http/apis/request/v1alpha2"
+	"github.com/crossplane-contrib/provider-http/apis/cluster/request/v1alpha2"
 	httpClient "github.com/crossplane-contrib/provider-http/internal/clients/http"
 	kubehandler "github.com/crossplane-contrib/provider-http/internal/kube-handler"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/logging"

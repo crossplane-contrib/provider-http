@@ -22,7 +22,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/crossplane-contrib/provider-http/apis/disposablerequest/v1alpha2"
+	"github.com/crossplane-contrib/provider-http/apis/cluster/disposablerequest/v1alpha2"
 	httpClient "github.com/crossplane-contrib/provider-http/internal/clients/http"
 	"github.com/crossplane-contrib/provider-http/internal/service"
 	"github.com/crossplane-contrib/provider-http/internal/service/disposablerequest"
