@@ -35,7 +35,6 @@ import (
 	"github.com/crossplane/crossplane-runtime/v2/pkg/test"
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -45,9 +44,9 @@ var (
 )
 
 const (
-	providerName              = "http-test"
+	providerName                        = "http-test"
 	testNamespacedDisposableRequestName = "test-request"
-	testNamespace             = "testns"
+	testNamespace                       = "testns"
 )
 
 var testHeaders = map[string][]string{
@@ -57,7 +56,7 @@ var testHeaders = map[string][]string{
 	"programming_languages": {"Go", "Python", "JavaScript"},
 }
 
-var testTimeout = &v1.Duration{
+var testTimeout = &metav1.Duration{
 	Duration: 5 * time.Minute,
 }
 
@@ -85,7 +84,7 @@ type httpNamespacedDisposableRequestModifier func(request *v1alpha2.DisposableRe
 
 func httpNamespacedDisposableRequest(rm ...httpNamespacedDisposableRequestModifier) *v1alpha2.DisposableRequest {
 	r := &v1alpha2.DisposableRequest{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      testNamespacedDisposableRequestName,
 			Namespace: testNamespace,
 		},
@@ -131,9 +130,9 @@ func namespacedDisposableRequest(modifiers ...func(*v1alpha2.DisposableRequest))
 }
 
 func namespacedDisposableRequestWithDeletion() *v1alpha2.DisposableRequest {
-	now := v1.Now()
+	now := metav1.Now()
 	return &v1alpha2.DisposableRequest{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:              "test-disposable",
 			Namespace:         "default",
 			DeletionTimestamp: &now,

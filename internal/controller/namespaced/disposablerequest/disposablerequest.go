@@ -98,6 +98,8 @@ type connector struct {
 }
 
 // Connect returns a new ExternalClient.
+//
+//gocyclo:ignore
 func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.ExternalClient, error) {
 	cr, ok := mg.(*v1alpha2.DisposableRequest)
 	if !ok {

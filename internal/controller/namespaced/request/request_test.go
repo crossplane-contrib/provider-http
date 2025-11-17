@@ -24,9 +24,9 @@ var (
 )
 
 const (
-	providerName          = "http-test"
+	providerName              = "http-test"
 	testNamespacedRequestName = "test-request"
-	testNamespace         = "testns"
+	testNamespace             = "testns"
 )
 
 var (
