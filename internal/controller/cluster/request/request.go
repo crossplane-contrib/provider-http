@@ -22,6 +22,7 @@ import (
 
 	"github.com/crossplane/crossplane-runtime/v2/pkg/feature"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/logging"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -45,17 +46,13 @@ import (
 )
 
 const (
-	errNotRequest                   = "managed resource is not a Request custom resource"
-	errTrackPCUsage                 = "cannot track ProviderConfig usage"
-	errNewHttpClient                = "cannot create new Http client"
-	errProviderNotRetrieved         = "provider could not be retrieved"
-	errFailedToSendHttpRequest      = "something went wrong"
-	errFailedToCheckIfUpToDate      = "failed to check if request is up to date"
-	errFailedToUpdateStatusFailures = "failed to reset status failures counter"
-	errFailedUpdateStatusConditions = "failed updating status conditions"
-	errPatchDataToSecret            = "Warning, couldn't patch data from request to secret %s:%s:%s, error: %s"
-	errGetLatestVersion             = "failed to get the latest version of the resource"
-	errExtractCredentials           = "cannot extract credentials"
+	errNotRequest              = "managed resource is not a Request custom resource"
+	errNewHttpClient           = "cannot create new Http client"
+	errProviderNotRetrieved    = "provider could not be retrieved"
+	errFailedToSendHttpRequest = "something went wrong"
+	errFailedToCheckIfUpToDate = "failed to check if request is up to date"
+	errGetLatestVersion        = "failed to get the latest version of the resource"
+	errExtractCredentials      = "cannot extract credentials"
 )
 
 // Setup adds a controller that reconciles Request managed resources.
@@ -98,7 +95,6 @@ func Setup(mgr ctrl.Manager, o controller.Options, timeout time.Duration) error 
 type connector struct {
 	logger          logging.Logger
 	kube            client.Client
-	usage           resource.Tracker
 	newHttpClientFn func(log logging.Logger, timeout time.Duration, creds string) (httpClient.Client, error)
 }
 
@@ -111,8 +107,12 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 
 	l := c.logger.WithValues("request", cr.Name)
 
-	if err := c.usage.Track(ctx, mg); err != nil {
-		return nil, errors.Wrap(err, errTrackPCUsage)
+	// Set default providerConfigRef if not specified
+	if cr.GetProviderConfigReference() == nil {
+		cr.SetProviderConfigReference(&xpv1.Reference{
+			Name: "default",
+		})
+		l.Debug("No providerConfigRef specified, defaulting to 'default'")
 	}
 
 	pc := &apisv1alpha1.ProviderConfig{}
@@ -155,6 +155,13 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	cr, ok := mg.(*v1alpha2.Request)
 	if !ok {
 		return managed.ExternalObservation{}, errors.New(errNotRequest)
+	}
+
+	if meta.WasDeleted(mg) {
+		c.logger.Debug("Request is being deleted, skipping observation")
+		return managed.ExternalObservation{
+			ResourceExists: false,
+		}, nil
 	}
 
 	svcCtx := service.NewServiceContext(ctx, c.localKube, c.logger, c.http)

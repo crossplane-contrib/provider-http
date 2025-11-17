@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/crossplane-contrib/provider-http/apis/common"
 	"github.com/crossplane-contrib/provider-http/apis/cluster/request/v1alpha2"
+	"github.com/crossplane-contrib/provider-http/apis/common"
 	httpClient "github.com/crossplane-contrib/provider-http/internal/clients/http"
 	"github.com/crossplane-contrib/provider-http/internal/service"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/logging"

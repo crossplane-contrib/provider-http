@@ -22,6 +22,7 @@ import (
 
 	"github.com/crossplane/crossplane-runtime/v2/pkg/feature"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/logging"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -108,6 +109,14 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 		return nil, errors.Wrap(err, errTrackPCUsage)
 	}
 
+	// Set default providerConfigRef if not specified
+	if cr.GetProviderConfigReference() == nil {
+		cr.SetProviderConfigReference(&xpv1.Reference{
+			Name: "default",
+		})
+		l.Debug("No providerConfigRef specified, defaulting to 'default'")
+	}
+
 	pc := &apisv1alpha1.ProviderConfig{}
 	n := types.NamespacedName{Name: cr.GetProviderConfigReference().Name}
 	if err := c.kube.Get(ctx, n, pc); err != nil {
@@ -143,10 +152,19 @@ type external struct {
 }
 
 // Observe checks the state of the DisposableRequest resource and updates its status accordingly.
+//
+//gocyclo:ignore
 func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
 	cr, ok := mg.(*v1alpha2.DisposableRequest)
 	if !ok {
 		return managed.ExternalObservation{}, errors.New(errNotDisposableRequest)
+	}
+
+	if meta.WasDeleted(mg) {
+		c.logger.Debug("DisposableRequest is being deleted, skipping observation and secret injection")
+		return managed.ExternalObservation{
+			ResourceExists: false,
+		}, nil
 	}
 
 	isUpToDate := !(utils.ShouldRetry(cr.Spec.ForProvider.RollbackRetriesLimit, cr.Status.Failed) && !utils.RetriesLimitReached(cr.Status.Failed, cr.Spec.ForProvider.RollbackRetriesLimit))

@@ -14,3 +14,6 @@ kubeconfig
 # Test server binaries
 cluster/test/server
 cluster/test/testserver
+
+argo-application.yaml
+CLAUDE.md

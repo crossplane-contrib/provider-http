@@ -73,7 +73,6 @@ type ProviderConfigList struct {
 	Items           []ProviderConfig `json:"items"`
 }
 
-
 // ProviderConfig type metadata.
 var (
 	ProviderConfigKind             = reflect.TypeOf(ProviderConfig{}).Name()
@@ -81,7 +80,6 @@ var (
 	ProviderConfigKindAPIVersion   = ProviderConfigKind + "." + SchemeGroupVersion.String()
 	ProviderConfigGroupVersionKind = SchemeGroupVersion.WithKind(ProviderConfigKind)
 )
-
 
 // GetCondition returns the condition for the given ConditionType if exists,
 // otherwise returns nil
@@ -103,7 +101,6 @@ func (pc *ProviderConfig) GetUsers() int64 {
 func (pc *ProviderConfig) SetUsers(i int64) {
 	pc.Status.Users = i
 }
-
 
 func init() {
 	SchemeBuilder.Register(&ProviderConfig{}, &ProviderConfigList{})

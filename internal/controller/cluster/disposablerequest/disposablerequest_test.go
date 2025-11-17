@@ -826,6 +826,54 @@ func TestDisposableRequestManagementPoliciesResolver(t *testing.T) {
 	}
 }
 
+func TestObserve_DeletionMonitoring(t *testing.T) {
+	type args struct {
+		http      httpClient.Client
+		localKube client.Client
+		mg        resource.Managed
+	}
+	type want struct {
+		obs managed.ExternalObservation
+		err error
+	}
+
+	cases := []struct {
+		name string
+		args args
+		want want
+	}{
+		{
+			name: "ResourceBeingDeleted",
+			args: args{
+				mg: disposableRequestWithDeletion(),
+			},
+			want: want{
+				obs: managed.ExternalObservation{
+					ResourceExists: false,
+				},
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			e := &external{
+				logger:    logging.NewNopLogger(),
+				localKube: tc.args.localKube,
+				http:      tc.args.http,
+			}
+
+			got, err := e.Observe(context.Background(), tc.args.mg)
+			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
+				t.Errorf("Observe(...): -want error, +got error: %s", diff)
+			}
+			if diff := cmp.Diff(tc.want.obs, got); diff != "" {
+				t.Errorf("Observe(...): -want, +got: %s", diff)
+			}
+		})
+	}
+}
+
 func TestDisposableRequestManagementPolicies(t *testing.T) {
 	cases := map[string]struct {
 		reason string
@@ -919,5 +967,23 @@ func TestDisposableRequestManagementPolicies(t *testing.T) {
 				t.Errorf("\n%s\nManagementPolicies: -want, +got:\n%s", tc.reason, diff)
 			}
 		})
+	}
+}
+
+func disposableRequestWithDeletion() *v1alpha2.DisposableRequest {
+	now := v1.Now()
+	return &v1alpha2.DisposableRequest{
+		ObjectMeta: v1.ObjectMeta{
+			Name:              "test-disposable",
+			Namespace:         "default",
+			DeletionTimestamp: &now,
+		},
+		Spec: v1alpha2.DisposableRequestSpec{
+			ForProvider: v1alpha2.DisposableRequestParameters{
+				URL:    "http://example.com/test",
+				Method: "POST",
+				Body:   `{"test": true}`,
+			},
+		},
 	}
 }

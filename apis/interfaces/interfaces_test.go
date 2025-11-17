@@ -24,11 +24,11 @@ import (
 	clusterdisposablerequestv1alpha2 "github.com/crossplane-contrib/provider-http/apis/cluster/disposablerequest/v1alpha2"
 	clusterrequestv1alpha1 "github.com/crossplane-contrib/provider-http/apis/cluster/request/v1alpha1"
 	clusterrequestv1alpha2 "github.com/crossplane-contrib/provider-http/apis/cluster/request/v1alpha2"
-	
+
 	// Namespaced imports
 	namespaceddisposablerequestv1alpha2 "github.com/crossplane-contrib/provider-http/apis/namespaced/disposablerequest/v1alpha2"
 	namespacedrequestv1alpha2 "github.com/crossplane-contrib/provider-http/apis/namespaced/request/v1alpha2"
-	
+
 	"github.com/crossplane-contrib/provider-http/apis/interfaces"
 )
 

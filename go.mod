@@ -22,7 +22,8 @@ require (
 	dario.cat/mergo v1.0.1 // indirect
 	github.com/alecthomas/kingpin/v2 v2.4.0 // indirect
 	github.com/blang/semver/v4 v4.0.0 // indirect
-	github.com/crossplane/crossplane-tools v0.0.0-20240522174801-1ad3d4c87f21 // indirect
+	github.com/crossplane/crossplane-tools v0.0.0-20251017183449-dd4517244339 // indirect
+	github.com/dave/jennifer v1.7.1 // indirect
 	github.com/evanphx/json-patch v5.9.11+incompatible // indirect
 	github.com/fxamacker/cbor/v2 v2.9.0 // indirect
 	github.com/google/btree v1.1.3 // indirect
@@ -48,10 +49,9 @@ require (
 
 require (
 	github.com/alecthomas/template v0.0.0-20190718012654-fb15b899a751 // indirect
-	github.com/alecthomas/units v0.0.0-20211218093645-b94a6e3cc137 // indirect
+	github.com/alecthomas/units v0.0.0-20240927000941-0f3dac36c52b // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
-	github.com/dave/jennifer v1.7.0 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/emicklei/go-restful/v3 v3.12.2 // indirect
 	github.com/evanphx/json-patch/v5 v5.9.11 // indirect

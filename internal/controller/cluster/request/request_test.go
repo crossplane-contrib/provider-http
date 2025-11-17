@@ -807,3 +807,58 @@ func TestRequestManagementPoliciesResolver(t *testing.T) {
 		})
 	}
 }
+
+func httpRequestWithDeletion() *v1alpha2.Request {
+	now := v1.Now()
+	return httpRequest(func(r *v1alpha2.Request) {
+		r.DeletionTimestamp = &now
+	})
+}
+
+func TestObserve_DeletionMonitoring(t *testing.T) {
+	type args struct {
+		http      httpClient.Client
+		localKube client.Client
+		mg        resource.Managed
+	}
+	type want struct {
+		obs managed.ExternalObservation
+		err error
+	}
+
+	cases := []struct {
+		name string
+		args args
+		want want
+	}{
+		{
+			name: "ResourceBeingDeleted",
+			args: args{
+				mg: httpRequestWithDeletion(),
+			},
+			want: want{
+				obs: managed.ExternalObservation{
+					ResourceExists: false,
+				},
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			e := &external{
+				logger:    logging.NewNopLogger(),
+				localKube: tc.args.localKube,
+				http:      tc.args.http,
+			}
+
+			got, err := e.Observe(context.Background(), tc.args.mg)
+			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
+				t.Errorf("Observe(...): -want error, +got error: %s", diff)
+			}
+			if diff := cmp.Diff(tc.want.obs, got); diff != "" {
+				t.Errorf("Observe(...): -want, +got: %s", diff)
+			}
+		})
+	}
+}

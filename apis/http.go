@@ -24,8 +24,8 @@ import (
 	clusterrequestv1alpha2 "github.com/crossplane-contrib/provider-http/apis/cluster/request/v1alpha2"
 	clusterhttpv1alpha1 "github.com/crossplane-contrib/provider-http/apis/cluster/v1alpha1"
 	namespaceddisposablerequestv1alpha2 "github.com/crossplane-contrib/provider-http/apis/namespaced/disposablerequest/v1alpha2"
-	namespacedhtpv1alpha2 "github.com/crossplane-contrib/provider-http/apis/namespaced/v1alpha2"
 	namespacedrequestv1alpha2 "github.com/crossplane-contrib/provider-http/apis/namespaced/request/v1alpha2"
+	namespacedhtpv1alpha2 "github.com/crossplane-contrib/provider-http/apis/namespaced/v1alpha2"
 )
 
 func init() {

@@ -44,7 +44,7 @@ spec:
       # Scenario 2: Action specified, method not specified (defaults to GET for OBSERVE)
       - action: OBSERVE
         # method: "GET"
-        url: .payload.baseUrl + "/" + (.response.body.id|tostring)
+        url: .payload.baseUrl + "/" + (.response.body.id | tostring)
         # If the ID of the external resource is known in advance, ownership of the resource can be attempted:
         # url: (.payload.baseUrl + "/1234567890")
 
@@ -56,12 +56,12 @@ spec:
             email: .payload.body.email, 
             age: .payload.body.age
           }
-        url: .payload.baseUrl + "/" + (.response.body.id|tostring)
+        url: .payload.baseUrl + "/" + (.response.body.id | tostring)
 
       # Scenario 4: Action specified, method not specified (defaults to DELETE for REMOVE)
       - action: REMOVE
         # method: "DELETE"
-        url: .payload.baseUrl + "/" + (.response.body.id|tostring)
+        url: .payload.baseUrl + "/" + (.response.body.id | tostring)
     
     # expectedResponseCheck is optional. If not specified or if the type is "DEFAULT", 
     # the resource is considered up to date if the GET response containes the PUT body.

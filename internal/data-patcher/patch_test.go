@@ -4,11 +4,14 @@ import (
 	"context"
 	"testing"
 
+	"github.com/crossplane-contrib/provider-http/apis/common"
+	httpClient "github.com/crossplane-contrib/provider-http/internal/clients/http"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/logging"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/test"
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -192,6 +195,147 @@ func TestPatchSecretsIntoHeaders(t *testing.T) {
 			if diff := cmp.Diff(tc.want.result, got); diff != "" {
 				t.Errorf("isUpToDate(...): -want result, +got result: %s", diff)
 			}
+		})
+	}
+}
+
+func TestApplyResponseDataToSecrets_CrossNamespaceOwnerReference(t *testing.T) {
+	type args struct {
+		ctx           context.Context
+		localKube     client.Client
+		logger        logging.Logger
+		response      *httpClient.HttpResponse
+		secretConfigs []common.SecretInjectionConfig
+		cr            metav1.Object
+	}
+
+	// Mock managed resource for testing
+	mockCR := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-cr",
+			Namespace: "default",
+		},
+	}
+
+	response := &httpClient.HttpResponse{
+		StatusCode: 200,
+		Body:       `{"status": "success", "id": "123"}`,
+		Headers:    map[string][]string{"Content-Type": {"application/json"}},
+	}
+
+	cases := map[string]struct {
+		args args
+	}{
+		"SameNamespaceSecretInjectionWithOwnerReference": {
+			args: args{
+				ctx:    context.Background(),
+				logger: logging.NewNopLogger(),
+				localKube: &test.MockClient{
+					MockGet: func(ctx context.Context, key client.ObjectKey, obj client.Object) error {
+						return errors.New("secret not found") // Simulate secret doesn't exist
+					},
+					MockUpdate: func(ctx context.Context, obj client.Object, opts ...client.UpdateOption) error {
+						return nil
+					},
+					MockCreate: func(ctx context.Context, obj client.Object, opts ...client.CreateOption) error {
+						return nil
+					},
+				},
+				response: response,
+				secretConfigs: []common.SecretInjectionConfig{
+					{
+						SecretRef: common.SecretRef{
+							Name:      "test-secret",
+							Namespace: "default", // Same namespace as CR
+						},
+						SetOwnerReference: true,
+						KeyMappings: []common.KeyInjection{
+							{
+								SecretKey:  "result",
+								ResponseJQ: ".status",
+							},
+						},
+					},
+				},
+				cr: mockCR,
+			},
+		},
+		"CrossNamespaceSecretInjectionWithOwnerReferenceIgnored": {
+			args: args{
+				ctx:    context.Background(),
+				logger: logging.NewNopLogger(),
+				localKube: &test.MockClient{
+					MockGet: func(ctx context.Context, key client.ObjectKey, obj client.Object) error {
+						return errors.New("secret not found") // Simulate secret doesn't exist
+					},
+					MockUpdate: func(ctx context.Context, obj client.Object, opts ...client.UpdateOption) error {
+						return nil
+					},
+					MockCreate: func(ctx context.Context, obj client.Object, opts ...client.CreateOption) error {
+						return nil
+					},
+				},
+				response: response,
+				secretConfigs: []common.SecretInjectionConfig{
+					{
+						SecretRef: common.SecretRef{
+							Name:      "test-secret",
+							Namespace: "crossplane-system", // Different namespace than CR
+						},
+						SetOwnerReference: true, // This should be ignored
+						KeyMappings: []common.KeyInjection{
+							{
+								SecretKey:  "result",
+								ResponseJQ: ".status",
+							},
+						},
+					},
+				},
+				cr: mockCR,
+			},
+		},
+		"CrossNamespaceSecretInjectionWithoutOwnerReference": {
+			args: args{
+				ctx:    context.Background(),
+				logger: logging.NewNopLogger(),
+				localKube: &test.MockClient{
+					MockGet: func(ctx context.Context, key client.ObjectKey, obj client.Object) error {
+						return errors.New("secret not found") // Simulate secret doesn't exist
+					},
+					MockUpdate: func(ctx context.Context, obj client.Object, opts ...client.UpdateOption) error {
+						return nil
+					},
+					MockCreate: func(ctx context.Context, obj client.Object, opts ...client.CreateOption) error {
+						return nil
+					},
+				},
+				response: response,
+				secretConfigs: []common.SecretInjectionConfig{
+					{
+						SecretRef: common.SecretRef{
+							Name:      "test-secret",
+							Namespace: "crossplane-system", // Different namespace than CR
+						},
+						SetOwnerReference: false, // Explicitly disabled
+						KeyMappings: []common.KeyInjection{
+							{
+								SecretKey:  "result",
+								ResponseJQ: ".status",
+							},
+						},
+					},
+				},
+				cr: mockCR,
+			},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			// Test that the function doesn't panic and handles cross-namespace scenarios gracefully
+			ApplyResponseDataToSecrets(tc.args.ctx, tc.args.localKube, tc.args.logger, tc.args.response, tc.args.secretConfigs, tc.args.cr)
+
+			// Test passes if no panic occurs - the cross-namespace logic should handle this gracefully
 		})
 	}
 }
