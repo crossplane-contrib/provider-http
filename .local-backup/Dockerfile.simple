@@ -1,4 +1,0 @@
-FROM gcr.io/distroless/static:latest
-COPY provider /usr/local/bin/crossplane-http-provider
-USER 65532:65532
-ENTRYPOINT ["/usr/local/bin/crossplane-http-provider"]
