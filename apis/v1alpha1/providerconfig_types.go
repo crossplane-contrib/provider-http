@@ -22,8 +22,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
+	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
 )
+
+// verify interface casting required by controller
+var _ resource.ProviderConfig = &ProviderConfig{}
 
 // A ProviderConfigSpec defines the desired state of a ProviderConfig.
 type ProviderConfigSpec struct {
@@ -76,6 +80,27 @@ var (
 	ProviderConfigKindAPIVersion   = ProviderConfigKind + "." + SchemeGroupVersion.String()
 	ProviderConfigGroupVersionKind = SchemeGroupVersion.WithKind(ProviderConfigKind)
 )
+
+// GetCondition returns the condition for the given ConditionType if exists,
+// otherwise returns nil
+func (pc *ProviderConfig) GetCondition(ct xpv1.ConditionType) xpv1.Condition {
+	return pc.Status.GetCondition(ct)
+}
+
+// SetConditions sets the conditions on the resource status
+func (pc *ProviderConfig) SetConditions(c ...xpv1.Condition) {
+	pc.Status.SetConditions(c...)
+}
+
+// GetUsers returns the number of users of this ProviderConfig.
+func (pc *ProviderConfig) GetUsers() int64 {
+	return pc.Status.Users
+}
+
+// SetUsers sets the number of users of this ProviderConfig.
+func (pc *ProviderConfig) SetUsers(i int64) {
+	pc.Status.Users = i
+}
 
 func init() {
 	SchemeBuilder.Register(&ProviderConfig{}, &ProviderConfigList{})

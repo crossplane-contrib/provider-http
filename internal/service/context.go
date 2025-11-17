@@ -3,7 +3,7 @@ package service
 import (
 	"context"
 
-	"github.com/crossplane/crossplane-runtime/pkg/logging"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/logging"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	httpClient "github.com/crossplane-contrib/provider-http/internal/clients/http"

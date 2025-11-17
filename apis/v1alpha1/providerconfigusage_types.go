@@ -22,8 +22,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
+	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
 )
+
+// verify interface casting required by controller
+var _ resource.ProviderConfigUsage = &ProviderConfigUsage{}
+var _ resource.ProviderConfigUsageList = &ProviderConfigUsageList{}
 
 // +kubebuilder:object:root=true
 
@@ -61,6 +66,25 @@ var (
 	ProviderConfigUsageListKindAPIVersion   = ProviderConfigUsageListKind + "." + SchemeGroupVersion.String()
 	ProviderConfigUsageListGroupVersionKind = SchemeGroupVersion.WithKind(ProviderConfigUsageListKind)
 )
+
+// SetResourceReference sets the resource reference.
+func (pcu *ProviderConfigUsage) SetResourceReference(r xpv1.TypedReference) {
+	pcu.ResourceReference = r
+}
+
+// GetResourceReference gets the resource reference.
+func (pcu *ProviderConfigUsage) GetResourceReference() xpv1.TypedReference {
+	return pcu.ResourceReference
+}
+
+// GetItems returns the list of ProviderConfigUsage items.
+func (pcul *ProviderConfigUsageList) GetItems() []resource.ProviderConfigUsage {
+	items := make([]resource.ProviderConfigUsage, len(pcul.Items))
+	for i := range pcul.Items {
+		items[i] = &pcul.Items[i]
+	}
+	return items
+}
 
 func init() {
 	SchemeBuilder.Register(&ProviderConfigUsage{}, &ProviderConfigUsageList{})
