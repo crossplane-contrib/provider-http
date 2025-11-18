@@ -19,66 +19,108 @@ package interfaces_test
 import (
 	"testing"
 
-	disposablerequestv1alpha1 "github.com/crossplane-contrib/provider-http/apis/disposablerequest/v1alpha1"
-	disposablerequestv1alpha2 "github.com/crossplane-contrib/provider-http/apis/disposablerequest/v1alpha2"
+	// Cluster-scoped imports
+	clusterdisposablerequestv1alpha1 "github.com/crossplane-contrib/provider-http/apis/cluster/disposablerequest/v1alpha1"
+	clusterdisposablerequestv1alpha2 "github.com/crossplane-contrib/provider-http/apis/cluster/disposablerequest/v1alpha2"
+	clusterrequestv1alpha1 "github.com/crossplane-contrib/provider-http/apis/cluster/request/v1alpha1"
+	clusterrequestv1alpha2 "github.com/crossplane-contrib/provider-http/apis/cluster/request/v1alpha2"
+
+	// Namespaced imports
+	namespaceddisposablerequestv1alpha2 "github.com/crossplane-contrib/provider-http/apis/namespaced/disposablerequest/v1alpha2"
+	namespacedrequestv1alpha2 "github.com/crossplane-contrib/provider-http/apis/namespaced/request/v1alpha2"
+
 	"github.com/crossplane-contrib/provider-http/apis/interfaces"
-	requestv1alpha1 "github.com/crossplane-contrib/provider-http/apis/request/v1alpha1"
-	requestv1alpha2 "github.com/crossplane-contrib/provider-http/apis/request/v1alpha2"
 )
 
-// TestInterfaceImplementations verifies that all types properly implement the expected interfaces.
-func TestInterfaceImplementations(t *testing.T) {
+// TestClusterScopedInterfaceImplementations verifies that cluster-scoped types properly implement the expected interfaces.
+func TestClusterScopedInterfaceImplementations(t *testing.T) {
 	// Test v1alpha2.RequestParameters implements MappedHTTPRequestSpec
-	var _ interfaces.MappedHTTPRequestSpec = (*requestv1alpha2.RequestParameters)(nil)
+	var _ interfaces.MappedHTTPRequestSpec = (*clusterrequestv1alpha2.RequestParameters)(nil)
 
 	// Test v1alpha1.RequestParameters implements MappedHTTPRequestSpec
-	var _ interfaces.MappedHTTPRequestSpec = (*requestv1alpha1.RequestParameters)(nil)
+	var _ interfaces.MappedHTTPRequestSpec = (*clusterrequestv1alpha1.RequestParameters)(nil)
 
 	// Test v1alpha2.DisposableRequestParameters implements SimpleHTTPRequestSpec
-	var _ interfaces.SimpleHTTPRequestSpec = (*disposablerequestv1alpha2.DisposableRequestParameters)(nil)
+	var _ interfaces.SimpleHTTPRequestSpec = (*clusterdisposablerequestv1alpha2.DisposableRequestParameters)(nil)
 
 	// Test v1alpha1.DisposableRequestParameters implements SimpleHTTPRequestSpec
-	var _ interfaces.SimpleHTTPRequestSpec = (*disposablerequestv1alpha1.DisposableRequestParameters)(nil)
+	var _ interfaces.SimpleHTTPRequestSpec = (*clusterdisposablerequestv1alpha1.DisposableRequestParameters)(nil)
 
 	// Test Response types implement HTTPResponse
-	var _ interfaces.HTTPResponse = (*requestv1alpha2.Response)(nil)
-	var _ interfaces.HTTPResponse = (*requestv1alpha1.Response)(nil)
-	var _ interfaces.HTTPResponse = (*disposablerequestv1alpha2.Response)(nil)
-	var _ interfaces.HTTPResponse = (*disposablerequestv1alpha1.Response)(nil)
+	var _ interfaces.HTTPResponse = (*clusterrequestv1alpha2.Response)(nil)
+	var _ interfaces.HTTPResponse = (*clusterrequestv1alpha1.Response)(nil)
+	var _ interfaces.HTTPResponse = (*clusterdisposablerequestv1alpha2.Response)(nil)
+	var _ interfaces.HTTPResponse = (*clusterdisposablerequestv1alpha1.Response)(nil)
 
 	// Test Mapping types implement HTTPMapping
-	var _ interfaces.HTTPMapping = (*requestv1alpha2.Mapping)(nil)
-	var _ interfaces.HTTPMapping = (*requestv1alpha1.Mapping)(nil)
+	var _ interfaces.HTTPMapping = (*clusterrequestv1alpha2.Mapping)(nil)
+	var _ interfaces.HTTPMapping = (*clusterrequestv1alpha1.Mapping)(nil)
 
 	// Test Payload types implement HTTPPayload
-	var _ interfaces.HTTPPayload = (*requestv1alpha2.Payload)(nil)
-	var _ interfaces.HTTPPayload = (*requestv1alpha1.Payload)(nil)
+	var _ interfaces.HTTPPayload = (*clusterrequestv1alpha2.Payload)(nil)
+	var _ interfaces.HTTPPayload = (*clusterrequestv1alpha1.Payload)(nil)
 }
 
-func TestV1Alpha2SpecificInterfaces(t *testing.T) {
+// TestNamespacedInterfaceImplementations verifies that namespaced types properly implement the expected interfaces.
+func TestNamespacedInterfaceImplementations(t *testing.T) {
+	// Test v1alpha2.RequestParameters implements MappedHTTPRequestSpec
+	var _ interfaces.MappedHTTPRequestSpec = (*namespacedrequestv1alpha2.RequestParameters)(nil)
+
+	// Test v1alpha2.DisposableRequestParameters implements SimpleHTTPRequestSpec
+	var _ interfaces.SimpleHTTPRequestSpec = (*namespaceddisposablerequestv1alpha2.DisposableRequestParameters)(nil)
+
+	// Test Response types implement HTTPResponse
+	var _ interfaces.HTTPResponse = (*namespacedrequestv1alpha2.Response)(nil)
+	var _ interfaces.HTTPResponse = (*namespaceddisposablerequestv1alpha2.Response)(nil)
+
+	// Test Mapping types implement HTTPMapping
+	var _ interfaces.HTTPMapping = (*namespacedrequestv1alpha2.Mapping)(nil)
+
+	// Test Payload types implement HTTPPayload
+	var _ interfaces.HTTPPayload = (*namespacedrequestv1alpha2.Payload)(nil)
+}
+
+func TestClusterScopedV1Alpha2SpecificInterfaces(t *testing.T) {
 	// Test v1alpha2.RequestParameters implements ResponseCheckAware
-	var _ interfaces.ResponseCheckAware = (*requestv1alpha2.RequestParameters)(nil)
+	var _ interfaces.ResponseCheckAware = (*clusterrequestv1alpha2.RequestParameters)(nil)
 
 	// Test v1alpha2.DisposableRequestParameters implements ReconciliationPolicyAware
-	var _ interfaces.ReconciliationPolicyAware = (*disposablerequestv1alpha2.DisposableRequestParameters)(nil)
+	var _ interfaces.ReconciliationPolicyAware = (*clusterdisposablerequestv1alpha2.DisposableRequestParameters)(nil)
 
 	// Test v1alpha2.DisposableRequestParameters implements RollbackAware
-	var _ interfaces.RollbackAware = (*disposablerequestv1alpha2.DisposableRequestParameters)(nil)
+	var _ interfaces.RollbackAware = (*clusterdisposablerequestv1alpha2.DisposableRequestParameters)(nil)
 
 	// Test v1alpha1.DisposableRequestParameters implements RollbackAware
-	var _ interfaces.RollbackAware = (*disposablerequestv1alpha1.DisposableRequestParameters)(nil)
+	var _ interfaces.RollbackAware = (*clusterdisposablerequestv1alpha1.DisposableRequestParameters)(nil)
 
 	// Test v1alpha2.Request implements RequestStatus
-	var _ interfaces.RequestStatus = (*requestv1alpha2.Request)(nil)
+	var _ interfaces.RequestStatus = (*clusterrequestv1alpha2.Request)(nil)
 
 	// Test v1alpha2.DisposableRequest implements DisposableRequestStatus
-	var _ interfaces.DisposableRequestStatus = (*disposablerequestv1alpha2.DisposableRequest)(nil)
+	var _ interfaces.DisposableRequestStatus = (*clusterdisposablerequestv1alpha2.DisposableRequest)(nil)
 }
 
-func TestMethodAccess(t *testing.T) {
-	// Test that we can call interface methods
-	params := &requestv1alpha2.RequestParameters{
-		Mappings: []requestv1alpha2.Mapping{
+func TestNamespacedV1Alpha2SpecificInterfaces(t *testing.T) {
+	// Test v1alpha2.RequestParameters implements ResponseCheckAware
+	var _ interfaces.ResponseCheckAware = (*namespacedrequestv1alpha2.RequestParameters)(nil)
+
+	// Test v1alpha2.DisposableRequestParameters implements ReconciliationPolicyAware
+	var _ interfaces.ReconciliationPolicyAware = (*namespaceddisposablerequestv1alpha2.DisposableRequestParameters)(nil)
+
+	// Test v1alpha2.DisposableRequestParameters implements RollbackAware
+	var _ interfaces.RollbackAware = (*namespaceddisposablerequestv1alpha2.DisposableRequestParameters)(nil)
+
+	// Test v1alpha2.Request implements RequestStatus
+	var _ interfaces.RequestStatus = (*namespacedrequestv1alpha2.Request)(nil)
+
+	// Test v1alpha2.DisposableRequest implements DisposableRequestStatus
+	var _ interfaces.DisposableRequestStatus = (*namespaceddisposablerequestv1alpha2.DisposableRequest)(nil)
+}
+
+func TestClusterScopedMethodAccess(t *testing.T) {
+	// Test that we can call interface methods on cluster-scoped resources
+	params := &clusterrequestv1alpha2.RequestParameters{
+		Mappings: []clusterrequestv1alpha2.Mapping{
 			{URL: "https://example.com", Method: "GET"},
 		},
 	}
@@ -92,5 +134,25 @@ func TestMethodAccess(t *testing.T) {
 
 	if mappings[0].GetURL() != "https://example.com" {
 		t.Errorf("Expected URL 'https://example.com', got '%s'", mappings[0].GetURL())
+	}
+}
+
+func TestNamespacedMethodAccess(t *testing.T) {
+	// Test that we can call interface methods on namespaced resources
+	params := &namespacedrequestv1alpha2.RequestParameters{
+		Mappings: []namespacedrequestv1alpha2.Mapping{
+			{URL: "https://api.example.com", Method: "POST"},
+		},
+	}
+
+	var spec interfaces.MappedHTTPRequestSpec = params
+
+	mappings := spec.GetMappings()
+	if len(mappings) != 1 {
+		t.Errorf("Expected 1 mapping, got %d", len(mappings))
+	}
+
+	if mappings[0].GetURL() != "https://api.example.com" {
+		t.Errorf("Expected URL 'https://api.example.com', got '%s'", mappings[0].GetURL())
 	}
 }

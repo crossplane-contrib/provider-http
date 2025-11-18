@@ -20,22 +20,36 @@ To install `provider-http`, you have two options:
    metadata:
      name: provider-http
    spec:
-     package: "xpkg.upbound.io/crossplane-contrib/provider-http:v1.0.11"
+     package: 'xpkg.upbound.io/crossplane-contrib/provider-http:v1.0.11'
    ```
 
 ## Supported Resources
 
-`provider-http` supports the following resources:
+`provider-http` supports resources in two scopes:
+
+### Cluster-scoped Resources (`http.crossplane.io`)
 
 - **DisposableRequest:** Initiates a one-time HTTP request. See [DisposableRequest CRD documentation](resources-docs/disposablerequest_docs.md).
 - **Request:** Manages a resource through HTTP requests. See [Request CRD documentation](resources-docs/request_docs.md).
+
+### Namespaced Resources (`http.m.crossplane.io`)
+
+- **DisposableRequest:** Namespace-scoped version of the disposable HTTP request.
+- **Request:** Namespace-scoped version of the managed HTTP resource.
+- **ProviderConfig:** Namespace-scoped provider configuration.
+- **ClusterProviderConfig:** Cluster-scoped provider configuration for cross-namespace access.
+
+**When to use each:**
+
+- Use **cluster-scoped** resources for shared infrastructure and when you have cluster-admin privileges
+- Use **namespaced** resources for tenant isolation, application-specific resources, and when working with namespace-level permissions
 
 ## TLS Certificate Authentication
 
 The provider supports TLS certificate-based authentication for secure API communication:
 
 - **CA Certificates:** Trust custom certificate authorities
-- **Client Certificates:** Mutual TLS (mTLS) authentication  
+- **Client Certificates:** Mutual TLS (mTLS) authentication
 - **Flexible Configuration:** Set TLS at provider or resource level
 - **Secret References:** Load certificates from Kubernetes secrets
 
@@ -129,6 +143,24 @@ spec:
 ```
 
 For more detailed examples and configuration options, refer to the [examples directory](examples/sample/).
+
+### Namespaced Resources
+
+For namespace-scoped resources, use the `http.m.crossplane.io` API group:
+
+```yaml
+apiVersion: http.m.crossplane.io/v1alpha2
+kind: Request
+metadata:
+  name: example-namespaced-request
+  namespace: my-namespace
+spec:
+  # Add your Request specification here
+  providerConfigRef:
+    name: my-namespaced-config
+```
+
+For namespaced examples and configuration options, refer to the [namespaced examples directory](examples/namespaced/).
 
 ## Developing locally
 

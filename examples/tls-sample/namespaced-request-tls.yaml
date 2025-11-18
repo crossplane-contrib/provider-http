@@ -1,0 +1,113 @@
+---
+# Example namespaced Request with TLS verification using ProviderConfig
+apiVersion: http.m.crossplane.io/v1alpha2
+kind: Request
+metadata:
+  name: example-https-with-tls
+  namespace: default
+spec:
+  forProvider:
+    payload:
+      baseUrl: https://api.example.com
+    mappings:
+      - method: POST
+        body: '{ "username": "testuser", "email": "test@example.com" }'
+        url: .payload.baseUrl + "/users"
+      - method: GET
+        url: .payload.baseUrl + "/users/" + (.response.body.id | tostring)
+      - method: DELETE
+        url: .payload.baseUrl + "/users/" + (.response.body.id | tostring)
+  providerConfigRef:
+    name: example-with-tls
+    kind: ProviderConfig
+---
+# Example namespaced Request with resource-level TLS override
+apiVersion: http.m.crossplane.io/v1alpha2
+kind: Request
+metadata:
+  name: example-https-with-custom-tls
+  namespace: default
+spec:
+  forProvider:
+    payload:
+      baseUrl: https://api.example.com
+    mappings:
+      - method: POST
+        body: '{ "username": "testuser", "email": "test@example.com" }'
+        url: .payload.baseUrl + "/users"
+      - method: GET
+        url: .payload.baseUrl + "/users/" + (.response.body.id | tostring)
+      - method: DELETE
+        url: .payload.baseUrl + "/users/" + (.response.body.id | tostring)
+    # Override TLS configuration for this specific request (optional)
+    tlsConfig:
+      caCertSecretRef:
+        name: custom-ca-secret
+        namespace: default
+        key: ca.pem
+  providerConfigRef:
+    name: example-with-tls
+    kind: ProviderConfig
+---
+# Example namespaced Request with mTLS authentication
+apiVersion: http.m.crossplane.io/v1alpha2
+kind: Request
+metadata:
+  name: example-request-mtls
+  namespace: default
+spec:
+  deletionPolicy: Delete
+  forProvider:
+    payload:
+      baseUrl: https://api.example.com
+    mappings:
+      - method: POST
+        body: '{ "name": "example", "value": "test" }'
+        url: .payload.baseUrl + "/resource"
+      - method: GET
+        url: .payload.baseUrl + "/resource/" + (.response.body.id | tostring)
+      - method: PUT
+        body: '{ "name": "example-updated", "value": "updated" }'
+        url: .payload.baseUrl + "/resource/" + (.response.body.id | tostring)
+      - method: DELETE
+        url: .payload.baseUrl + "/resource/" + (.response.body.id | tostring)
+    headers:
+      Content-Type:
+        - application/json
+    # Use specific TLS configuration for this API
+    tlsConfig:
+      caCertSecretRef:
+        name: api-specific-ca
+        namespace: default
+        key: ca.crt
+      clientCertSecretRef:
+        name: api-client-cert
+        namespace: default
+        key: tls.crt
+      clientKeySecretRef:
+        name: api-client-cert
+        namespace: default
+        key: tls.key
+  providerConfigRef:
+    name: example-with-tls
+    kind: ProviderConfig
+---
+# Example namespaced Request with insecureSkipTLSVerify
+apiVersion: http.m.crossplane.io/v1alpha2
+kind: Request
+metadata:
+  name: example-request-insecure
+  namespace: default
+spec:
+  deletionPolicy: Delete
+  forProvider:
+    payload:
+      baseUrl: https://self-signed.example.com
+    mappings:
+      - method: GET
+        url: .payload.baseUrl + "/test"
+    # Skip TLS verification for this request (not recommended for production)
+    insecureSkipTLSVerify: true
+  providerConfigRef:
+    name: example-with-tls
+    kind: ProviderConfig

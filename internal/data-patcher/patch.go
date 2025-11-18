@@ -4,12 +4,12 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/crossplane-contrib/provider-http/apis/cluster/request/v1alpha2"
 	"github.com/crossplane-contrib/provider-http/apis/common"
 	"github.com/crossplane-contrib/provider-http/apis/interfaces"
-	"github.com/crossplane-contrib/provider-http/apis/request/v1alpha2"
 	httpClient "github.com/crossplane-contrib/provider-http/internal/clients/http"
 	kubehandler "github.com/crossplane-contrib/provider-http/internal/kube-handler"
-	"github.com/crossplane/crossplane-runtime/pkg/logging"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/logging"
 	"github.com/pkg/errors"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -145,7 +145,13 @@ func ApplyResponseDataToSecrets(ctx context.Context, localKube client.Client, lo
 		var owner metav1.Object = nil
 
 		if ref.SetOwnerReference {
-			owner = cr
+			// Kubernetes disallows cross-namespace owner references
+			// Only set owner reference if the secret is in the same namespace as the owner
+			if cr.GetNamespace() == ref.SecretRef.Namespace {
+				owner = cr
+			} else {
+				logger.Debug(fmt.Sprintf("Skipping owner reference for cross-namespace secret injection: owner in %s, secret in %s", cr.GetNamespace(), ref.SecretRef.Namespace))
+			}
 		}
 
 		// Use the cumulative response for patching (gets updated with secret placeholders)

@@ -30,10 +30,10 @@ spec:
     # shouldLoopInfinitely: true
 
     # Specifies the duration after which the next reconcile should occur.
-    # nextReconcile: 3m
+    # nextReconcile: 3m 
 
     # Secrets receiving patches from response data
-    secretInjectionConfigs:
+    secretInjectionConfigs: 
       - secretRef:
           name: notification-response
           namespace: default
@@ -51,7 +51,6 @@ spec:
             missingFieldStrategy: preserve
         # setOwnerReference determines if the secret should be deleted when the associated resource is deleted.
         setOwnerReference: true
-
+ 
   providerConfigRef:
     name: http-conf
-# TODO: check if it's possible to modify the deletionPolicy to be orphan by default.

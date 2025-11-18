@@ -39,8 +39,8 @@ GOLANGCILINT_VERSION = 2.1.2
 # ====================================================================================
 # Setup Kubernetes tools
 USE_HELM3 = true
-CROSSPLANE_VERSION = 2.0.2
-CROSSPLANE_CLI_VERSION = v2.0.2
+CROSSPLANE_VERSION = 2.1.1
+CROSSPLANE_CLI_VERSION = v2.1.1
 
 -include build/makelib/k8s_tools.mk
 
@@ -90,11 +90,16 @@ CROSSPLANE_NAMESPACE = crossplane-system
 -include build/makelib/local.xpkg.mk
 -include build/makelib/controlplane.mk
 
-UPTEST_EXAMPLE_LIST := $(shell find ./examples/sample -path '*.yaml' | paste -s -d ',' - )
+# Conditionally include namespaced examples for Crossplane v2
+ifeq ($(shell echo "$(CROSSPLANE_VERSION)" | cut -d. -f1),2)
+    UPTEST_EXAMPLE_LIST := $(shell find ./examples/sample -path '*.yaml' | paste -s -d ',' - ),$(shell find ./examples/namespaced -path '*.yaml' | paste -s -d ',' - )
+else
+    UPTEST_EXAMPLE_LIST := $(shell find ./examples/sample -path '*.yaml' | paste -s -d ',' - )
+endif
 
-uptest: $(UPTEST) $(KUBECTL) $(KUTTL)
+uptest: $(UPTEST) $(KUBECTL) $(CHAINSAW) $(CROSSPLANE_CLI)
 	@$(INFO) running automated tests
-	@KUBECTL=$(KUBECTL) KUTTL=$(KUTTL) CROSSPLANE_NAMESPACE=$(CROSSPLANE_NAMESPACE) TEST_SERVER_IMAGE=$(TEST_SERVER_IMAGE) $(UPTEST) e2e "$(UPTEST_EXAMPLE_LIST)" --setup-script=cluster/test/setup.sh || $(FAIL)
+	@KUBECTL=$(KUBECTL) CHAINSAW=$(CHAINSAW) CROSSPLANE_CLI=$(CROSSPLANE_CLI) CROSSPLANE_NAMESPACE=$(CROSSPLANE_NAMESPACE) CROSSPLANE_VERSION=$(CROSSPLANE_VERSION) $(UPTEST) e2e "$(UPTEST_EXAMPLE_LIST)" --setup-script=cluster/test/setup.sh || $(FAIL)
 	@$(OK) running automated tests
 
 local-dev: controlplane.up
