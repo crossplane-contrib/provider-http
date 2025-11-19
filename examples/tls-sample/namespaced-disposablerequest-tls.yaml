@@ -1,0 +1,91 @@
+---
+# Example namespaced DisposableRequest with TLS verification using ProviderConfig
+apiVersion: http.m.crossplane.io/v1alpha2
+kind: DisposableRequest
+metadata:
+  name: example-disposable-https-tls
+  namespace: default
+spec:
+  deletionPolicy: Orphan
+  forProvider:
+    url: https://api.example.com/v1/resource
+    method: GET
+    headers:
+      Accept:
+        - application/json
+  providerConfigRef:
+    name: example-with-tls
+    kind: ProviderConfig
+---
+# Example namespaced DisposableRequest with mTLS authentication
+apiVersion: http.m.crossplane.io/v1alpha2
+kind: DisposableRequest
+metadata:
+  name: example-disposable-mtls
+  namespace: default
+spec:
+  deletionPolicy: Orphan
+  forProvider:
+    url: https://api.example.com/v1/protected-resource
+    method: GET
+    headers:
+      Accept:
+        - application/json
+  # Use ProviderConfig with mTLS settings
+  providerConfigRef:
+    name: example-with-mtls
+    kind: ProviderConfig
+---
+# Example namespaced DisposableRequest with resource-level TLS override
+apiVersion: http.m.crossplane.io/v1alpha2
+kind: DisposableRequest
+metadata:
+  name: example-disposable-custom-tls
+  namespace: default
+spec:
+  deletionPolicy: Orphan
+  forProvider:
+    url: https://api.example.com/webhook
+    method: POST
+    headers:
+      Content-Type:
+        - application/json
+    body: |
+      {
+        "event": "deployment",
+        "status": "success"
+      }
+    # Override TLS configuration for this specific request (optional)
+    tlsConfig:
+      caCertSecretRef:
+        name: webhook-ca
+        namespace: default
+        key: ca.crt
+      clientCertSecretRef:
+        name: webhook-client-cert
+        namespace: default
+        key: tls.crt
+      clientKeySecretRef:
+        name: webhook-client-cert
+        namespace: default
+        key: tls.key
+  providerConfigRef:
+    name: example-with-tls
+    kind: ProviderConfig
+---
+# Example namespaced DisposableRequest with insecureSkipTLSVerify
+apiVersion: http.m.crossplane.io/v1alpha2
+kind: DisposableRequest
+metadata:
+  name: example-disposable-insecure
+  namespace: default
+spec:
+  deletionPolicy: Orphan
+  forProvider:
+    url: https://self-signed.example.com/api/test
+    method: GET
+    # Skip TLS verification for this request (not recommended for production)
+    insecureSkipTLSVerify: true
+  providerConfigRef:
+    name: example-with-tls
+    kind: ProviderConfig

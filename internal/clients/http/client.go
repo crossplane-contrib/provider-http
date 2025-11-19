@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/crossplane-contrib/provider-http/apis/interfaces"
-	"github.com/crossplane/crossplane-runtime/pkg/logging"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/logging"
 )
 
 const (

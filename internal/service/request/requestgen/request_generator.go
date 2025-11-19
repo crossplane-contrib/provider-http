@@ -4,9 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/pkg/errors"
-	"golang.org/x/exp/maps"
-
 	"github.com/crossplane-contrib/provider-http/apis/interfaces"
 	httpClient "github.com/crossplane-contrib/provider-http/internal/clients/http"
 	datapatcher "github.com/crossplane-contrib/provider-http/internal/data-patcher"
@@ -14,6 +11,8 @@ import (
 	"github.com/crossplane-contrib/provider-http/internal/service"
 	"github.com/crossplane-contrib/provider-http/internal/service/request/requestprocessing"
 	"github.com/crossplane-contrib/provider-http/internal/utils"
+	"github.com/pkg/errors"
+	"golang.org/x/exp/maps"
 )
 
 type RequestDetails struct {

@@ -1,0 +1,453 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.18.0
+  name: disposablerequests.http.m.crossplane.io
+spec:
+  group: http.m.crossplane.io
+  names:
+    categories:
+    - crossplane
+    - managed
+    - http
+    kind: DisposableRequest
+    listKind: DisposableRequestList
+    plural: disposablerequests
+    singular: disposablerequest
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .status.conditions[?(@.type=='Ready')].status
+      name: READY
+      type: string
+    - jsonPath: .status.conditions[?(@.type=='Synced')].status
+      name: SYNCED
+      type: string
+    - jsonPath: .metadata.annotations.crossplane\.io/external-name
+      name: EXTERNAL-NAME
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: AGE
+      type: date
+    name: v1alpha2
+    schema:
+      openAPIV3Schema:
+        description: A DisposableRequest is a namespaced HTTP disposable request resource.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: A DisposableRequestSpec defines the desired state of a DisposableRequest.
+            properties:
+              forProvider:
+                description: DisposableRequestParameters are the configurable fields
+                  of a DisposableRequest.
+                properties:
+                  body:
+                    type: string
+                    x-kubernetes-validations:
+                    - message: Field 'forProvider.body' is immutable
+                      rule: self == oldSelf
+                  expectedResponse:
+                    description: |-
+                      ExpectedResponse is a jq filter expression used to evaluate the HTTP response and determine if it matches the expected criteria.
+                      The expression should return a boolean; if true, the response is considered expected.
+                      Example: '.body.job_status == "success"'
+                    type: string
+                  headers:
+                    additionalProperties:
+                      items:
+                        type: string
+                      type: array
+                    type: object
+                    x-kubernetes-validations:
+                    - message: Field 'forProvider.headers' is immutable
+                      rule: self == oldSelf
+                  insecureSkipTLSVerify:
+                    description: |-
+                      InsecureSkipTLSVerify, when set to true, skips TLS certificate checks for the HTTP request.
+                      This field is mutually exclusive with TLSConfig.
+                    type: boolean
+                  method:
+                    type: string
+                    x-kubernetes-validations:
+                    - message: Field 'forProvider.method' is immutable
+                      rule: self == oldSelf
+                  nextReconcile:
+                    description: NextReconcile specifies the duration after which
+                      the next reconcile should occur.
+                    type: string
+                  rollbackRetriesLimit:
+                    description: RollbackRetriesLimit is max number of attempts to
+                      retry HTTP request by sending again the request.
+                    format: int32
+                    type: integer
+                  secretInjectionConfigs:
+                    description: SecretInjectionConfig specifies the secrets receiving
+                      patches from response data.
+                    items:
+                      description: SecretInjectionConfig represents the configuration
+                        for injecting secret data into a Kubernetes secret.
+                      properties:
+                        keyMappings:
+                          description: KeyMappings allows injecting data into single
+                            or multiple keys within the same Kubernetes secret.
+                          items:
+                            description: KeyInjection represents the configuration
+                              for injecting data into a specific key in a Kubernetes
+                              secret.
+                            properties:
+                              missingFieldStrategy:
+                                default: delete
+                                description: |-
+                                  MissingFieldStrategy determines how to handle cases where the field is missing from the response.
+                                  Possible values are:
+                                  - "preserve": keeps the existing value in the secret
+                                  - "setEmpty": sets the value to the empty string
+                                  - "delete": removes the key from the s
+                                enum:
+                                - preserve
+                                - setEmpty
+                                - delete
+                                type: string
+                              responseJQ:
+                                description: ResponseJQ is a jq filter expression
+                                  representing the path in the response where the
+                                  secret value will be extracted from.
+                                type: string
+                              secretKey:
+                                description: SecretKey is the key within the Kubernetes
+                                  secret where the data will be injected.
+                                type: string
+                            required:
+                            - responseJQ
+                            - secretKey
+                            type: object
+                          type: array
+                        metadata:
+                          description: Metadata contains labels and annotations to
+                            apply to the Kubernetes secret.
+                          properties:
+                            annotations:
+                              additionalProperties:
+                                type: string
+                              description: Annotations contains key-value pairs to
+                                apply as annotations to the Kubernetes secret.
+                              type: object
+                            labels:
+                              additionalProperties:
+                                type: string
+                              description: Labels contains key-value pairs to apply
+                                as labels to the Kubernetes secret.
+                              type: object
+                          type: object
+                        responsePath:
+                          description: |-
+                            ResponsePath is a jq filter expression representing the path in the response where the secret value will be extracted from.
+                            Deprecated: Use KeyMappings for injecting single or multiple keys.
+                          type: string
+                        secretKey:
+                          description: |-
+                            SecretKey is the key within the Kubernetes secret where the data will be injected.
+                            Deprecated: Use KeyMappings for injecting single or multiple keys.
+                          type: string
+                        secretRef:
+                          description: SecretRef contains the name and namespace of
+                            the Kubernetes secret where the data will be injected.
+                          properties:
+                            name:
+                              description: Name is the name of the Kubernetes secret.
+                              type: string
+                            namespace:
+                              description: Namespace is the namespace of the Kubernetes
+                                secret.
+                              type: string
+                          required:
+                          - name
+                          - namespace
+                          type: object
+                        setOwnerReference:
+                          description: SetOwnerReference determines whether to set
+                            the owner reference on the Kubernetes secret.
+                          type: boolean
+                      required:
+                      - secretRef
+                      type: object
+                    type: array
+                  shouldLoopInfinitely:
+                    description: ShouldLoopInfinitely specifies whether the reconciliation
+                      should loop indefinitely.
+                    type: boolean
+                  tlsConfig:
+                    description: |-
+                      TLSConfig allows overriding the TLS configuration from ProviderConfig for this specific request.
+                      This field is mutually exclusive with InsecureSkipTLSVerify.
+                    properties:
+                      caBundle:
+                        description: |-
+                          CABundle is a PEM encoded CA bundle which will be used to validate the server certificate.
+                          If empty, system root CAs will be used.
+                        format: byte
+                        type: string
+                      caCertSecretRef:
+                        description: |-
+                          CACertSecretRef is a reference to a secret containing the CA certificate(s).
+                          The secret must contain a key specified in the SecretKeySelector.
+                        properties:
+                          key:
+                            description: The key to select.
+                            type: string
+                          name:
+                            description: Name of the secret.
+                            type: string
+                          namespace:
+                            description: Namespace of the secret.
+                            type: string
+                        required:
+                        - key
+                        - name
+                        - namespace
+                        type: object
+                      clientCertSecretRef:
+                        description: |-
+                          ClientCertSecretRef is a reference to a secret containing the client certificate.
+                          The secret must contain a key specified in the SecretKeySelector.
+                        properties:
+                          key:
+                            description: The key to select.
+                            type: string
+                          name:
+                            description: Name of the secret.
+                            type: string
+                          namespace:
+                            description: Namespace of the secret.
+                            type: string
+                        required:
+                        - key
+                        - name
+                        - namespace
+                        type: object
+                      clientKeySecretRef:
+                        description: |-
+                          ClientKeySecretRef is a reference to a secret containing the client private key.
+                          The secret must contain a key specified in the SecretKeySelector.
+                        properties:
+                          key:
+                            description: The key to select.
+                            type: string
+                          name:
+                            description: Name of the secret.
+                            type: string
+                          namespace:
+                            description: Namespace of the secret.
+                            type: string
+                        required:
+                        - key
+                        - name
+                        - namespace
+                        type: object
+                      insecureSkipVerify:
+                        description: |-
+                          InsecureSkipVerify controls whether the client verifies the server's certificate chain and host name.
+                          If true, any certificate presented by the server and any host name in that certificate is accepted.
+                        type: boolean
+                    type: object
+                  url:
+                    type: string
+                    x-kubernetes-validations:
+                    - message: Field 'forProvider.url' is immutable
+                      rule: self == oldSelf
+                  waitTimeout:
+                    description: WaitTimeout specifies the maximum time duration for
+                      waiting.
+                    type: string
+                required:
+                - method
+                - url
+                type: object
+                x-kubernetes-validations:
+                - message: insecureSkipTLSVerify and tlsConfig are mutually exclusive
+                  rule: '!(self.insecureSkipTLSVerify == true && has(self.tlsConfig))'
+              managementPolicies:
+                default:
+                - '*'
+                description: |-
+                  THIS IS A BETA FIELD. It is on by default but can be opted out
+                  through a Crossplane feature flag.
+                  ManagementPolicies specify the array of actions Crossplane is allowed to
+                  take on the managed and external resources.
+                  See the design doc for more information: https://github.com/crossplane/crossplane/blob/499895a25d1a1a0ba1604944ef98ac7a1a71f197/design/design-doc-observe-only-resources.md?plain=1#L223
+                  and this one: https://github.com/crossplane/crossplane/blob/444267e84783136daa93568b364a5f01228cacbe/design/one-pager-ignore-changes.md
+                items:
+                  description: |-
+                    A ManagementAction represents an action that the Crossplane controllers
+                    can take on an external resource.
+                  enum:
+                  - Observe
+                  - Create
+                  - Update
+                  - Delete
+                  - LateInitialize
+                  - '*'
+                  type: string
+                type: array
+              providerConfigRef:
+                default:
+                  kind: ClusterProviderConfig
+                  name: default
+                description: |-
+                  ProviderConfigReference specifies how the provider that will be used to
+                  create, observe, update, and delete this managed resource should be
+                  configured.
+                properties:
+                  kind:
+                    description: Kind of the referenced object.
+                    type: string
+                  name:
+                    description: Name of the referenced object.
+                    type: string
+                required:
+                - kind
+                - name
+                type: object
+              writeConnectionSecretToRef:
+                description: |-
+                  WriteConnectionSecretToReference specifies the namespace and name of a
+                  Secret to which any connection details for this managed resource should
+                  be written. Connection details frequently include the endpoint, username,
+                  and password required to connect to the managed resource.
+                properties:
+                  name:
+                    description: Name of the secret.
+                    type: string
+                required:
+                - name
+                type: object
+            required:
+            - forProvider
+            type: object
+          status:
+            description: A DisposableRequestStatus represents the observed state of
+              a DisposableRequest.
+            properties:
+              conditions:
+                description: Conditions of the resource.
+                items:
+                  description: A Condition that may apply to a resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        LastTransitionTime is the last time this condition transitioned from one
+                        status to another.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        A Message containing details about this condition's last transition from
+                        one status to another, if any.
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        ObservedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      type: integer
+                    reason:
+                      description: A Reason for this condition's last transition from
+                        one status to another.
+                      type: string
+                    status:
+                      description: Status of this condition; is it currently True,
+                        False, or Unknown?
+                      type: string
+                    type:
+                      description: |-
+                        Type of this condition. At most one of each condition type may apply to
+                        a resource at any point in time.
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - type
+                x-kubernetes-list-type: map
+              error:
+                type: string
+              failed:
+                format: int32
+                type: integer
+              lastReconcileTime:
+                description: LastReconcileTime records the last time the resource
+                  was reconciled.
+                format: date-time
+                type: string
+              observedGeneration:
+                description: |-
+                  ObservedGeneration is the latest metadata.generation
+                  which resulted in either a ready state, or stalled due to error
+                  it can not recover from without human intervention.
+                format: int64
+                type: integer
+              requestDetails:
+                properties:
+                  body:
+                    type: string
+                  headers:
+                    additionalProperties:
+                      items:
+                        type: string
+                      type: array
+                    type: object
+                  method:
+                    type: string
+                  url:
+                    type: string
+                required:
+                - method
+                - url
+                type: object
+              response:
+                properties:
+                  body:
+                    type: string
+                  headers:
+                    additionalProperties:
+                      items:
+                        type: string
+                      type: array
+                    type: object
+                  statusCode:
+                    type: integer
+                type: object
+              synced:
+                type: boolean
+            type: object
+        required:
+        - spec
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

@@ -5,7 +5,6 @@ kind: Request
 metadata:
   name: example-https-with-tls
 spec:
-  deletionPolicy: Delete
   forProvider:
     payload:
       baseUrl: https://api.example.com

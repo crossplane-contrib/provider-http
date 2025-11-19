@@ -17,7 +17,6 @@ spec:
       metadata:
         name: obtain-jwt-token
       spec:
-        deletionPolicy: Orphan
         forProvider:
           url: http://localhost:8000/v1/login/
           method: POST
