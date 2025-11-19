@@ -54,3 +54,4 @@ spec:
  
   providerConfigRef:
     name: http-conf
+# TODO: check if it's possible to modify the deletionPolicy to be orphan by default.
