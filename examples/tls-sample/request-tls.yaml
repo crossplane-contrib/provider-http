@@ -1,0 +1,46 @@
+---
+# Example Request with TLS verification using ProviderConfig
+apiVersion: http.crossplane.io/v1alpha2
+kind: Request
+metadata:
+  name: example-https-with-tls
+spec:
+  forProvider:
+    payload:
+      baseUrl: https://api.example.com
+    mappings:
+      - method: POST
+        body: '{ "username": "testuser", "email": "test@example.com" }'
+        url: .payload.baseUrl + "/users"
+      - method: GET
+        url: .payload.baseUrl + "/users/" + (.response.body.id | tostring)
+      - method: DELETE
+        url: .payload.baseUrl + "/users/" + (.response.body.id | tostring)
+  providerConfigRef:
+    name: example-with-tls
+---
+# Example Request with resource-level TLS override
+apiVersion: http.crossplane.io/v1alpha2
+kind: Request
+metadata:
+  name: example-https-with-custom-tls
+spec:
+  deletionPolicy: Delete
+  forProvider:
+    payload:
+      baseUrl: https://api.example.com
+    mappings:
+      - method: POST
+        body: '{ "username": "testuser", "email": "test@example.com" }'
+        url: .payload.baseUrl + "/users"
+      - method: GET
+        url: .payload.baseUrl + "/users/" + (.response.body.id | tostring)
+      - method: DELETE
+        url: .payload.baseUrl + "/users/" + (.response.body.id | tostring)
+    tlsConfig:
+      caCertSecretRef:
+        name: custom-ca-secret
+        namespace: default
+        key: ca.pem
+  providerConfigRef:
+    name: example-with-tls

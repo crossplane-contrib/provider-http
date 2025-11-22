@@ -11,9 +11,9 @@ spec:
     headers:
       Authorization:
         - "Basic {{ basic-auth:crossplane-system:token }}"
-    url:  http://flask-api.default.svc.cluster.local/v1/login
+    url:  http://test-server.default.svc.cluster.local/v1/login
     method: POST
-    
+
     # Indicates whether the reconciliation should loop indefinitely. If `rollbackRetriesLimit` is set and the request returns an error, it will stop reconciliation once the limit is reached.
     shouldLoopInfinitely: true
     # Specifies the duration after which the next reconcile should occur.
@@ -22,14 +22,14 @@ spec:
     # waitTimeout: 5m
 
     # Secrets receiving patches from response data
-    secretInjectionConfigs: 
+    secretInjectionConfigs:
       - secretRef:
           name: obtained-token
           namespace: crossplane-system
         secretKey: token
         responsePath: .body.token
         # setOwnerReference determines if the secret should be deleted when the associated resource is deleted.
-        # When injecting multiple keys into the same secret, ensure this field is set consistently for all keys.        
+        # When injecting multiple keys into the same secret, ensure this field is set consistently for all keys.
         setOwnerReference: true
   providerConfigRef:
     name: http-conf

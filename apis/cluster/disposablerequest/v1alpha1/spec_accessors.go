@@ -1,0 +1,94 @@
+/*
+Copyright 2022 The Crossplane Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package v1alpha1
+
+import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/crossplane-contrib/provider-http/apis/common"
+	"github.com/crossplane-contrib/provider-http/apis/interfaces"
+)
+
+// Ensure DisposableRequestParameters implements SimpleHTTPRequestSpec
+var _ interfaces.SimpleHTTPRequestSpec = (*DisposableRequestParameters)(nil)
+
+// Ensure DisposableRequestParameters implements RollbackAware
+var _ interfaces.RollbackAware = (*DisposableRequestParameters)(nil)
+
+// GetWaitTimeout returns the maximum time duration for waiting.
+func (d *DisposableRequestParameters) GetWaitTimeout() *metav1.Duration {
+	return d.WaitTimeout
+}
+
+// GetInsecureSkipTLSVerify returns whether to skip TLS certificate verification.
+func (d *DisposableRequestParameters) GetInsecureSkipTLSVerify() bool {
+	return d.InsecureSkipTLSVerify
+}
+
+// GetSecretInjectionConfigs returns the secret injection configurations.
+// v1alpha1 does not support secret injection, so this returns nil.
+func (d *DisposableRequestParameters) GetSecretInjectionConfigs() []common.SecretInjectionConfig {
+	return nil
+}
+
+// GetHeaders returns the default headers for the request.
+func (d *DisposableRequestParameters) GetHeaders() map[string][]string {
+	return d.Headers
+}
+
+// GetURL returns the URL for the request.
+func (d *DisposableRequestParameters) GetURL() string {
+	return d.URL
+}
+
+// GetMethod returns the HTTP method for the request.
+func (d *DisposableRequestParameters) GetMethod() string {
+	return d.Method
+}
+
+// GetBody returns the body of the request.
+func (d *DisposableRequestParameters) GetBody() string {
+	return d.Body
+}
+
+// GetExpectedResponse returns the jq filter expression for validating the response.
+func (d *DisposableRequestParameters) GetExpectedResponse() string {
+	return d.ExpectedResponse
+}
+
+// GetRollbackRetriesLimit returns the maximum number of rollback retry attempts.
+func (d *DisposableRequestParameters) GetRollbackRetriesLimit() *int32 {
+	return d.RollbackRetriesLimit
+}
+
+// Ensure Response implements HTTPResponse
+var _ interfaces.HTTPResponse = (*Response)(nil)
+
+// GetStatusCode returns the HTTP status code.
+func (r *Response) GetStatusCode() int {
+	return r.StatusCode
+}
+
+// GetBody returns the response body.
+func (r *Response) GetBody() string {
+	return r.Body
+}
+
+// GetHeaders returns the response headers.
+func (r *Response) GetHeaders() map[string][]string {
+	return r.Headers
+}
