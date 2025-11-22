@@ -97,7 +97,7 @@ func handleHttpResponse(svcCtx *service.ServiceContext, crCtx *service.Disposabl
 	obj := crCtx.GetCR()
 
 	// Handle HTTP error status codes
-	if utils.IsHTTPError(resource.HttpResponse.StatusCode) {
+	if utils.IsHTTPError(resource.HttpResponse.StatusCode, spec.GetAllowedStatusCodes()) {
 		return handleHttpErrorStatus(spec, resource)
 	}
 

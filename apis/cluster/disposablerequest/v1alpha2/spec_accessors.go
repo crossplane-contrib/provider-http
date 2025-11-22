@@ -87,6 +87,11 @@ func (d *DisposableRequestParameters) GetRollbackRetriesLimit() *int32 {
 	return d.RollbackRetriesLimit
 }
 
+// GetAllowedStatusCodes returns the HTTP status codes that should not be treated as errors.
+func (d *DisposableRequestParameters) GetAllowedStatusCodes() []int {
+	return d.AllowedStatusCodes
+}
+
 // Ensure Response implements HTTPResponse
 var _ interfaces.HTTPResponse = (*Response)(nil)
 

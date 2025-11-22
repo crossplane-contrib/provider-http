@@ -90,7 +90,8 @@ func Test_IsHTTPSuccess(t *testing.T) {
 
 func Test_IsHTTPError(t *testing.T) {
 	type args struct {
-		statusCode int
+		statusCode         int
+		allowedStatusCodes []int
 	}
 	type want struct {
 		result bool
@@ -101,7 +102,8 @@ func Test_IsHTTPError(t *testing.T) {
 	}{
 		"ResultTrue": {
 			args: args{
-				statusCode: 400,
+				statusCode:         400,
+				allowedStatusCodes: nil,
 			},
 			want: want{
 				result: true,
@@ -109,16 +111,53 @@ func Test_IsHTTPError(t *testing.T) {
 		},
 		"ResultFalse": {
 			args: args{
-				statusCode: 200,
+				statusCode:         200,
+				allowedStatusCodes: nil,
 			},
 			want: want{
 				result: false,
 			},
 		},
+		"AllowedStatusCode404": {
+			args: args{
+				statusCode:         404,
+				allowedStatusCodes: []int{404},
+			},
+			want: want{
+				result: false,
+			},
+		},
+		"AllowedStatusCode500": {
+			args: args{
+				statusCode:         500,
+				allowedStatusCodes: []int{404, 500, 503},
+			},
+			want: want{
+				result: false,
+			},
+		},
+		"NotAllowedStatusCode400": {
+			args: args{
+				statusCode:         400,
+				allowedStatusCodes: []int{404, 500},
+			},
+			want: want{
+				result: true,
+			},
+		},
+		"EmptyAllowedList": {
+			args: args{
+				statusCode:         404,
+				allowedStatusCodes: []int{},
+			},
+			want: want{
+				result: true,
+			},
+		},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			got := IsHTTPError(tc.args.statusCode)
+			got := IsHTTPError(tc.args.statusCode, tc.args.allowedStatusCodes)
 			if diff := cmp.Diff(tc.want.result, got); diff != "" {
 				t.Fatalf("IsHTTPError(...): -want result, +got result: %s", diff)
 			}

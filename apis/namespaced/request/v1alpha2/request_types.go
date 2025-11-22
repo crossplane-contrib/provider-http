@@ -74,6 +74,12 @@ type RequestParameters struct {
 
 	// IsRemovedCheck specifies the mechanism to validate the OBSERVE response after removal against expected value.
 	IsRemovedCheck ExpectedResponseCheck `json:"isRemovedCheck,omitempty"`
+
+	// AllowedStatusCodes specifies HTTP status codes that should not be treated as errors.
+	// By default, status codes 400-599 are considered errors. This field allows users to
+	// override that behavior for specific status codes (e.g., treating 404 as valid).
+	// +optional
+	AllowedStatusCodes []int `json:"allowedStatusCodes,omitempty"`
 }
 
 type Mapping struct {

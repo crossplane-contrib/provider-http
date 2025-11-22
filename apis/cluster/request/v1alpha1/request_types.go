@@ -35,6 +35,12 @@ type RequestParameters struct {
 
 	// InsecureSkipTLSVerify, when set to true, skips TLS certificate checks for the HTTP request
 	InsecureSkipTLSVerify bool `json:"insecureSkipTLSVerify,omitempty"`
+
+	// AllowedStatusCodes specifies HTTP status codes that should not be treated as errors.
+	// By default, status codes 400-599 are considered errors. This field allows users to
+	// override that behavior for specific status codes (e.g., treating 404 as valid).
+	// +optional
+	AllowedStatusCodes []int `json:"allowedStatusCodes,omitempty"`
 }
 
 type Mapping struct {

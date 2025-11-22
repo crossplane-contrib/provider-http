@@ -31,8 +31,20 @@ func IsHTTPSuccess(statusCode int) bool {
 }
 
 // IsHTTPError checks if an HTTP status code indicates an error.
-func IsHTTPError(statusCode int) bool {
-	return statusCode >= 400 && statusCode < 600
+// The allowedStatusCodes parameter specifies status codes that should not be treated as errors.
+func IsHTTPError(statusCode int, allowedStatusCodes []int) bool {
+	if statusCode < 400 || statusCode >= 600 {
+		return false
+	}
+
+	// Check if this status code is in the allowed list
+	for _, allowed := range allowedStatusCodes {
+		if statusCode == allowed {
+			return false
+		}
+	}
+
+	return true
 }
 
 func IsUrlValid(input string) bool {

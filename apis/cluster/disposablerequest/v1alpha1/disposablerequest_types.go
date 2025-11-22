@@ -48,6 +48,12 @@ type DisposableRequestParameters struct {
 	// The expression should return a boolean; if true, the response is considered expected.
 	// Example: '.Body.job_status == "success"'
 	ExpectedResponse string `json:"expectedResponse,omitempty"`
+
+	// AllowedStatusCodes specifies HTTP status codes that should not be treated as errors.
+	// By default, status codes 400-599 are considered errors. This field allows users to
+	// override that behavior for specific status codes (e.g., treating 404 as valid).
+	// +optional
+	AllowedStatusCodes []int `json:"allowedStatusCodes,omitempty"`
 }
 
 // A DisposableRequestSpec defines the desired state of a DisposableRequest.

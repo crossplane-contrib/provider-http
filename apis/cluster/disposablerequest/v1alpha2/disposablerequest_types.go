@@ -67,6 +67,12 @@ type DisposableRequestParameters struct {
 
 	// SecretInjectionConfig specifies the secrets receiving patches from response data.
 	SecretInjectionConfigs []common.SecretInjectionConfig `json:"secretInjectionConfigs,omitempty"`
+
+	// AllowedStatusCodes specifies HTTP status codes that should not be treated as errors.
+	// By default, status codes 400-599 are considered errors. This field allows users to
+	// override that behavior for specific status codes (e.g., treating 404 as valid).
+	// +optional
+	AllowedStatusCodes []int `json:"allowedStatusCodes,omitempty"`
 }
 
 // A DisposableRequestSpec defines the desired state of a DisposableRequest.
