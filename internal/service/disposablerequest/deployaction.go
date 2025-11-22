@@ -23,8 +23,9 @@ func DeployAction(svcCtx *service.ServiceContext, crCtx *service.DisposableReque
 	spec := crCtx.Spec()
 	status := crCtx.Status()
 	rollbackPolicy := crCtx.RollbackPolicy()
+	reconciliationPolicy := crCtx.ReconciliationPolicy()
 
-	if status.GetSynced() {
+	if status.GetSynced() && (reconciliationPolicy == nil || !reconciliationPolicy.GetShouldLoopInfinitely()) {
 		svcCtx.Logger.Debug("Resource is already synced, skipping deployment action")
 		return nil
 	}
