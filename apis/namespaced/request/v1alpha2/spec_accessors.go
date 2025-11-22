@@ -73,6 +73,11 @@ func (r *RequestParameters) GetIsRemovedCheck() interfaces.ResponseCheck {
 	return &r.IsRemovedCheck
 }
 
+// GetAllowedStatusCodes returns the HTTP status codes that should not be treated as errors.
+func (r *RequestParameters) GetAllowedStatusCodes() []int {
+	return r.AllowedStatusCodes
+}
+
 // Ensure Mapping implements HTTPMapping
 var _ interfaces.HTTPMapping = (*Mapping)(nil)
 

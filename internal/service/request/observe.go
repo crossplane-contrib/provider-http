@@ -114,7 +114,8 @@ func determineIfRemoved(svcCtx *service.ServiceContext, crCtx *service.RequestCR
 func isObjectValidForObservation(crCtx *service.RequestCRContext) bool {
 	response := crCtx.Status().GetResponse()
 	requestDetails := crCtx.Status().GetRequestDetails()
+	spec := crCtx.Spec()
 
 	return response.GetStatusCode() != 0 &&
-		!(requestDetails.GetMethod() == http.MethodPost && utils.IsHTTPError(response.GetStatusCode()))
+		!(requestDetails.GetMethod() == http.MethodPost && utils.IsHTTPError(response.GetStatusCode(), spec.GetAllowedStatusCodes()))
 }

@@ -49,7 +49,7 @@ func (r *requestStatusHandler) SetRequestStatus() error {
 
 	basicSetters = append(basicSetters, *r.extraSetters...)
 
-	if utils.IsHTTPError(r.resource.HttpResponse.StatusCode) {
+	if utils.IsHTTPError(r.resource.HttpResponse.StatusCode, r.forProvider.GetAllowedStatusCodes()) {
 		return r.incrementFailures(basicSetters)
 	}
 

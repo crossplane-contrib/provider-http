@@ -55,6 +55,9 @@ type SimpleHTTPRequestSpec interface {
 
 	// GetExpectedResponse returns the jq filter expression for validating the response.
 	GetExpectedResponse() string
+
+	// GetAllowedStatusCodes returns the HTTP status codes that should not be treated as errors.
+	GetAllowedStatusCodes() []int
 }
 
 // MappedHTTPRequestSpec defines the interface for requests with multiple mappings (like Request).
@@ -67,6 +70,9 @@ type MappedHTTPRequestSpec interface {
 
 	// GetPayload returns the payload configuration.
 	GetPayload() HTTPPayload
+
+	// GetAllowedStatusCodes returns the HTTP status codes that should not be treated as errors.
+	GetAllowedStatusCodes() []int
 }
 
 // HTTPMapping represents a single HTTP mapping configuration.

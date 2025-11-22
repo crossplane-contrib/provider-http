@@ -1,0 +1,20 @@
+apiVersion: http.crossplane.io/v1alpha2
+kind: DisposableRequest
+metadata:
+  name: check-resource-not-found
+spec:
+  deletionPolicy: Orphan
+  forProvider:
+    url: http://test-server.default.svc.cluster.local/v1/resource/nonexistent
+    method: GET
+    headers:
+      Authorization:
+        - "Basic {{ basic-auth:crossplane-system:token }}"
+    # Treat 404 as a valid response instead of an error
+    # This allows expectedResponse to be evaluated even for 404 status codes
+    allowedStatusCodes:
+      - 404
+    # Check if the response indicates the resource is not found
+    expectedResponse: '.statusCode == 404'
+  providerConfigRef:
+    name: http-conf

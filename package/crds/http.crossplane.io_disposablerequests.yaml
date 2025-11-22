@@ -74,6 +74,14 @@ spec:
                 description: DisposableRequestParameters are the configurable fields
                   of a DisposableRequest.
                 properties:
+                  allowedStatusCodes:
+                    description: |-
+                      AllowedStatusCodes specifies HTTP status codes that should not be treated as errors.
+                      By default, status codes 400-599 are considered errors. This field allows users to
+                      override that behavior for specific status codes (e.g., treating 404 as valid).
+                    items:
+                      type: integer
+                    type: array
                   body:
                     type: string
                     x-kubernetes-validations:
@@ -364,6 +372,14 @@ spec:
                 description: DisposableRequestParameters are the configurable fields
                   of a DisposableRequest.
                 properties:
+                  allowedStatusCodes:
+                    description: |-
+                      AllowedStatusCodes specifies HTTP status codes that should not be treated as errors.
+                      By default, status codes 400-599 are considered errors. This field allows users to
+                      override that behavior for specific status codes (e.g., treating 404 as valid).
+                    items:
+                      type: integer
+                    type: array
                   body:
                     type: string
                     x-kubernetes-validations:

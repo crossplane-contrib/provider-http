@@ -65,6 +65,14 @@ func requireAuthorization(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
+// Logging middleware
+func loggingMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		log.Printf("[%s] %s %s - Headers: %v", r.Method, r.URL.Path, r.RemoteAddr, r.Header)
+		next.ServeHTTP(w, r)
+	})
+}
+
 // Custom header middleware
 func addCustomHeader(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -175,9 +183,22 @@ func notify(w http.ResponseWriter, r *http.Request) {
 	writeJSONResponse(w, response, http.StatusCreated)
 }
 
+// GET /v1/resource/{resource_id} - Returns 404 for testing allowedStatusCodes
+func checkResource(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	resourceID := vars["resource_id"]
+
+	// Return 404 with a descriptive message
+	writeJSONResponse(w, Response{
+		Message: fmt.Sprintf("Resource %s not found", resourceID),
+	}, http.StatusNotFound)
+}
+
 func main() {
 	r := mux.NewRouter()
 
+	// Apply logging middleware to all routes
+	r.Use(loggingMiddleware)
 	// Apply custom header middleware to all routes
 	r.Use(addCustomHeader)
 
@@ -192,6 +213,9 @@ func main() {
 
 	// Notify route with authorization
 	r.HandleFunc("/v1/notify", requireAuthorization(notify)).Methods("POST")
+
+	// Resource check route (returns 404) - with authorization
+	r.HandleFunc("/v1/resource/{resource_id}", requireAuthorization(checkResource)).Methods("GET")
 
 	fmt.Println("Server starting on :5000...")
 	log.Fatal(http.ListenAndServe(":5000", r))
