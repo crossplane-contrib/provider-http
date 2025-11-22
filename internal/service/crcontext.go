@@ -76,6 +76,18 @@ func (c *DisposableRequestCRContext) RollbackPolicy() interfaces.RollbackAware {
 	return nil
 }
 
+// ReconciliationPolicy returns the reconciliation policy configuration.
+// The spec also implements ReconciliationPolicyAware for DisposableRequest.
+func (c *DisposableRequestCRContext) ReconciliationPolicy() interfaces.ReconciliationPolicyAware {
+	spec := c.cr.GetSpec()
+
+	if reconciliationAware, ok := spec.(interfaces.ReconciliationPolicyAware); ok {
+		return reconciliationAware
+	}
+
+	return nil
+}
+
 // Status returns the status reader.
 func (c *DisposableRequestCRContext) Status() interfaces.DisposableRequestStatusReader {
 	return c.cr

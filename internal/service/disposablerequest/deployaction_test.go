@@ -93,6 +93,46 @@ func TestDeployAction(t *testing.T) {
 				synced: true,
 			},
 		},
+		"AlreadySyncedButShouldLoopInfinitely": {
+			reason: "Should NOT skip deployment when resource is already synced but ShouldLoopInfinitely is true",
+			args: args{
+				ctx: context.Background(),
+				dr: disposableRequest(func(dr *v1alpha2.DisposableRequest) {
+					dr.Status.Synced = true
+					dr.Spec.ForProvider.ShouldLoopInfinitely = true
+				}),
+				localKube: &test.MockClient{
+					MockGet: test.NewMockGetFn(nil, func(obj client.Object) error {
+						if dr, ok := obj.(*v1alpha2.DisposableRequest); ok {
+							dr.Name = testDisposableName
+							dr.Namespace = testNamespace
+						}
+						return nil
+					}),
+					MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
+				},
+				httpClient: &MockHttpClient{
+					MockSendRequest: func(ctx context.Context, method string, url string, body httpClient.Data, headers httpClient.Data, tlsConfigData *httpClient.TLSConfigData) (resp httpClient.HttpDetails, err error) {
+						return httpClient.HttpDetails{
+							HttpResponse: httpClient.HttpResponse{
+								StatusCode: 200,
+								Body:       `{"status": "ok"}`,
+								Headers:    map[string][]string{"Content-Type": {"application/json"}},
+							},
+							HttpRequest: httpClient.HttpRequest{
+								Method: "POST",
+								URL:    testURL,
+								Body:   testBody,
+							},
+						}, nil
+					},
+				},
+			},
+			want: want{
+				err:    nil,
+				synced: true,
+			},
+		},
 		"RetriesLimitReached": {
 			reason: "Should not retry when retries limit is reached",
 			args: args{
