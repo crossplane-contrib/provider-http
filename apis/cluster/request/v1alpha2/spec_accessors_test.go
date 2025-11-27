@@ -176,9 +176,11 @@ func TestRequest_CachedResponse(t *testing.T) {
 	// Test with cached response
 	req := &Request{
 		Status: RequestStatus{
-			Response: Response{
-				StatusCode: 200,
-				Body:       "cached",
+			Cache: Cache{
+				Response: Response{
+					StatusCode: 200,
+					Body:       "cached",
+				},
 			},
 		},
 	}
