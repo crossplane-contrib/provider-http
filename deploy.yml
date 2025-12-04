@@ -1,19 +1,27 @@
+---
 # provider-http
 apiVersion: pkg.crossplane.io/v1
 kind: Provider
 metadata:
-  name: http-provider
+  name: provider-http
 spec:
   package: xpkg.upbound.io/crossplane-contrib/provider-http:v1.0.11
-  controllerConfigRef:
-    name: debug-config
-
+  runtimeConfigRef:
+    apiVersion: pkg.crossplane.io/v1beta1
+    kind: DeploymentRuntimeConfig
+    name: provider-http-config-debug
 ---
-# DEBUG_CONTROLLER_CONFIG
-apiVersion: pkg.crossplane.io/v1alpha1
-kind: ControllerConfig
+apiVersion: pkg.crossplane.io/v1beta1
+kind: DeploymentRuntimeConfig
 metadata:
-  name: debug-config
+  name: provider-http-config-debug
 spec:
-  args:
-    - --debug
+  deploymentTemplate:
+    spec:
+      selector: {}
+      template:
+        spec:
+          containers:
+            - name: package-runtime
+              args:
+                - --debug
