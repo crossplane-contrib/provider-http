@@ -1,0 +1,33 @@
+apiVersion: http.m.crossplane.io/v1alpha2
+kind: DisposableRequest
+metadata:
+  name: sample-nextreconcile
+  namespace: default
+  annotations:
+    # Run a pre-assert check to ensure the test server is reachable (relative to this manifest file)
+    uptest.upbound.io/pre-assert-hook: ../../test/hooks/check-test-server.sh
+    # Run the verification script after the resource is asserted by uptest (relative to this manifest file)
+    uptest.upbound.io/post-assert-hook: ../../test/hooks/verify-next-reconcile.sh
+spec:
+  forProvider:
+    url: http://test-server.default.svc.cluster.local/v1/notify
+    method: POST
+    body: |
+      { "recipient": "sample@example.com", "subject": "e2e", "message": "test" }
+    headers:
+      Content-Type:
+        - application/json
+      Authorization:
+        - "Bearer {{ auth:default:token }}"
+    insecureSkipTLSVerify: true
+    # expectedResponse evaluates a jq expression against the recorded response.
+    # The response body is available under the `body` key, so check `body.status`.
+    expectedResponse: '.body.status == "sent"'
+    rollbackRetriesLimit: 1
+    shouldLoopInfinitely: true
+    # Verify the controller honors this duration in e2e; short for test speed.
+    nextReconcile: 1m
+    waitTimeout: 10s
+  providerConfigRef:
+    name: http-conf-namespaced
+    kind: ProviderConfig
