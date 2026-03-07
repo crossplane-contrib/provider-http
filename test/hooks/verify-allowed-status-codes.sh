@@ -11,6 +11,20 @@ TIMEOUT=${VERIFY_ALLOWED_STATUS_TIMEOUT:-120}
 # Default to the .m API group (matches packaged CRD name)
 RESOURCE_KIND=${RESOURCE_KIND:-disposablerequests.http.m.crossplane.io}
 
+# Auto-detect the correct resource kind: sample examples use cluster-scoped
+# http.crossplane.io/v1alpha2 while namespaced examples use http.m.crossplane.io/v1alpha2
+_detect_disposablerequest_kind() {
+  local name="$1" ns_arg="${2:-}"
+  for kind in "disposablerequests.http.crossplane.io" "disposablerequests.http.m.crossplane.io"; do
+    if kubectl get "$kind" "$name" >/dev/null 2>&1; then echo "$kind"; return 0; fi
+    if [[ -n "$ns_arg" ]] && kubectl get "$kind" "$name" $ns_arg >/dev/null 2>&1; then echo "$kind"; return 0; fi
+  done
+  echo "$RESOURCE_KIND"
+}
+RESOURCE_KIND=$(_detect_disposablerequest_kind "$RESOURCE_NAME" "-n ${RESOURCE_NAMESPACE}")
+# Cluster-scoped resources have no namespace
+if [[ "$RESOURCE_KIND" == "disposablerequests.http.crossplane.io" ]]; then RESOURCE_NAMESPACE=""; fi
+
 echo "========================================="
 echo "verify-allowed-status-codes: validating $RESOURCE_NAME"
 echo "========================================="

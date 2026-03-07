@@ -13,6 +13,31 @@ TIMEOUT=${VERIFY_TEMPLATING_TIMEOUT:-120}
 # Default to the .m API group for requests resources
 RESOURCE_KIND=${RESOURCE_KIND:-requests.http.m.crossplane.io}
 
+# Auto-detect the correct resource kind: sample examples use cluster-scoped
+# http.crossplane.io/v1alpha2 while namespaced examples use http.m.crossplane.io/v1alpha2
+_detect_request_kind() {
+  local name="$1" ns_arg="${2:-}"
+  for kind in "requests.http.crossplane.io" "requests.http.m.crossplane.io"; do
+    if kubectl get "$kind" "$name" >/dev/null 2>&1; then echo "$kind"; return 0; fi
+    if [[ -n "$ns_arg" ]] && kubectl get "$kind" "$name" $ns_arg >/dev/null 2>&1; then echo "$kind"; return 0; fi
+  done
+  echo "$RESOURCE_KIND"
+}
+_resolve_resource_name() {
+  local name="$1" ns_arg="${2:-}"
+  for kind in "requests.http.crossplane.io" "requests.http.m.crossplane.io"; do
+    if kubectl get "$kind" "$name" >/dev/null 2>&1; then echo "$name"; return 0; fi
+    if [[ -n "$ns_arg" ]] && kubectl get "$kind" "$name" $ns_arg >/dev/null 2>&1; then echo "$name"; return 0; fi
+    if kubectl get "$kind" "${name}-namespaced" >/dev/null 2>&1; then echo "${name}-namespaced"; return 0; fi
+    if [[ -n "$ns_arg" ]] && kubectl get "$kind" "${name}-namespaced" $ns_arg >/dev/null 2>&1; then echo "${name}-namespaced"; return 0; fi
+  done
+  echo "$name"
+}
+RESOURCE_NAME=$(_resolve_resource_name "$RESOURCE_NAME" "-n ${RESOURCE_NAMESPACE}")
+RESOURCE_KIND=$(_detect_request_kind "$RESOURCE_NAME" "-n ${RESOURCE_NAMESPACE}")
+# Cluster-scoped resources have no namespace
+if [[ "$RESOURCE_KIND" == "requests.http.crossplane.io" ]]; then RESOURCE_NAMESPACE=""; fi
+
 # Support cluster-scoped resources by conditionally including the namespace flag
 if [[ -n "${RESOURCE_NAMESPACE:-}" ]]; then
   RT_NS_ARG="-n $RESOURCE_NAMESPACE"

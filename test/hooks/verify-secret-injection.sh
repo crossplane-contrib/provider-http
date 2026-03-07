@@ -4,16 +4,44 @@ set -euo pipefail
 # verify-secret-injection.sh
 # Uptest post-assert hook: validate secret injection from HTTP responses
 
-TEST_RESOURCE_NAME=${TEST_RESOURCE_NAME:-send-notification}
+TEST_RESOURCE_NAME=${TEST_RESOURCE_NAME:-}
 TEST_RESOURCE_NAMESPACE=${TEST_RESOURCE_NAMESPACE:-default}
-SECRET_NAME=${SECRET_NAME:-notification-response}
-SECRET_NAMESPACE=${SECRET_NAMESPACE:-default}
-SECRET_KEY=${SECRET_KEY:-notification-status}
+SECRET_NAME=${SECRET_NAME:-}
+SECRET_NAMESPACE=${SECRET_NAMESPACE:-}
+SECRET_KEY=${SECRET_KEY:-}
 EXPECTED_VALUE_REGEX=${EXPECTED_VALUE_REGEX:-}
 CHECK_OWNER_REFERENCE=${CHECK_OWNER_REFERENCE:-false}
 TIMEOUT=${VERIFY_SECRET_TIMEOUT:-120}
 # Default to the .m API group (matches packaged CRD name)
 RESOURCE_KIND=${RESOURCE_KIND:-disposablerequests.http.m.crossplane.io}
+
+# Auto-detect the correct resource kind: sample examples use cluster-scoped
+# http.crossplane.io/v1alpha2 while namespaced examples use http.m.crossplane.io/v1alpha2
+_detect_disposablerequest_kind() {
+  local name="$1" ns_arg="${2:-}"
+  for kind in "disposablerequests.http.crossplane.io" "disposablerequests.http.m.crossplane.io"; do
+    if kubectl get "$kind" "$name" >/dev/null 2>&1; then echo "$kind"; return 0; fi
+    if [[ -n "$ns_arg" ]] && kubectl get "$kind" "$name" $ns_arg >/dev/null 2>&1; then echo "$kind"; return 0; fi
+  done
+  echo "$RESOURCE_KIND"
+}
+
+# Discover the resource name by searching all test-annotated resources across both API groups
+_discover_resource_name() {
+  local ns_arg="${1:-}"
+  for kind in "disposablerequests.http.crossplane.io" "disposablerequests.http.m.crossplane.io"; do
+    local found
+    # cluster-scoped
+    found=$(kubectl get "$kind" -o jsonpath='{range .items[?(@.metadata.annotations["upjet.upbound.io/test"]=="true")]}{.metadata.name}{"\n"}{end}' 2>/dev/null | head -n1 || true)
+    if [[ -n "$found" ]]; then echo "$found"; return 0; fi
+    # namespaced
+    if [[ -n "$ns_arg" ]]; then
+      found=$(kubectl get "$kind" $ns_arg -o jsonpath='{range .items[?(@.metadata.annotations["upjet.upbound.io/test"]=="true")]}{.metadata.name}{"\n"}{end}' 2>/dev/null | head -n1 || true)
+      if [[ -n "$found" ]]; then echo "$found"; return 0; fi
+    fi
+  done
+  echo ""
+}
 
 # Support cluster-scoped resources by conditionally including the namespace flag
 if [[ -n "${TEST_RESOURCE_NAMESPACE:-}" ]]; then
@@ -23,19 +51,56 @@ else
 fi
 
 echo "========================================="
-echo "verify-secret-injection: validating secret injection for $TEST_RESOURCE_NAME"
+echo "verify-secret-injection: validating secret injection"
 echo "========================================="
 
-# Auto-discover resource name if not set or not found
-if ! kubectl get "$RESOURCE_KIND" "$TEST_RESOURCE_NAME" $TR_NS_ARG >/dev/null 2>&1; then
-  discovered=$(kubectl get "$RESOURCE_KIND" $TR_NS_ARG -o jsonpath='{range .items[?(@.metadata.annotations["upjet.upbound.io/test"]=="true")]}{.metadata.name}{"\n"}{end}' 2>/dev/null | head -n1 || true)
+# Auto-discover resource name if not provided or not found
+if [[ -z "$TEST_RESOURCE_NAME" ]] || ! kubectl get "$RESOURCE_KIND" "$TEST_RESOURCE_NAME" $TR_NS_ARG >/dev/null 2>&1; then
+  discovered=$(_discover_resource_name "$TR_NS_ARG")
   if [[ -n "$discovered" ]]; then
     TEST_RESOURCE_NAME="$discovered"
     echo "INFO: discovered resource name: $TEST_RESOURCE_NAME"
   fi
 fi
 
-echo "Resource: $TEST_RESOURCE_NAME (namespace: $TEST_RESOURCE_NAMESPACE)"
+# Auto-detect resource kind
+RESOURCE_KIND=$(_detect_disposablerequest_kind "$TEST_RESOURCE_NAME" "$TR_NS_ARG")
+# Cluster-scoped resources have no namespace
+if [[ "$RESOURCE_KIND" == "disposablerequests.http.crossplane.io" ]]; then
+  TEST_RESOURCE_NAMESPACE=""
+  TR_NS_ARG=""
+fi
+
+# Auto-discover secret config from resource spec if not explicitly provided
+if [[ -z "$SECRET_NAME" ]]; then
+  SECRET_NAME=$(kubectl get "$RESOURCE_KIND" "$TEST_RESOURCE_NAME" $TR_NS_ARG \
+    -o jsonpath='{.spec.forProvider.secretInjectionConfig[0].secretRef.name}' 2>/dev/null || echo "")
+  if [[ -z "$SECRET_NAME" ]]; then
+    # Try keyMappings-style (for older format)
+    SECRET_NAME=$(kubectl get "$RESOURCE_KIND" "$TEST_RESOURCE_NAME" $TR_NS_ARG \
+      -o jsonpath='{.spec.forProvider.secretInjectionConfig[0].secretRef.name}' 2>/dev/null || echo "notification-response")
+  fi
+  echo "INFO: auto-discovered SECRET_NAME=$SECRET_NAME"
+fi
+if [[ -z "$SECRET_NAMESPACE" ]]; then
+  SECRET_NAMESPACE=$(kubectl get "$RESOURCE_KIND" "$TEST_RESOURCE_NAME" $TR_NS_ARG \
+    -o jsonpath='{.spec.forProvider.secretInjectionConfig[0].secretRef.namespace}' 2>/dev/null || echo "default")
+  if [[ -z "$SECRET_NAMESPACE" ]]; then SECRET_NAMESPACE="default"; fi
+  echo "INFO: auto-discovered SECRET_NAMESPACE=$SECRET_NAMESPACE"
+fi
+if [[ -z "$SECRET_KEY" ]]; then
+  # Try secretKey field first
+  SECRET_KEY=$(kubectl get "$RESOURCE_KIND" "$TEST_RESOURCE_NAME" $TR_NS_ARG \
+    -o jsonpath='{.spec.forProvider.secretInjectionConfig[0].secretKey}' 2>/dev/null || echo "")
+  if [[ -z "$SECRET_KEY" ]]; then
+    # Try keyMappings secretKey
+    SECRET_KEY=$(kubectl get "$RESOURCE_KIND" "$TEST_RESOURCE_NAME" $TR_NS_ARG \
+      -o jsonpath='{.spec.forProvider.secretInjectionConfig[0].keyMappings[0].secretKey}' 2>/dev/null || echo "notification-status")
+  fi
+  echo "INFO: auto-discovered SECRET_KEY=$SECRET_KEY"
+fi
+
+echo "Resource: $TEST_RESOURCE_NAME (namespace: ${TEST_RESOURCE_NAMESPACE:-<cluster-scoped>})"
 echo "Secret: $SECRET_NAME/$SECRET_KEY (namespace: $SECRET_NAMESPACE)"
 echo ""
 
@@ -57,7 +122,7 @@ get_resource_uid() {
 
 get_condition_status() {
   local condition_type=$1
-  kubectl get "$RESOURCE_KIND" "$TEST_RESOURCE_NAME" -n "$TEST_RESOURCE_NAMESPACE" -o jsonpath="{.status.conditions[?(@.type=='$condition_type')].status}" 2>/dev/null || echo "Unknown"
+  kubectl get "$RESOURCE_KIND" "$TEST_RESOURCE_NAME" $TR_NS_ARG -o jsonpath="{.status.conditions[?(@.type=='$condition_type')].status}" 2>/dev/null || echo "Unknown"
 }
 
 get_secret_injection_status() {

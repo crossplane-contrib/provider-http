@@ -19,6 +19,11 @@ else
   NS_ARG=""
 fi
 
+# Initialize ACTUAL_CALLS so it is always defined (updated inside CHECK 7 if the
+# test-server pod is found; otherwise stays 0 so the final summary never fails
+# with an "unbound variable" error under set -u).
+ACTUAL_CALLS=0
+
 echo "========================================="
 echo "verify-error-status: validating $NAME in namespace $NAMESPACE"
 echo "========================================="

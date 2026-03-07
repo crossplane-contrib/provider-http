@@ -12,6 +12,33 @@ TIMEOUT=${VERIFY_EXPECTED_RESPONSE_TIMEOUT:-180}
 # Default to the .m API group (matches packaged CRD name)
 RESOURCE_KIND=${RESOURCE_KIND:-disposablerequests.http.m.crossplane.io}
 
+# Auto-detect the correct resource kind: sample examples use cluster-scoped
+# http.crossplane.io/v1alpha2 while namespaced examples use http.m.crossplane.io/v1alpha2
+_detect_disposablerequest_kind() {
+  local name="$1" ns_arg="${2:-}"
+  for kind in "disposablerequests.http.crossplane.io" "disposablerequests.http.m.crossplane.io"; do
+    if kubectl get "$kind" "$name" >/dev/null 2>&1; then echo "$kind"; return 0; fi
+    if [[ -n "$ns_arg" ]] && kubectl get "$kind" "$name" $ns_arg >/dev/null 2>&1; then echo "$kind"; return 0; fi
+  done
+  echo "$RESOURCE_KIND"
+}
+# Also try the namespaced variant of the resource name (e.g. send-notification-namespaced)
+_resolve_resource_name() {
+  local name="$1" ns_arg="${2:-}"
+  for kind in "disposablerequests.http.crossplane.io" "disposablerequests.http.m.crossplane.io"; do
+    if kubectl get "$kind" "$name" >/dev/null 2>&1; then echo "$name"; return 0; fi
+    if [[ -n "$ns_arg" ]] && kubectl get "$kind" "$name" $ns_arg >/dev/null 2>&1; then echo "$name"; return 0; fi
+    # Try with -namespaced suffix
+    if kubectl get "$kind" "${name}-namespaced" >/dev/null 2>&1; then echo "${name}-namespaced"; return 0; fi
+    if [[ -n "$ns_arg" ]] && kubectl get "$kind" "${name}-namespaced" $ns_arg >/dev/null 2>&1; then echo "${name}-namespaced"; return 0; fi
+  done
+  echo "$name"
+}
+RESOURCE_NAME=$(_resolve_resource_name "$RESOURCE_NAME" "-n ${RESOURCE_NAMESPACE}")
+RESOURCE_KIND=$(_detect_disposablerequest_kind "$RESOURCE_NAME" "-n ${RESOURCE_NAMESPACE}")
+# Cluster-scoped resources have no namespace
+if [[ "$RESOURCE_KIND" == "disposablerequests.http.crossplane.io" ]]; then RESOURCE_NAMESPACE=""; fi
+
 # Support cluster-scoped resources by conditionally including the namespace flag
 if [[ -n "${RESOURCE_NAMESPACE:-}" ]]; then
   RS_NS_ARG="-n $RESOURCE_NAMESPACE"
