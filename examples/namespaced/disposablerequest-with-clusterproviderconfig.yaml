@@ -3,6 +3,8 @@ kind: DisposableRequest
 metadata:
   name: send-notification-with-cluster-config
   namespace: default
+  annotations:
+    uptest.upbound.io/post-assert-hook: "../../test/hooks/verify-secret-injection.sh"
 spec:
   forProvider:
     # This example demonstrates using ClusterProviderConfig with namespaced DisposableRequest

@@ -183,6 +183,11 @@ func notify(w http.ResponseWriter, r *http.Request) {
 	writeJSONResponse(w, response, http.StatusCreated)
 }
 
+// POST /v1/error - Return 500 for testing error handling paths
+func errorEndpoint(w http.ResponseWriter, r *http.Request) {
+	writeJSONResponse(w, Response{Error: "internal server error"}, http.StatusInternalServerError)
+}
+
 // GET /v1/resource/{resource_id} - Returns 404 for testing allowedStatusCodes
 func checkResource(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
@@ -213,6 +218,9 @@ func main() {
 
 	// Notify route with authorization
 	r.HandleFunc("/v1/notify", requireAuthorization(notify)).Methods("POST")
+
+	// Error route (returns 500) - with authorization
+	r.HandleFunc("/v1/error", requireAuthorization(errorEndpoint)).Methods("POST")
 
 	// Resource check route (returns 404) - with authorization
 	r.HandleFunc("/v1/resource/{resource_id}", requireAuthorization(checkResource)).Methods("GET")

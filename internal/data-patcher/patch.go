@@ -145,12 +145,14 @@ func ApplyResponseDataToSecrets(ctx context.Context, localKube client.Client, lo
 		var owner metav1.Object = nil
 
 		if ref.SetOwnerReference {
-			// Kubernetes disallows cross-namespace owner references
-			// Only set owner reference if the secret is in the same namespace as the owner
-			if cr.GetNamespace() == ref.SecretRef.Namespace {
+			// Kubernetes owner reference rules:
+			// - Cluster-scoped resources (empty namespace) can own namespaced resources in any namespace
+			// - Namespaced resources can only own resources in the same namespace
+			ownerNamespace := cr.GetNamespace()
+			if ownerNamespace == "" || ownerNamespace == ref.SecretRef.Namespace {
 				owner = cr
 			} else {
-				logger.Debug(fmt.Sprintf("Skipping owner reference for cross-namespace secret injection: owner in %s, secret in %s", cr.GetNamespace(), ref.SecretRef.Namespace))
+				logger.Debug(fmt.Sprintf("Skipping owner reference for cross-namespace secret injection: owner in %s, secret in %s", ownerNamespace, ref.SecretRef.Namespace))
 			}
 		}
 

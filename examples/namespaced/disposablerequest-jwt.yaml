@@ -3,6 +3,8 @@ kind: DisposableRequest
 metadata:
   name: obtain-jwt-token-namespaced
   namespace: default
+  annotations:
+    uptest.upbound.io/post-assert-hook: "../../test/hooks/verify-secret-injection.sh"
 spec:
   forProvider:
     insecureSkipTLSVerify: true

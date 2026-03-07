@@ -2,6 +2,8 @@ apiVersion: http.crossplane.io/v1alpha2
 kind: Request
 metadata:
   name: manage-user
+  annotations:
+    uptest.upbound.io/post-assert-hook: "../../test/hooks/verify-secret-templating.sh"
 spec:
   forProvider:
     # Injecting data from secrets is possible, simply use the following syntax: {{ name:namespace:key }} (supported for body and headers only)

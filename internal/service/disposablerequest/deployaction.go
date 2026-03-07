@@ -116,11 +116,13 @@ func handleHttpRequestError(resource *utils.RequestResource, httpRequestErr erro
 
 // handleHttpErrorStatus handles HTTP error status codes
 func handleHttpErrorStatus(spec interfaces.SimpleHTTPRequestSpec, resource *utils.RequestResource) error {
-	if settingError := utils.SetRequestResourceStatus(*resource, resource.SetStatusCode(), resource.SetLastReconcileTime(), resource.SetHeaders(), resource.SetBody(), resource.SetRequestDetails(), resource.SetError(nil)); settingError != nil {
+	httpErr := errors.Errorf(utils.ErrStatusCode, spec.GetMethod(), strconv.Itoa(resource.HttpResponse.StatusCode))
+	setErr := resource.SetError(httpErr)
+	if settingError := utils.SetRequestResourceStatus(*resource, resource.SetStatusCode(), resource.SetLastReconcileTime(), resource.SetHeaders(), resource.SetBody(), resource.SetRequestDetails(), setErr); settingError != nil {
 		return errors.Wrap(settingError, utils.ErrFailedToSetStatus)
 	}
 
-	return errors.Errorf(utils.ErrStatusCode, spec.GetMethod(), strconv.Itoa(resource.HttpResponse.StatusCode))
+	return httpErr
 }
 
 // handleResponseValidation validates the response and updates status accordingly
@@ -136,6 +138,8 @@ func handleResponseValidation(svcCtx *service.ServiceContext, spec interfaces.Si
 	}
 
 	limit := utils.GetRollbackRetriesLimit(rollbackPolicy.GetRollbackRetriesLimit())
+	validationErr := errors.New(errResponseFormat + fmt.Sprint(limit))
+	setErr := resource.SetError(validationErr)
 	return utils.SetRequestResourceStatus(*resource, resource.SetStatusCode(), resource.SetLastReconcileTime(), resource.SetHeaders(), resource.SetBody(),
-		resource.SetError(errors.New(errResponseFormat+fmt.Sprint(limit))), resource.SetRequestDetails())
+		setErr, resource.SetRequestDetails())
 }

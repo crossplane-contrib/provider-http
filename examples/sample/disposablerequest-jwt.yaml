@@ -2,6 +2,8 @@ apiVersion: http.crossplane.io/v1alpha2
 kind: DisposableRequest
 metadata:
   name: obtain-jwt-token
+  annotations:
+    uptest.upbound.io/post-assert-hook: "../../test/hooks/verify-secret-injection.sh"
 spec:
   deletionPolicy: Orphan
   forProvider:

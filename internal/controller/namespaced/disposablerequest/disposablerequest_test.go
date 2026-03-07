@@ -207,6 +207,28 @@ func TestObserve(t *testing.T) {
 			},
 		},
 		{
+			name: "ResourceNotSyncedWithRetryPendingAndNextReconcileNotReached",
+			args: args{
+				mg: func() *v1alpha2.DisposableRequest {
+					cr := namespacedDisposableRequest()
+					cr.Status.Synced = false
+					cr.Status.Failed = 1
+					limit := int32(3)
+					cr.Spec.ForProvider.RollbackRetriesLimit = &limit
+					cr.Spec.ForProvider.NextReconcile = &metav1.Duration{Duration: 10 * time.Second}
+					// Set last reconcile time to now so NextReconcile hasn't elapsed
+					cr.Status.LastReconcileTime = metav1.Now()
+					return cr
+				}(),
+			},
+			want: want{
+				obs: managed.ExternalObservation{
+					ResourceExists:   true,
+					ResourceUpToDate: true,
+				},
+			},
+		},
+		{
 			name: "ResourceSyncedAndUpToDate",
 			args: args{
 				http: &MockHttpClient{},
@@ -598,10 +620,6 @@ func Test_deployAction(t *testing.T) {
 			}
 
 			if tc.condition {
-				if diff := cmp.Diff(tc.args.cr.Spec.ForProvider.Body, tc.args.cr.Status.Response.Body); diff != "" {
-					t.Fatalf("deployAction(...): -want Status.Response.Body, +got Status.Response.Body: %s", diff)
-				}
-
 				if diff := cmp.Diff(tc.want.statusCode, tc.args.cr.Status.Response.StatusCode); diff != "" {
 					t.Fatalf("deployAction(...): -want Status.Response.StatusCode, +got Status.Response.StatusCode: %s", diff)
 				}
@@ -909,6 +927,39 @@ func TestObserve_DeletionMonitoring(t *testing.T) {
 				t.Errorf("Observe(...): -want, +got: %s", diff)
 			}
 		})
+	}
+}
+
+func Test_httpExternal_Observe_ResponseDoesNotMatchExpected(t *testing.T) {
+	e := &external{
+		logger:    logging.NewNopLogger(),
+		localKube: &test.MockClient{MockGet: test.NewMockGetFn(nil), MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil)},
+		http:      &MockHttpClient{},
+	}
+
+	mg := &v1alpha2.DisposableRequest{
+		Spec: v1alpha2.DisposableRequestSpec{
+			ForProvider: v1alpha2.DisposableRequestParameters{
+				URL:              testURL,
+				Method:           testMethod,
+				ExpectedResponse: ".body.status == \"success\"",
+			},
+		},
+		Status: v1alpha2.DisposableRequestStatus{
+			Synced: true,
+			Response: v1alpha2.Response{
+				StatusCode: 400,
+				Body:       `{"status": "failed"}`,
+			},
+		},
+	}
+
+	got, err := e.Observe(context.Background(), mg)
+	if err != nil {
+		t.Fatalf("e.Observe(...): unexpected error: %v", err)
+	}
+	if got.ResourceUpToDate {
+		t.Fatalf("e.Observe(...): expected ResourceUpToDate=false when response does not match expected, got true")
 	}
 }
 

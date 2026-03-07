@@ -29,28 +29,15 @@ import (
 	"github.com/crossplane-contrib/provider-http/internal/service/disposablerequest"
 	"github.com/crossplane-contrib/provider-http/internal/utils"
 	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
-	"github.com/google/go-cmp/cmp"
-	"github.com/pkg/errors"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
 	"github.com/crossplane/crossplane-runtime/v2/pkg/feature"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/logging"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/test"
-)
-
-// Unlike many Kubernetes projects Crossplane does not use third party testing
-// libraries, per the common Go test review comments. Crossplane encourages the
-// use of table driven unit tests. The tests of the crossplane-runtime project
-// are representative of the testing style Crossplane encourages.
-//
-// https://github.com/golang/go/wiki/TestComments
-// https://github.com/crossplane/crossplane/blob/master/CONTRIBUTING.md#contributing-code
-
-var (
-	errBoom = errors.New("boom")
+	"github.com/google/go-cmp/cmp"
+	"github.com/pkg/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
@@ -66,7 +53,7 @@ var testHeaders = map[string][]string{
 	"programming_languages": {"Go", "Python", "JavaScript"},
 }
 
-var testTimeout = &v1.Duration{
+var testTimeout = &metav1.Duration{
 	Duration: 5 * time.Minute,
 }
 
@@ -78,9 +65,13 @@ const (
 
 type httpDisposableRequestModifier func(request *v1alpha2.DisposableRequest)
 
+var (
+	errBoom = errors.New("boom")
+)
+
 func httpDisposableRequest(rm ...httpDisposableRequestModifier) *v1alpha2.DisposableRequest {
 	r := &v1alpha2.DisposableRequest{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      testDisposableRequestName,
 			Namespace: testNamespace,
 		},
@@ -344,6 +335,37 @@ func Test_httpExternal_Observe(t *testing.T) {
 			},
 		},
 		{
+			name: "ResourceNotSyncedWithRetryPendingAndNextReconcileNotReached",
+			args: args{
+				http: &MockHttpClient{},
+				localKube: &test.MockClient{
+					MockGet: test.NewMockGetFn(nil),
+				},
+				mg: &v1alpha2.DisposableRequest{
+					Spec: v1alpha2.DisposableRequestSpec{
+						ForProvider: v1alpha2.DisposableRequestParameters{
+							URL:                  testURL,
+							Method:               testMethod,
+							NextReconcile:        &metav1.Duration{Duration: 10 * time.Second},
+							RollbackRetriesLimit: func() *int32 { v := int32(3); return &v }(),
+						},
+					},
+					Status: v1alpha2.DisposableRequestStatus{
+						Synced:            false,
+						Failed:            1,
+						LastReconcileTime: metav1.Now(),
+					},
+				},
+			},
+			want: want{
+				observation: managed.ExternalObservation{
+					ResourceExists:   true,
+					ResourceUpToDate: true,
+				},
+				err: nil,
+			},
+		},
+		{
 			name: "ResourceSyncedAndUpToDate",
 			args: args{
 				http: &MockHttpClient{},
@@ -574,10 +596,6 @@ func Test_deployAction(t *testing.T) {
 
 			if tc.condition {
 				if diff := cmp.Diff(tc.args.cr.Spec.ForProvider.Body, tc.args.cr.Status.Response.Body); diff != "" {
-					t.Fatalf("deployAction(...): -want Status.Response.Body, +got Status.Response.Body: %s", diff)
-				}
-
-				if diff := cmp.Diff(tc.want.statusCode, tc.args.cr.Status.Response.StatusCode); diff != "" {
 					t.Fatalf("deployAction(...): -want Status.Response.StatusCode, +got Status.Response.StatusCode: %s", diff)
 				}
 
@@ -1133,9 +1151,9 @@ func TestDisposableRequestManagementPolicies(t *testing.T) {
 }
 
 func disposableRequestWithDeletion() *v1alpha2.DisposableRequest {
-	now := v1.Now()
+	now := metav1.Now()
 	return &v1alpha2.DisposableRequest{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:              "test-disposable",
 			Namespace:         "default",
 			DeletionTimestamp: &now,

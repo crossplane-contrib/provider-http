@@ -24,9 +24,12 @@ import (
 	"github.com/crossplane/crossplane-runtime/v2/pkg/logging"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
 	"github.com/pkg/errors"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/controller"
@@ -56,6 +59,84 @@ const (
 	errGetCPC = "cannot get ClusterProviderConfig"
 )
 
+// errorConditionReconciler wraps a reconciler to add ErrorObserved condition after reconciliation
+type errorConditionReconciler struct {
+	reconciler reconcile.Reconciler
+	kube       client.Client
+}
+
+// Reconcile implements reconcile.Reconciler
+func (r *errorConditionReconciler) Reconcile(ctx context.Context, req reconcile.Request) (reconcile.Result, error) {
+	// Call the managed reconciler
+	result, err := r.reconciler.Reconcile(ctx, req)
+
+	// After reconciliation, check if we need to add ErrorObserved condition
+	cr := &v1alpha2.DisposableRequest{}
+	if getErr := r.kube.Get(ctx, req.NamespacedName, cr); getErr != nil {
+		// If we can't get the resource, just return the original result
+		return result, err
+	}
+
+	if cr.Status.Error != "" && utils.RetriesLimitReached(cr.Status.Failed, cr.Spec.ForProvider.RollbackRetriesLimit) {
+		// Ensure the ErrorObserved condition is present and current
+		if ensureErr := r.ensureErrorObserved(ctx, cr); ensureErr != nil {
+			// Log but don't fail the reconciliation
+			return result, err
+		}
+	}
+
+	return result, err
+}
+
+// ensureErrorObserved sets or updates the ErrorObserved condition to the current error message
+func (r *errorConditionReconciler) ensureErrorObserved(ctx context.Context, cr *v1alpha2.DisposableRequest) error {
+	// Check if ErrorObserved condition already exists and is current
+	hasCurrentErrorCondition := false
+	for _, c := range cr.Status.Conditions {
+		if c.Type == "ErrorObserved" && c.Status == corev1.ConditionTrue && c.Message == cr.Status.Error {
+			hasCurrentErrorCondition = true
+			break
+		}
+	}
+
+	if hasCurrentErrorCondition {
+		return nil
+	}
+
+	// Update conditions
+	conditions := cr.Status.Conditions
+	foundIndex := -1
+	for i, c := range conditions {
+		if c.Type == "ErrorObserved" {
+			foundIndex = i
+			break
+		}
+	}
+
+	errorCondition := xpv1.Condition{
+		Type:               "ErrorObserved",
+		Status:             corev1.ConditionTrue,
+		LastTransitionTime: metav1.Now(),
+		Reason:             "RetriesExhausted",
+		Message:            cr.Status.Error,
+	}
+
+	if foundIndex >= 0 {
+		conditions[foundIndex] = errorCondition
+	} else {
+		conditions = append(conditions, errorCondition)
+	}
+
+	cr.SetConditions(conditions...)
+
+	// Update the resource status
+	if updateErr := r.kube.Status().Update(ctx, cr); updateErr != nil {
+		return updateErr
+	}
+
+	return nil
+}
+
 // Setup adds a controller that reconciles namespaced DisposableRequest managed resources.
 func Setup(mgr ctrl.Manager, o controller.Options, timeout time.Duration) error {
 	name := managed.ControllerName(v1alpha2.DisposableRequestGroupKind)
@@ -83,12 +164,18 @@ func Setup(mgr ctrl.Manager, o controller.Options, timeout time.Duration) error 
 		reconcilerOptions...,
 	)
 
+	// Wrap the reconciler to add ErrorObserved condition after managed reconciler completes
+	wrappedReconciler := &errorConditionReconciler{
+		reconciler: ratelimiter.NewReconciler(name, r, o.GlobalRateLimiter),
+		kube:       mgr.GetClient(),
+	}
+
 	return ctrl.NewControllerManagedBy(mgr).
 		Named(name).
 		WithOptions(o.ForControllerRuntime()).
 		WithEventFilter(resource.DesiredStateChanged()).
 		For(&v1alpha2.DisposableRequest{}).
-		Complete(ratelimiter.NewReconciler(name, r, o.GlobalRateLimiter))
+		Complete(wrappedReconciler)
 }
 
 type connector struct {
@@ -210,10 +297,48 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		}, nil
 	}
 
-	isUpToDate := !(utils.ShouldRetry(cr.Spec.ForProvider.RollbackRetriesLimit, cr.Status.Failed) && !utils.RetriesLimitReached(cr.Status.Failed, cr.Spec.ForProvider.RollbackRetriesLimit))
+	// Check if retries are needed (error occurred and haven't exhausted retries)
+	needsRetry := utils.ShouldRetry(cr.Spec.ForProvider.RollbackRetriesLimit, cr.Status.Failed) && !utils.RetriesLimitReached(cr.Status.Failed, cr.Spec.ForProvider.RollbackRetriesLimit)
+
+	// For retries, respect nextReconcile timing if configured
+	isUpToDate := true
+	if needsRetry {
+		if cr.Spec.ForProvider.NextReconcile != nil {
+			// Only retry if enough time has passed since last reconcile
+			nextReconcileDuration := cr.Spec.ForProvider.NextReconcile.Duration
+			last := cr.Status.LastReconcileTime.Time
+			if last.IsZero() {
+				last = time.Now()
+			}
+			if !time.Now().Before(last.Add(nextReconcileDuration)) {
+				c.logger.Debug("NextReconcile time reached and retry needed, marking resource as not up-to-date")
+				isUpToDate = false
+			} else {
+				c.logger.Debug("Retry needed but nextReconcile time not yet reached, keeping resource up-to-date")
+			}
+		} else {
+			// No nextReconcile configured, allow immediate retry
+			isUpToDate = false
+		}
+	}
+
 	isAvailable := isUpToDate
 
+	// If the resource is not yet marked as synced, we would normally trigger
+	// a Create (or Update) which causes an immediate deployment. However,
+	// when a retry is pending (an error occurred and rollback retries are
+	// enabled) and the configured NextReconcile time has not yet been reached
+	// we should avoid triggering an immediate deployment and instead treat
+	// the resource as existing and up-to-date until NextReconcile elapses.
 	if !cr.Status.Synced {
+		if needsRetry && isUpToDate {
+			c.logger.Debug("Retry pending and nextReconcile not reached; suppressing Create to respect NextReconcile timing")
+			return managed.ExternalObservation{
+				ResourceExists:   true,
+				ResourceUpToDate: true,
+			}, nil
+		}
+
 		return managed.ExternalObservation{
 			ResourceExists: false,
 		}, nil
@@ -226,15 +351,33 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, err
 	}
 	if !isExpected {
-		return managed.ExternalObservation{}, errors.New(errResponseDoesntMatchExpectedCriteria)
+		c.logger.Debug("Response does not match expected criteria")
+		// Respect nextReconcile timing even for validation failures
+		if cr.Spec.ForProvider.NextReconcile != nil {
+			nextReconcileDuration := cr.Spec.ForProvider.NextReconcile.Duration
+			last := cr.Status.LastReconcileTime.Time
+			if last.IsZero() {
+				last = time.Now()
+			}
+			if time.Now().Before(last.Add(nextReconcileDuration)) {
+				c.logger.Debug("Validation failed but nextReconcile time not yet reached, keeping resource up-to-date")
+				return managed.ExternalObservation{
+					ResourceExists:   isAvailable,
+					ResourceUpToDate: true,
+				}, nil
+			}
+		}
+		c.logger.Debug("Validation failed and nextReconcile time reached (or not configured), marking resource as not up-to-date")
+		return managed.ExternalObservation{
+			ResourceExists:   isAvailable,
+			ResourceUpToDate: false,
+		}, nil
 	}
 
 	isUpToDate = disposablerequest.CalculateUpToDateStatus(crCtx, isUpToDate)
 
-	// If nextReconcile is configured, and the next reconcile time has passed,
-	// force the resource to be considered out-of-date so DeployAction runs and
-	// updates LastReconcileTime.
-	if cr.Spec.ForProvider.NextReconcile != nil {
+	// If nextReconcile is configured and no retry is pending, check if regular reconcile time has passed
+	if !needsRetry && cr.Spec.ForProvider.NextReconcile != nil {
 		nextReconcileDuration := cr.Spec.ForProvider.NextReconcile.Duration
 		last := cr.Status.LastReconcileTime.Time
 		if last.IsZero() {
