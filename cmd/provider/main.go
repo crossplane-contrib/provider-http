@@ -17,13 +17,17 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"time"
 
+	authv1 "k8s.io/api/authorization/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	kingpin "gopkg.in/alecthomas/kingpin.v2"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
@@ -31,6 +35,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	"github.com/crossplane/crossplane-runtime/v2/pkg/controller"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/errors"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/feature"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/gate"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/logging"
@@ -101,8 +106,58 @@ func main() {
 		log.Info("Beta feature enabled", "flag", feature.EnableBetaManagementPolicies)
 	}
 
-	// Setup SafeStart CRD gate controller
-	kingpin.FatalIfError(customresourcesgate.Setup(mgr, o), "Cannot setup CRD gate controller")
-	kingpin.FatalIfError(httpcontrollers.SetupGated(mgr, o, *timeout), "Cannot setup provider controllers")
+	precheckCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	canSafeStart, err := canWatchCRD(precheckCtx, mgr)
+	kingpin.FatalIfError(err, "SafeStart precheck failed")
+
+	if canSafeStart {
+		crdGate := new(gate.Gate[schema.GroupVersionKind])
+		o.Gate = crdGate
+		gateOpts := controller.Options{
+			Gate:                    crdGate,
+			Logger:                  log,
+			MaxConcurrentReconciles: 1,
+		}
+		kingpin.FatalIfError(customresourcesgate.Setup(mgr, gateOpts), "Cannot setup CRD gate controller")
+		kingpin.FatalIfError(httpcontrollers.SetupGated(mgr, o, *timeout), "Cannot setup provider controllers")
+	} else {
+		log.Info("Provider has missing RBAC permissions for watching CRDs, controller SafeStart capability will be disabled")
+		kingpin.FatalIfError(httpcontrollers.Setup(mgr, o, *timeout), "Cannot setup provider controllers")
+	}
+
 	kingpin.FatalIfError(mgr.Start(ctrl.SetupSignalHandler()), "Cannot start controller manager")
+}
+
+func canWatchCRD(ctx context.Context, mgr manager.Manager) (bool, error) {
+	return canWatchCRDWithCreate(ctx, mgr.GetScheme(), func(ctx context.Context, sar *authv1.SelfSubjectAccessReview) error {
+		return mgr.GetClient().Create(ctx, sar)
+	})
+}
+
+func canWatchCRDWithCreate(ctx context.Context, scheme *runtime.Scheme, create func(context.Context, *authv1.SelfSubjectAccessReview) error) (bool, error) {
+	if err := authv1.AddToScheme(scheme); err != nil {
+		return false, err
+	}
+
+	verbs := []string{"get", "list", "watch"}
+	for _, verb := range verbs {
+		sar := &authv1.SelfSubjectAccessReview{
+			Spec: authv1.SelfSubjectAccessReviewSpec{
+				ResourceAttributes: &authv1.ResourceAttributes{
+					Group:    "apiextensions.k8s.io",
+					Resource: "customresourcedefinitions",
+					Verb:     verb,
+				},
+			},
+		}
+		if err := create(ctx, sar); err != nil {
+			return false, errors.Wrapf(err, "unable to perform RBAC check for verb %s on CustomResourceDefinitions", verb)
+		}
+		if !sar.Status.Allowed {
+			return false, nil
+		}
+	}
+
+	return true, nil
 }
