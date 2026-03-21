@@ -204,7 +204,7 @@ func TestObserve(t *testing.T) {
 			},
 			want: want{
 				obs: managed.ExternalObservation{
-					ResourceExists: false,
+					ResourceExists: true,
 				},
 			},
 		},
@@ -990,11 +990,24 @@ func TestObserve_DeletionMonitoring(t *testing.T) {
 		{
 			name: "ResourceBeingDeleted",
 			args: args{
+				http: &MockHttpClient{
+					MockSendRequest: func(ctx context.Context, method string, url string, body, headers httpClient.Data, tlsConfigData *httpClient.TLSConfigData) (resp httpClient.HttpDetails, err error) {
+						return httpClient.HttpDetails{
+							HttpResponse: httpClient.HttpResponse{
+								StatusCode: 200,
+								Body:       `{"id": "123"}`,
+							},
+						}, nil
+					},
+				},
+				localKube: &test.MockClient{
+					MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
+				},
 				mg: httpNamespacedRequestWithDeletion(),
 			},
 			want: want{
 				obs: managed.ExternalObservation{
-					ResourceExists: false,
+					ResourceExists: true,
 				},
 			},
 		},

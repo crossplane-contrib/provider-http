@@ -1,0 +1,46 @@
+apiVersion: http.crossplane.io/v1alpha2
+kind: Request
+metadata:
+  name: manage-user-delete-remove-e2e-sample
+  annotations:
+    uptest.upbound.io/post-assert-hook: "../../test/hooks/verify-remove-on-delete.sh"
+spec:
+  forProvider:
+    insecureSkipTLSVerify: true
+    waitTimeout: 5m
+    headers:
+      Content-Type:
+        - application/json
+      Authorization:
+        - "Bearer {{ auth:default:token }}"
+    payload:
+      baseUrl: http://test-server.default.svc.cluster.local/v1/users
+      body: |
+        {
+          "username": "delete_remove_e2e_user_sample",
+          "email": "delete_remove_e2e_user_sample@example.com",
+          "password": "delete_remove_pw_{{ user-password:crossplane-system:password }}"
+        }
+    mappings:
+      - action: CREATE
+        body: |
+          {
+            username: .payload.body.username,
+            email: .payload.body.email,
+            password: .payload.body.password
+          }
+        url: .payload.baseUrl
+      - action: OBSERVE
+        url: .payload.baseUrl + "/" + (.response.body.id | tostring)
+      - action: REMOVE
+        url: .payload.baseUrl + "/" + (.response.body.id | tostring)
+    expectedResponseCheck:
+      type: CUSTOM
+      logic: |
+        if (.response.body.id != null)
+          and (.response.body.username == .payload.body.username)
+          then true
+          else false
+          end
+  providerConfigRef:
+    name: http-conf
