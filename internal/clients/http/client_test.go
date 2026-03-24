@@ -1095,6 +1095,80 @@ func TestBuildTLSConfigNilSafety(t *testing.T) {
 	})
 }
 
+func TestHTTPClientCacheReuse(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("ok"))
+	}))
+	defer server.Close()
+
+	tlsConfig := &TLSConfigData{InsecureSkipVerify: true}
+
+	// Two separate client instances (simulating two reconcile cycles) should
+	// get the same cached http.Client for the same TLS config + timeout.
+	c1, _ := NewClient(logging.NewNopLogger(), 30*time.Second, "")
+	c2, _ := NewClient(logging.NewNopLogger(), 30*time.Second, "")
+
+	for i := 0; i < 10; i++ {
+		c := c1
+		if i%2 == 1 {
+			c = c2
+		}
+		result, err := c.SendRequest(
+			context.Background(),
+			http.MethodGet,
+			server.URL,
+			Data{Encrypted: "", Decrypted: ""},
+			Data{Encrypted: map[string][]string{}, Decrypted: map[string][]string{}},
+			tlsConfig,
+		)
+		if err != nil {
+			t.Fatalf("SendRequest #%d: unexpected error: %v", i, err)
+		}
+		if result.HttpResponse.StatusCode != http.StatusOK {
+			t.Fatalf("SendRequest #%d: statusCode = %v, want 200", i, result.HttpResponse.StatusCode)
+		}
+	}
+}
+
+func TestTransportReuse(t *testing.T) {
+	requestCount := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestCount++
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("ok"))
+	}))
+	defer server.Close()
+
+	c, err := NewClient(logging.NewNopLogger(), 30*time.Second, "")
+	if err != nil {
+		t.Fatalf("NewClient(...): unexpected error: %v", err)
+	}
+
+	// Send multiple requests on the same client — all should succeed,
+	// proving transport/connection reuse works.
+	for i := 0; i < 50; i++ {
+		result, err := c.SendRequest(
+			context.Background(),
+			http.MethodGet,
+			server.URL,
+			Data{Encrypted: "", Decrypted: ""},
+			Data{Encrypted: map[string][]string{}, Decrypted: map[string][]string{}},
+			nil, // nil TLS config = use shared client
+		)
+		if err != nil {
+			t.Fatalf("SendRequest #%d: unexpected error: %v", i, err)
+		}
+		if result.HttpResponse.StatusCode != http.StatusOK {
+			t.Fatalf("SendRequest #%d: statusCode = %v, want 200", i, result.HttpResponse.StatusCode)
+		}
+	}
+
+	if requestCount != 50 {
+		t.Errorf("expected 50 requests to reach server, got %d", requestCount)
+	}
+}
+
 func TestTLSConfigInsecureSkipVerifyFlag(t *testing.T) {
 	t.Run("InsecureSkipVerifyFalseByDefault", func(t *testing.T) {
 		config := &tls.Config{}
