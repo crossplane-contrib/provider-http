@@ -7,9 +7,11 @@ import (
 	"encoding/pem"
 	"errors"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -1095,78 +1097,207 @@ func TestBuildTLSConfigNilSafety(t *testing.T) {
 	})
 }
 
+// resetHTTPClientCache clears the global httpClientCache so that tests are
+// isolated from each other.
+func resetHTTPClientCache() {
+	httpClientCache.Clear()
+}
+
 func TestHTTPClientCacheReuse(t *testing.T) {
-	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("ok"))
-	}))
-	defer server.Close()
+	type pair struct {
+		timeout time.Duration
+		tls     *TLSConfigData
+	}
 
-	tlsConfig := &TLSConfigData{InsecureSkipVerify: true}
+	cases := map[string]struct {
+		a        pair
+		b        pair
+		wantSame bool
+	}{
+		"SameConfigReturnsSameClient": {
+			a:        pair{timeout: 30 * time.Second, tls: &TLSConfigData{InsecureSkipVerify: true}},
+			b:        pair{timeout: 30 * time.Second, tls: &TLSConfigData{InsecureSkipVerify: true}},
+			wantSame: true,
+		},
+		"NilTLSConfigReturnsSameClient": {
+			a:        pair{timeout: 30 * time.Second, tls: nil},
+			b:        pair{timeout: 30 * time.Second, tls: nil},
+			wantSame: true,
+		},
+		"DifferentTimeoutReturnsDifferentClient": {
+			a:        pair{timeout: 30 * time.Second, tls: &TLSConfigData{InsecureSkipVerify: true}},
+			b:        pair{timeout: 10 * time.Second, tls: &TLSConfigData{InsecureSkipVerify: true}},
+			wantSame: false,
+		},
+		"NilVsNonNilTLSReturnsDifferentClient": {
+			a:        pair{timeout: 30 * time.Second, tls: nil},
+			b:        pair{timeout: 30 * time.Second, tls: &TLSConfigData{}},
+			wantSame: false,
+		},
+		"DifferentInsecureSkipVerifyReturnsDifferentClient": {
+			a:        pair{timeout: 30 * time.Second, tls: &TLSConfigData{InsecureSkipVerify: false}},
+			b:        pair{timeout: 30 * time.Second, tls: &TLSConfigData{InsecureSkipVerify: true}},
+			wantSame: false,
+		},
+	}
 
-	// Two separate client instances (simulating two reconcile cycles) should
-	// get the same cached http.Client for the same TLS config + timeout.
-	c1, _ := NewClient(logging.NewNopLogger(), 30*time.Second, "")
-	c2, _ := NewClient(logging.NewNopLogger(), 30*time.Second, "")
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			resetHTTPClientCache()
 
-	for i := 0; i < 10; i++ {
-		c := c1
-		if i%2 == 1 {
-			c = c2
-		}
-		result, err := c.SendRequest(
-			context.Background(),
-			http.MethodGet,
-			server.URL,
-			Data{Encrypted: "", Decrypted: ""},
-			Data{Encrypted: map[string][]string{}, Decrypted: map[string][]string{}},
-			tlsConfig,
-		)
-		if err != nil {
-			t.Fatalf("SendRequest #%d: unexpected error: %v", i, err)
-		}
-		if result.HttpResponse.StatusCode != http.StatusOK {
-			t.Fatalf("SendRequest #%d: statusCode = %v, want 200", i, result.HttpResponse.StatusCode)
-		}
+			cl1, err := getOrCreateHTTPClient(tc.a.timeout, tc.a.tls)
+			if err != nil {
+				t.Fatalf("getOrCreateHTTPClient(a): %v", err)
+			}
+			if cl1 == nil {
+				t.Fatal("getOrCreateHTTPClient(a): returned nil")
+			}
+			if cl1.Timeout != tc.a.timeout {
+				t.Errorf("cl1.Timeout = %v, want %v", cl1.Timeout, tc.a.timeout)
+			}
+
+			cl2, err := getOrCreateHTTPClient(tc.b.timeout, tc.b.tls)
+			if err != nil {
+				t.Fatalf("getOrCreateHTTPClient(b): %v", err)
+			}
+			if cl2 == nil {
+				t.Fatal("getOrCreateHTTPClient(b): returned nil")
+			}
+			if cl2.Timeout != tc.b.timeout {
+				t.Errorf("cl2.Timeout = %v, want %v", cl2.Timeout, tc.b.timeout)
+			}
+
+			if tc.wantSame && cl1 != cl2 {
+				t.Error("expected same *http.Client from cache, got different pointers")
+			}
+			if !tc.wantSame && cl1 == cl2 {
+				t.Error("expected different *http.Client instances, got same pointer")
+			}
+		})
+	}
+}
+
+func TestHTTPClientKeyDifferentiation(t *testing.T) {
+	type pair struct {
+		timeout time.Duration
+		tls     *TLSConfigData
+	}
+
+	cases := map[string]struct {
+		a        pair
+		b        pair
+		wantSame bool
+	}{
+		"IdenticalConfigsSameKey": {
+			a:        pair{timeout: 30 * time.Second, tls: &TLSConfigData{InsecureSkipVerify: true}},
+			b:        pair{timeout: 30 * time.Second, tls: &TLSConfigData{InsecureSkipVerify: true}},
+			wantSame: true,
+		},
+		"DifferentCABundleDifferentKey": {
+			a:        pair{timeout: 30 * time.Second, tls: &TLSConfigData{CABundle: []byte("ca-a")}},
+			b:        pair{timeout: 30 * time.Second, tls: &TLSConfigData{CABundle: []byte("ca-b")}},
+			wantSame: false,
+		},
+		"DifferentClientCertDifferentKey": {
+			a:        pair{timeout: 30 * time.Second, tls: &TLSConfigData{ClientCert: []byte("cert-a")}},
+			b:        pair{timeout: 30 * time.Second, tls: &TLSConfigData{ClientCert: []byte("cert-b")}},
+			wantSame: false,
+		},
+		"DifferentClientKeyDifferentKey": {
+			a:        pair{timeout: 30 * time.Second, tls: &TLSConfigData{ClientKey: []byte("key-a")}},
+			b:        pair{timeout: 30 * time.Second, tls: &TLSConfigData{ClientKey: []byte("key-b")}},
+			wantSame: false,
+		},
+		"NilVsEmptyTLSDifferentKey": {
+			a:        pair{timeout: 30 * time.Second, tls: nil},
+			b:        pair{timeout: 30 * time.Second, tls: &TLSConfigData{}},
+			wantSame: false,
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			keyA := httpClientKey(tc.a.timeout, tc.a.tls)
+			keyB := httpClientKey(tc.b.timeout, tc.b.tls)
+
+			if keyA == "" {
+				t.Fatal("httpClientKey(a) returned empty string")
+			}
+			if tc.wantSame && keyA != keyB {
+				t.Errorf("expected same key, got %q vs %q", keyA, keyB)
+			}
+			if !tc.wantSame && keyA == keyB {
+				t.Errorf("expected different keys, got identical %q", keyA)
+			}
+		})
 	}
 }
 
 func TestTransportReuse(t *testing.T) {
-	requestCount := 0
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		requestCount++
+	resetHTTPClientCache()
+
+	var connCount int32
+	var requestCount int32
+	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&requestCount, 1)
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("ok"))
+		_, _ = w.Write([]byte("ok"))
 	}))
+	server.Config.ConnState = func(_ net.Conn, state http.ConnState) {
+		if state == http.StateNew {
+			atomic.AddInt32(&connCount, 1)
+		}
+	}
+	server.Start()
 	defer server.Close()
 
-	c, err := NewClient(logging.NewNopLogger(), 30*time.Second, "")
+	// Two separate client instances simulate consecutive reconcile cycles.
+	// With transport caching, both should share the same underlying
+	// http.Client and TCP connection pool.
+	c1, err := NewClient(logging.NewNopLogger(), 30*time.Second, "")
 	if err != nil {
-		t.Fatalf("NewClient(...): unexpected error: %v", err)
+		t.Fatalf("NewClient (1st): %v", err)
+	}
+	c2, err := NewClient(logging.NewNopLogger(), 30*time.Second, "")
+	if err != nil {
+		t.Fatalf("NewClient (2nd): %v", err)
 	}
 
-	// Send multiple requests on the same client — all should succeed,
-	// proving transport/connection reuse works.
-	for i := 0; i < 50; i++ {
-		result, err := c.SendRequest(
+	const totalRequests = 50
+	for i := 0; i < totalRequests; i++ {
+		cl := c1
+		if i%2 == 1 {
+			cl = c2
+		}
+		result, err := cl.SendRequest(
 			context.Background(),
 			http.MethodGet,
 			server.URL,
 			Data{Encrypted: "", Decrypted: ""},
 			Data{Encrypted: map[string][]string{}, Decrypted: map[string][]string{}},
-			nil, // nil TLS config = use shared client
+			nil,
 		)
 		if err != nil {
-			t.Fatalf("SendRequest #%d: unexpected error: %v", i, err)
+			t.Fatalf("SendRequest #%d: %v", i, err)
 		}
 		if result.HttpResponse.StatusCode != http.StatusOK {
-			t.Fatalf("SendRequest #%d: statusCode = %v, want 200", i, result.HttpResponse.StatusCode)
+			t.Fatalf("SendRequest #%d: status = %d, want %d", i, result.HttpResponse.StatusCode, http.StatusOK)
 		}
 	}
 
-	if requestCount != 50 {
-		t.Errorf("expected 50 requests to reach server, got %d", requestCount)
+	conns := atomic.LoadInt32(&connCount)
+	reqs := atomic.LoadInt32(&requestCount)
+
+	if reqs != totalRequests {
+		t.Errorf("server received %d requests, want %d", reqs, totalRequests)
 	}
+	// Without transport reuse we'd see ~50 TCP connections (one per
+	// SendRequest). With reuse, keep-alive ensures very few connections
+	// (typically 1-2).
+	if conns > 5 {
+		t.Errorf("expected connection reuse (<=5 TCP connections for %d requests), got %d", totalRequests, conns)
+	}
+	t.Logf("%d requests served over %d TCP connection(s)", totalRequests, conns)
 }
 
 func TestTLSConfigInsecureSkipVerifyFlag(t *testing.T) {
