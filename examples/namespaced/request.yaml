@@ -77,7 +77,7 @@ spec:
         if .response.body.password == .payload.body.password
          and .response.body.age == 25
          and .response.headers."Content-Type" == ["application/json"]
-         and .response.headers."X-Secret-Header"[0] == "{{ response-secret:default:extracted-header-data }}"
+         and .response.headers."X-Secret-Header"[0] == "{{ response-secret-namespaced:default:extracted-header-data }}"
          then true 
          else false 
          end

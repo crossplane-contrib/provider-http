@@ -1002,11 +1002,25 @@ func TestObserve_DeletionMonitoring(t *testing.T) {
 		{
 			name: "ResourceBeingDeleted",
 			args: args{
+				http: &MockHttpClient{
+					MockSendRequest: func(ctx context.Context, method string, url string, body, headers httpClient.Data, tlsConfigData *httpClient.TLSConfigData) (resp httpClient.HttpDetails, err error) {
+						return httpClient.HttpDetails{
+							HttpResponse: httpClient.HttpResponse{
+								StatusCode: 200,
+								Body:       `{"id": "123"}`,
+							},
+						}, nil
+					},
+				},
+				localKube: &test.MockClient{
+					MockGet:          test.NewMockGetFn(nil),
+					MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
+				},
 				mg: httpRequestWithDeletion(),
 			},
 			want: want{
 				obs: managed.ExternalObservation{
-					ResourceExists: false,
+					ResourceExists: true,
 				},
 			},
 		},

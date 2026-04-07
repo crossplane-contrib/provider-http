@@ -22,7 +22,6 @@ import (
 
 	"github.com/crossplane/crossplane-runtime/v2/pkg/feature"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/logging"
-	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -182,13 +181,6 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	cr, ok := mg.(*v1alpha2.Request)
 	if !ok {
 		return managed.ExternalObservation{}, errors.New(errNotRequest)
-	}
-
-	if meta.WasDeleted(mg) {
-		c.logger.Debug("Request is being deleted, skipping observation")
-		return managed.ExternalObservation{
-			ResourceExists: false,
-		}, nil
 	}
 
 	svcCtx := service.NewServiceContext(ctx, c.localKube, c.logger, c.http, c.tlsConfigData)
