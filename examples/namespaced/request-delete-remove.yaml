@@ -4,7 +4,8 @@ metadata:
   name: manage-user-delete-remove-e2e
   namespace: default
   annotations:
-    uptest.upbound.io/post-assert-hook: "../../test/hooks/verify-remove-on-delete.sh"
+    uptest.upbound.io/pre-delete-hook: "./test/hooks/verify-remove-on-delete.sh"
+    uptest.upbound.io/conditions: "Synced"
 spec:
   forProvider:
     insecureSkipTLSVerify: true

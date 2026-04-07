@@ -4,7 +4,7 @@ set -euo pipefail
 # verify-remove-on-delete.sh
 # Uptest post-assert hook: validate Request REMOVE (DELETE) is sent on resource deletion
 
-RESOURCE_NAME=${RESOURCE_NAME:-${TEST_NAME:-manage-user-delete-remove-e2e}}
+RESOURCE_NAME=${RESOURCE_NAME:-${TEST_NAME:-}}
 RESOURCE_NAMESPACE=${RESOURCE_NAMESPACE:-${TEST_NAMESPACE:-default}}
 RESOURCE_KIND=${RESOURCE_KIND:-requests.http.m.crossplane.io}
 TIMEOUT=${VERIFY_REMOVE_TIMEOUT:-120}
@@ -77,6 +77,11 @@ echo "========================================="
 echo "verify-remove-on-delete: validating DELETE on Request deletion"
 echo "Resource: $RESOURCE_KIND/$RESOURCE_NAME (namespace: ${RESOURCE_NAMESPACE:-<cluster-scoped>})"
 echo "========================================="
+
+if [[ -z "$RESOURCE_NAME" ]]; then
+  echo "FAIL: RESOURCE_NAME is empty; set RESOURCE_NAME explicitly in uptest.upbound.io/post-assert-hook"
+  exit 1
+fi
 
 if ! kubectl get "$RESOURCE_KIND" "$RESOURCE_NAME" $RR_NS_ARG >/dev/null 2>&1; then
   echo "FAIL: Resource not found: $RESOURCE_KIND/$RESOURCE_NAME"

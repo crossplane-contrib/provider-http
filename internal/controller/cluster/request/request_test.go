@@ -1013,6 +1013,7 @@ func TestObserve_DeletionMonitoring(t *testing.T) {
 					},
 				},
 				localKube: &test.MockClient{
+					MockGet:          test.NewMockGetFn(nil),
 					MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
 				},
 				mg: httpRequestWithDeletion(),

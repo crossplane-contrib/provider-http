@@ -204,7 +204,7 @@ func TestObserve(t *testing.T) {
 			},
 			want: want{
 				obs: managed.ExternalObservation{
-					ResourceExists: true,
+					ResourceExists: false,
 				},
 			},
 		},
@@ -1001,6 +1001,7 @@ func TestObserve_DeletionMonitoring(t *testing.T) {
 					},
 				},
 				localKube: &test.MockClient{
+					MockGet:          test.NewMockGetFn(nil),
 					MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
 				},
 				mg: httpNamespacedRequestWithDeletion(),
