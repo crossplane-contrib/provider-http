@@ -324,7 +324,39 @@ func TestReplaceSensitiveValues(t *testing.T) {
 				valueToPatch: ptr.To(`{"client_id":"test_client","client_secret":"test_secret"}`),
 			},
 			want: want{
-				body: `{"credentials": "{{my-secret:default:creds}}", "other": "data"}`,
+				// Body is re-marshaled to normalize key ordering, so insignificant
+				// whitespace is collapsed.
+				body: `{"credentials":"{{my-secret:default:creds}}","other":"data"}`,
+				headers: map[string][]string{
+					"Content-Type": {"application/json"},
+				},
+			},
+		},
+		"ShouldReplaceJSONObjectInBodyWhenServerKeyOrderDiffersFromValueToPatch": {
+			// Regression test for issue #169: extractValueToPatch produces JSON with
+			// json.Marshal which sorts keys alphabetically, while the response body
+			// preserves the server's key ordering. A plain strings.ReplaceAll on body
+			// fails to match, leaving the sensitive object unmasked in status.
+			args: args{
+				data: &httpClient.HttpResponse{
+					// Server returns keys in non-alphabetical order ("token" before "expires").
+					Body: `{"body":{"status":{"token":"abc123","expires":3600}},"statusCode":200}`,
+					Headers: map[string][]string{
+						"Content-Type": {"application/json"},
+					},
+				},
+				secret: &corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "my-secret",
+						Namespace: "default",
+					},
+				},
+				secretKey: "auth",
+				// Same content as in body but key-sorted, as json.Marshal would emit it.
+				valueToPatch: ptr.To(`{"expires":3600,"token":"abc123"}`),
+			},
+			want: want{
+				body: `{"body":{"status":"{{my-secret:default:auth}}"},"statusCode":200}`,
 				headers: map[string][]string{
 					"Content-Type": {"application/json"},
 				},

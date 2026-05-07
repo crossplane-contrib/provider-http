@@ -175,9 +175,17 @@ func replaceSensitiveValues(data *httpClient.HttpResponse, secret *corev1.Secret
 
 	placeholder := fmt.Sprintf("{{%s:%s:%s}}", secret.Name, secret.Namespace, secretKey)
 
-	// For JSON objects, replace the entire JSON object in the response
+	// For JSON objects, replace the entire JSON object in the response.
+	// valueToPatch is produced by json.Marshal which sorts keys alphabetically,
+	// while data.Body preserves the server's key ordering, so a substring match
+	// on data.Body fails. Walk the parsed body and replace any subtree whose
+	// canonical JSON form equals valueToPatch.
 	if isJSONObject(*valueToPatch) {
-		data.Body = strings.ReplaceAll(data.Body, *valueToPatch, fmt.Sprintf("\"%s\"", placeholder))
+		if replaced, ok := replaceJSONObjectInBody(data.Body, *valueToPatch, placeholder); ok {
+			data.Body = replaced
+		} else {
+			data.Body = strings.ReplaceAll(data.Body, *valueToPatch, fmt.Sprintf("\"%s\"", placeholder))
+		}
 	} else {
 		// For simple values, use the existing logic with quoted replacement
 		quotedValue := fmt.Sprintf("\"%s\"", *valueToPatch)
@@ -191,6 +199,52 @@ func replaceSensitiveValues(data *httpClient.HttpResponse, secret *corev1.Secret
 			headersList[i] = strings.ReplaceAll(header, *valueToPatch, placeholder)
 		}
 	}
+}
+
+// replaceJSONObjectInBody parses body as JSON, replaces any subtree whose
+// canonical (key-sorted) JSON form matches canonicalValue with the placeholder,
+// and returns the re-marshaled body. Returns ok=false if body is not valid JSON
+// or no match was found, leaving the caller to fall back to substring replace.
+func replaceJSONObjectInBody(body, canonicalValue, placeholder string) (string, bool) {
+	var parsed interface{}
+	if err := json.Unmarshal([]byte(body), &parsed); err != nil {
+		return "", false
+	}
+	replaced, ok := walkAndReplace(parsed, canonicalValue, placeholder)
+	if !ok {
+		return "", false
+	}
+	out, err := json.Marshal(replaced)
+	if err != nil {
+		return "", false
+	}
+	return string(out), true
+}
+
+// walkAndReplace traverses v and substitutes the first subtree whose
+// canonical JSON form equals target with placeholder. Returns the (possibly
+// updated) tree and whether a replacement occurred.
+func walkAndReplace(v interface{}, target, placeholder string) (interface{}, bool) {
+	if obj, isObj := v.(map[string]interface{}); isObj {
+		if marshaled, err := json.Marshal(obj); err == nil && string(marshaled) == target {
+			return placeholder, true
+		}
+		for k, child := range obj {
+			if newChild, ok := walkAndReplace(child, target, placeholder); ok {
+				obj[k] = newChild
+				return obj, true
+			}
+		}
+	}
+	if arr, isArr := v.([]interface{}); isArr {
+		for i, child := range arr {
+			if newChild, ok := walkAndReplace(child, target, placeholder); ok {
+				arr[i] = newChild
+				return arr, true
+			}
+		}
+	}
+	return v, false
 }
 
 // isJSONObject checks if a string is a valid JSON object (starts with '{' and ends with '}')
