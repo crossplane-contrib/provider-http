@@ -112,6 +112,89 @@ spec:
 
 See [examples/provider/tls-config.yaml](examples/provider/tls-config.yaml) for more configuration options.
 
+## Sensitive Data Masking
+
+When a request carries credentials — API tokens, Basic-auth headers, database passwords — those values should never be placed in plaintext in a resource `spec`. Anything written to `spec` is persisted in etcd, visible to anyone with `get` RBAC on the resource, rendered in the ArgoCD UI, and (under GitOps) stored in your Git history.
+
+`provider-http` addresses this with **secret-reference placeholders**. You store the sensitive value in a Kubernetes `Secret` and reference it from the request body or headers using the syntax:
+
+```
+{{ secret-name:secret-namespace:secret-key }}
+```
+
+At reconcile time the provider:
+
+1. Resolves each placeholder to the live value from the referenced `Secret` and sends the **resolved** value over the wire.
+2. Stores only the **placeholder** form in `status.requestDetails` and writes only the placeholder form to controller logs.
+
+As a result the outgoing credential never appears in the resource `spec`, in `status.requestDetails` or in controller logs — it lives only in the `Secret`.
+
+> Placeholders are supported in the request **body** and **headers** only.
+
+> **Important — this covers outgoing request data only.** Placeholders protect what you *send*. They do **not** mask the HTTP *response*. If the endpoint echoes a sensitive value back (for example returns the password you just submitted), that value arrives in plaintext and — unless you configure `secretInjectionConfigs` (see [Masking response data](#masking-response-data)) — is stored verbatim in `status.response.body` and `status.cache.response`.
+
+### Example: credentials in a header and request body
+
+A credential in the `Authorization` header and a password in the request body are both sourced from Secrets via placeholders:
+
+```yaml
+apiVersion: http.crossplane.io/v1alpha2
+kind: Request
+metadata:
+  name: manage-user
+spec:
+  providerConfigRef:
+    name: http-conf
+  forProvider:
+    headers:
+      Content-Type:
+        - application/json
+      Authorization:
+        - "Bearer {{ auth:default:token }}"
+    payload:
+      baseUrl: http://test-server.default.svc.cluster.local/v1/users
+      body: |
+        {
+          "username": "mock_user",
+          "password": "{{ user-password:crossplane-system:password }}"
+        }
+    mappings:
+      - action: CREATE
+        url: .payload.baseUrl
+        body: |
+          {
+            username: .payload.body.username,
+            password: .payload.body.password
+          }
+```
+
+With this configuration, `kubectl get request manage-user -o yaml` and the ArgoCD UI show only the `{{ ... }}` placeholders in `spec` and `status.requestDetails`, while the actual request contains the resolved credentials. If the API echoes the password back in its response, add a matching `secretInjectionConfig` (next section) — otherwise it lands in `status.response.body` in plaintext.
+
+The complete, end-to-end example is [examples/sample/request.yaml](examples/sample/request.yaml); its masking behavior is asserted in e2e by [test/hooks/verify-secret-templating.sh](test/hooks/verify-secret-templating.sh).
+
+### Masking response data
+
+By default the **full HTTP response is stored verbatim** in `status.response.body`, `status.response.headers`, and `status.cache.response`. The provider cannot know which response fields are sensitive, so it masks nothing in the response unless you configure it to via `secretInjectionConfigs`. For each entry the provider:
+
+1. Extracts the value at the configured JQ path (e.g. `.body.password`, `.headers."X-Secret-Header"[0]`) and writes it into a Kubernetes `Secret`.
+2. Replaces that exact value in the stored response with a `{{ secret-name:secret-namespace:secret-key }}` placeholder.
+
+Masking a response value is therefore a **side effect of extracting it into a Secret** — the two cannot be separated. A response field that has no corresponding `secretInjectionConfig` entry is **not** masked and remains in plaintext in `status`.
+
+```yaml
+spec:
+  forProvider:
+    secretInjectionConfigs:
+      - secretRef:
+          name: response-user-password
+          namespace: default
+        keyMappings:
+          - secretKey: extracted-user-password
+            responseJQ: .body.password   # this value is written to the Secret AND masked in status.response.body
+```
+
+See the [Request CRD documentation](resources-docs/request_docs.md) and [examples/sample/request.yaml](examples/sample/request.yaml) for the complete set of options (`keyMappings`, `missingFieldStrategy`, `setOwnerReference`, metadata).
+
 ## Usage
 
 ### DisposableRequest

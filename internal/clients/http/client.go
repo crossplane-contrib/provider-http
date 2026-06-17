@@ -67,8 +67,13 @@ func (r *HttpResponse) GetHeaders() map[string][]string {
 }
 
 type Data struct {
-	Encrypted interface{} // Data containing encrypted data -> to be shown at the status
-	Decrypted interface{} // Data containing sensitive data -> to be sent
+	// Encrypted holds the templated value with secret placeholders ({{ name:namespace:key }})
+	// left unresolved. This is the form surfaced in status and controller logs, so sensitive
+	// values are never exposed.
+	Encrypted interface{}
+	// Decrypted holds the value with all secret placeholders resolved to their real values.
+	// This is the form actually sent over the wire and is never persisted to status or logs.
+	Decrypted interface{}
 }
 
 type HttpRequest struct {
