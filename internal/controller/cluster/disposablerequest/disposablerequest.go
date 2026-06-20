@@ -151,6 +151,7 @@ func Setup(mgr ctrl.Manager, o controller.Options, timeout time.Duration) error 
 		WithCustomPollIntervalHook(),
 		managed.WithTimeout(timeout),
 		managed.WithRecorder(event.NewAPIRecorder(mgr.GetEventRecorderFor(name))),
+		managed.WithDeterministicExternalName(true),
 	}
 
 	if o.Features.Enabled(feature.EnableBetaManagementPolicies) {

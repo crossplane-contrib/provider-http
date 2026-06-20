@@ -335,6 +335,42 @@ func Test_httpExternal_Observe(t *testing.T) {
 			},
 		},
 		{
+			name: "ResourceNotSyncedWithCreatePending",
+			args: args{
+				http: &MockHttpClient{},
+				localKube: &test.MockClient{
+					MockGet: test.NewMockGetFn(nil),
+				},
+				mg: &v1alpha2.DisposableRequest{
+					ObjectMeta: metav1.ObjectMeta{
+						Annotations: map[string]string{
+							"crossplane.io/external-create-pending": time.Now().Format(time.RFC3339),
+							"crossplane.io/external-name":           "test-request",
+						},
+					},
+					Spec: v1alpha2.DisposableRequestSpec{
+						ForProvider: v1alpha2.DisposableRequestParameters{
+							URL:    testURL,
+							Method: testMethod,
+						},
+					},
+					Status: v1alpha2.DisposableRequestStatus{
+						Synced: false,
+					},
+				},
+			},
+			want: want{
+				// ResourceExists=false when not synced, even with create-pending.
+				// This triggers the managed reconciler to re-enter Create on every
+				// loop, which is why WithDeterministicExternalName(true) is needed
+				// to prevent the reconciler from hard-stopping on ambiguous creation.
+				observation: managed.ExternalObservation{
+					ResourceExists: false,
+				},
+				err: nil,
+			},
+		},
+		{
 			name: "ResourceNotSyncedWithRetryPendingAndNextReconcileNotReached",
 			args: args{
 				http: &MockHttpClient{},
