@@ -40,12 +40,13 @@ func (r *requestStatusHandler) SetRequestStatus() error {
 		return r.setErrorAndReturn(r.responseError)
 	}
 
-	basicSetters := []utils.SetRequestStatusFunc{
+	basicSetters := make([]utils.SetRequestStatusFunc, 0, 4+len(*r.extraSetters))
+	basicSetters = append(basicSetters,
 		r.resource.SetStatusCode(),
 		r.resource.SetHeaders(),
 		r.resource.SetBody(),
 		r.resource.SetRequestDetails(),
-	}
+	)
 
 	basicSetters = append(basicSetters, *r.extraSetters...)
 

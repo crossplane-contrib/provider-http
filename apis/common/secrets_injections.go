@@ -15,10 +15,12 @@ type SecretInjectionConfig struct {
 	SecretRef SecretRef `json:"secretRef"`
 
 	// SecretKey is the key within the Kubernetes secret where the data will be injected.
+	//
 	// Deprecated: Use KeyMappings for injecting single or multiple keys.
 	SecretKey string `json:"secretKey,omitempty"`
 
 	// ResponsePath is a jq filter expression representing the path in the response where the secret value will be extracted from.
+	//
 	// Deprecated: Use KeyMappings for injecting single or multiple keys.
 	ResponsePath string `json:"responsePath,omitempty"`
 

@@ -565,11 +565,13 @@ spec:
                         responsePath:
                           description: |-
                             ResponsePath is a jq filter expression representing the path in the response where the secret value will be extracted from.
+
                             Deprecated: Use KeyMappings for injecting single or multiple keys.
                           type: string
                         secretKey:
                           description: |-
                             SecretKey is the key within the Kubernetes secret where the data will be injected.
+
                             Deprecated: Use KeyMappings for injecting single or multiple keys.
                           type: string
                         secretRef:

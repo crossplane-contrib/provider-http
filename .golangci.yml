@@ -75,6 +75,7 @@ linters:
           - errcheck
           - exportloopref
           - gocyclo
+          - goconst
           - gosec
           - unparam
         path: _test(ing)?\.go
@@ -88,6 +89,10 @@ linters:
       - linters:
           - staticcheck
         text: 'SA3000:'
+      - linters:
+          - staticcheck
+        path: internal/data-patcher/patch.go
+        text: 'SA1019:'
       - linters:
           - gosec
         text: 'G101:'
@@ -105,6 +110,8 @@ linters:
 issues:
   max-same-issues: 0
   new: false
+run:
+  go: "1.26.2"
 formatters:
   enable:
     - gofmt

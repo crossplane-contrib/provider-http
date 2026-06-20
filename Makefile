@@ -33,7 +33,8 @@ GO_STATIC_PACKAGES = $(GO_PROJECT)/cmd/provider
 GO_LDFLAGS += -X $(GO_PROJECT)/internal/version.Version=$(VERSION)
 GO_SUBDIRS += cmd internal apis
 GO111MODULE = on
-GOLANGCILINT_VERSION = 2.1.2
+GO := GOTOOLCHAIN=go1.26.2 go
+GOLANGCILINT_VERSION = 2.12.2
 -include build/makelib/golang.mk
 
 # ====================================================================================
@@ -213,7 +214,7 @@ submodules:
 # NOTE(hasheddan): we must ensure up is installed in tool cache prior to build
 # as including the k8s_tools machinery prior to the xpkg machinery sets
 # CROSSPLANE_CLI to point to tool cache.
-build.init: $(CROSSPLANE_CLI)
+build.init: $(UP) $(CROSSPLANE_CLI)
 
 # This is for running out-of-cluster locally, and is for convenience. Running
 # this make target will print out the command which was used. For more control,
