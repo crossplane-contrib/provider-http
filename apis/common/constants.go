@@ -22,6 +22,8 @@ const (
 	ActionObserve = "OBSERVE"
 	ActionUpdate  = "UPDATE"
 	ActionRemove  = "REMOVE"
+
+	DefaultProviderConfigName = "default"
 )
 
 // ExpectedResponseCheckType constants define how response validation is performed

@@ -202,9 +202,9 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 	// Set default providerConfigRef if not specified
 	if cr.GetProviderConfigReference() == nil {
 		cr.SetProviderConfigReference(&xpv1.Reference{
-			Name: "default",
+			Name: common.DefaultProviderConfigName,
 		})
-		l.Debug("No providerConfigRef specified, defaulting to 'default'")
+		l.Debug("No providerConfigRef specified", "providerConfigRef", common.DefaultProviderConfigName)
 	}
 
 	pc := &apisv1alpha1.ProviderConfig{}
