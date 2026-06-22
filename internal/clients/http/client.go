@@ -3,12 +3,15 @@ package http
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/crossplane-contrib/provider-http/apis/interfaces"
@@ -18,6 +21,12 @@ import (
 const (
 	authKey = "Authorization"
 )
+
+// httpClientCache is a process-level cache of *http.Client instances keyed by
+// a hash of their TLS configuration + timeout. Because NewClient is called on
+// every reconcile, the cache must outlive individual client instances to
+// achieve cross-reconcile connection reuse.
+var httpClientCache sync.Map
 
 // TLSConfigData contains the TLS configuration data loaded from secrets or inline.
 type TLSConfigData struct {
@@ -120,28 +129,21 @@ func (hc *client) SendRequest(ctx context.Context, method string, url string, bo
 		request.Header[authKey] = []string{hc.authorizationToken}
 	}
 
-	// Build TLS configuration
-	tlsConfig, err := buildTLSConfig(tlsConfigData)
-	if err != nil {
-		return HttpDetails{
-			HttpRequest: requestDetails,
-		}, fmt.Errorf("failed to build TLS config: %w", err)
-	}
-
-	client := &http.Client{
-		Transport: &http.Transport{
-			TLSClientConfig: tlsConfig,
-			Proxy:           http.ProxyFromEnvironment, // Use proxy settings from environment
-		},
-		Timeout: hc.timeout,
-	}
-
-	response, err := client.Do(request)
+	// Look up or create a cached http.Client for this TLS + timeout combination.
+	httpCl, err := getOrCreateHTTPClient(hc.timeout, tlsConfigData)
 	if err != nil {
 		return HttpDetails{
 			HttpRequest: requestDetails,
 		}, err
 	}
+
+	response, err := httpCl.Do(request)
+	if err != nil {
+		return HttpDetails{
+			HttpRequest: requestDetails,
+		}, err
+	}
+	defer func() { _ = response.Body.Close() }()
 
 	responsebody, err := io.ReadAll(response.Body)
 	if err != nil {
@@ -154,13 +156,6 @@ func (hc *client) SendRequest(ctx context.Context, method string, url string, bo
 		Body:       string(responsebody),
 		Headers:    response.Header,
 		StatusCode: response.StatusCode,
-	}
-
-	err = response.Body.Close()
-	if err != nil {
-		return HttpDetails{
-			HttpRequest: requestDetails,
-		}, err
 	}
 
 	hc.log.Info(fmt.Sprint("http request sent: ", toJSON(requestDetails)))
@@ -178,6 +173,54 @@ func NewClient(log logging.Logger, timeout time.Duration, authorizationToken str
 		timeout:            timeout,
 		authorizationToken: authorizationToken,
 	}, nil
+}
+
+// getOrCreateHTTPClient returns a cached http.Client for the given timeout and
+// TLS configuration, creating one if it doesn't exist yet. The cache is
+// process-level so clients are reused across reconcile cycles.
+func getOrCreateHTTPClient(timeout time.Duration, tlsData *TLSConfigData) (*http.Client, error) {
+	key := httpClientKey(timeout, tlsData)
+
+	if cached, ok := httpClientCache.Load(key); ok {
+		return cached.(*http.Client), nil
+	}
+
+	tlsConfig, err := buildTLSConfig(tlsData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build TLS config: %w", err)
+	}
+
+	httpCl := &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: tlsConfig,
+			Proxy:           http.ProxyFromEnvironment,
+		},
+		Timeout: timeout,
+	}
+
+	actual, _ := httpClientCache.LoadOrStore(key, httpCl)
+	return actual.(*http.Client), nil
+}
+
+// httpClientKey produces a cache key from timeout and TLS config content so
+// that identical configurations share a single http.Client/Transport.
+func httpClientKey(timeout time.Duration, data *TLSConfigData) string {
+	h := sha256.New()
+	// Include timeout in the key so different timeouts get different clients.
+	_, _ = fmt.Fprintf(h, "%d\x00", timeout)
+	if data != nil {
+		h.Write(data.CABundle)
+		h.Write([]byte{0})
+		h.Write(data.ClientCert)
+		h.Write([]byte{0})
+		h.Write(data.ClientKey)
+		if data.InsecureSkipVerify {
+			h.Write([]byte{1})
+		} else {
+			h.Write([]byte{0})
+		}
+	}
+	return hex.EncodeToString(h.Sum(nil))
 }
 
 // toJSON converts the request to a JSON string.
