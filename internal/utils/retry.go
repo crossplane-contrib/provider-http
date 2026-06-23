@@ -22,6 +22,9 @@ func RollBackEnabled(rollbackRetriesLimit *int32) bool {
 
 // RetriesLimitReached determines if the rollback retries limit has been reached.
 func RetriesLimitReached(statusFailed int32, rollbackRetriesLimit *int32) bool {
+	if rollbackRetriesLimit == nil {
+		return false
+	}
 	return statusFailed >= *rollbackRetriesLimit
 }
 
