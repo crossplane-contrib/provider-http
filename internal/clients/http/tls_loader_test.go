@@ -5,9 +5,9 @@ import (
 	"testing"
 
 	"github.com/crossplane-contrib/provider-http/apis/common"
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/errors"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/test"
+	xpv2 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	"github.com/google/go-cmp/cmp"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -90,8 +90,8 @@ func TestLoadTLSConfig(t *testing.T) {
 					},
 				},
 				tlsConfig: &common.TLSConfig{
-					CACertSecretRef: &xpv1.SecretKeySelector{
-						SecretReference: xpv1.SecretReference{
+					CACertSecretRef: &xpv2.SecretKeySelector{
+						SecretReference: xpv2.SecretReference{
 							Name:      "ca-secret",
 							Namespace: "default",
 						},
@@ -140,15 +140,15 @@ func TestLoadTLSConfig(t *testing.T) {
 					},
 				},
 				tlsConfig: &common.TLSConfig{
-					ClientCertSecretRef: &xpv1.SecretKeySelector{
-						SecretReference: xpv1.SecretReference{
+					ClientCertSecretRef: &xpv2.SecretKeySelector{
+						SecretReference: xpv2.SecretReference{
 							Name:      "cert-secret",
 							Namespace: "default",
 						},
 						Key: "tls.crt",
 					},
-					ClientKeySecretRef: &xpv1.SecretKeySelector{
-						SecretReference: xpv1.SecretReference{
+					ClientKeySecretRef: &xpv2.SecretKeySelector{
+						SecretReference: xpv2.SecretReference{
 							Name:      "key-secret",
 							Namespace: "default",
 						},
@@ -208,22 +208,22 @@ func TestLoadTLSConfig(t *testing.T) {
 					},
 				},
 				tlsConfig: &common.TLSConfig{
-					CACertSecretRef: &xpv1.SecretKeySelector{
-						SecretReference: xpv1.SecretReference{
+					CACertSecretRef: &xpv2.SecretKeySelector{
+						SecretReference: xpv2.SecretReference{
 							Name:      "ca-secret",
 							Namespace: "default",
 						},
 						Key: "ca.crt",
 					},
-					ClientCertSecretRef: &xpv1.SecretKeySelector{
-						SecretReference: xpv1.SecretReference{
+					ClientCertSecretRef: &xpv2.SecretKeySelector{
+						SecretReference: xpv2.SecretReference{
 							Name:      "cert-secret",
 							Namespace: "default",
 						},
 						Key: "tls.crt",
 					},
-					ClientKeySecretRef: &xpv1.SecretKeySelector{
-						SecretReference: xpv1.SecretReference{
+					ClientKeySecretRef: &xpv2.SecretKeySelector{
+						SecretReference: xpv2.SecretReference{
 							Name:      "key-secret",
 							Namespace: "default",
 						},
@@ -251,8 +251,8 @@ func TestLoadTLSConfig(t *testing.T) {
 				},
 				tlsConfig: &common.TLSConfig{
 					CABundle: []byte("inline-ca-bundle"),
-					CACertSecretRef: &xpv1.SecretKeySelector{
-						SecretReference: xpv1.SecretReference{
+					CACertSecretRef: &xpv2.SecretKeySelector{
+						SecretReference: xpv2.SecretReference{
 							Name:      "ca-secret",
 							Namespace: "default",
 						},
@@ -274,8 +274,8 @@ func TestLoadTLSConfig(t *testing.T) {
 					MockGet: test.NewMockGetFn(errBoom),
 				},
 				tlsConfig: &common.TLSConfig{
-					CACertSecretRef: &xpv1.SecretKeySelector{
-						SecretReference: xpv1.SecretReference{
+					CACertSecretRef: &xpv2.SecretKeySelector{
+						SecretReference: xpv2.SecretReference{
 							Name:      "ca-secret",
 							Namespace: "default",
 						},
@@ -294,8 +294,8 @@ func TestLoadTLSConfig(t *testing.T) {
 					MockGet: test.NewMockGetFn(errBoom),
 				},
 				tlsConfig: &common.TLSConfig{
-					ClientCertSecretRef: &xpv1.SecretKeySelector{
-						SecretReference: xpv1.SecretReference{
+					ClientCertSecretRef: &xpv2.SecretKeySelector{
+						SecretReference: xpv2.SecretReference{
 							Name:      "cert-secret",
 							Namespace: "default",
 						},
@@ -314,8 +314,8 @@ func TestLoadTLSConfig(t *testing.T) {
 					MockGet: test.NewMockGetFn(errBoom),
 				},
 				tlsConfig: &common.TLSConfig{
-					ClientKeySecretRef: &xpv1.SecretKeySelector{
-						SecretReference: xpv1.SecretReference{
+					ClientKeySecretRef: &xpv2.SecretKeySelector{
+						SecretReference: xpv2.SecretReference{
 							Name:      "key-secret",
 							Namespace: "default",
 						},
@@ -347,7 +347,7 @@ func TestLoadTLSConfig(t *testing.T) {
 func TestLoadSecretData(t *testing.T) {
 	type args struct {
 		kubeClient kube.Client
-		secretRef  *xpv1.SecretKeySelector
+		secretRef  *xpv2.SecretKeySelector
 	}
 	type want struct {
 		result []byte
@@ -387,8 +387,8 @@ func TestLoadSecretData(t *testing.T) {
 						return errors.New("unexpected object type")
 					},
 				},
-				secretRef: &xpv1.SecretKeySelector{
-					SecretReference: xpv1.SecretReference{
+				secretRef: &xpv2.SecretKeySelector{
+					SecretReference: xpv2.SecretReference{
 						Name:      "test-secret",
 						Namespace: "test-namespace",
 					},
@@ -405,8 +405,8 @@ func TestLoadSecretData(t *testing.T) {
 				kubeClient: &test.MockClient{
 					MockGet: test.NewMockGetFn(errBoom),
 				},
-				secretRef: &xpv1.SecretKeySelector{
-					SecretReference: xpv1.SecretReference{
+				secretRef: &xpv2.SecretKeySelector{
+					SecretReference: xpv2.SecretReference{
 						Name:      "missing-secret",
 						Namespace: "test-namespace",
 					},
@@ -437,8 +437,8 @@ func TestLoadSecretData(t *testing.T) {
 						return errors.New("unexpected object type")
 					},
 				},
-				secretRef: &xpv1.SecretKeySelector{
-					SecretReference: xpv1.SecretReference{
+				secretRef: &xpv2.SecretKeySelector{
+					SecretReference: xpv2.SecretReference{
 						Name:      "test-secret",
 						Namespace: "test-namespace",
 					},
@@ -467,8 +467,8 @@ func TestLoadSecretData(t *testing.T) {
 						return errors.New("unexpected object type")
 					},
 				},
-				secretRef: &xpv1.SecretKeySelector{
-					SecretReference: xpv1.SecretReference{
+				secretRef: &xpv2.SecretKeySelector{
+					SecretReference: xpv2.SecretReference{
 						Name:      "test-secret",
 						Namespace: "test-namespace",
 					},
@@ -601,22 +601,22 @@ func TestMergeTLSConfigs(t *testing.T) {
 		"ResourceSecretRefsOverrideProviderSecretRefs": {
 			args: args{
 				resourceTLS: &common.TLSConfig{
-					CACertSecretRef: &xpv1.SecretKeySelector{
-						SecretReference: xpv1.SecretReference{
+					CACertSecretRef: &xpv2.SecretKeySelector{
+						SecretReference: xpv2.SecretReference{
 							Name:      "resource-ca-secret",
 							Namespace: "resource-ns",
 						},
 						Key: "ca.crt",
 					},
-					ClientCertSecretRef: &xpv1.SecretKeySelector{
-						SecretReference: xpv1.SecretReference{
+					ClientCertSecretRef: &xpv2.SecretKeySelector{
+						SecretReference: xpv2.SecretReference{
 							Name:      "resource-cert-secret",
 							Namespace: "resource-ns",
 						},
 						Key: "tls.crt",
 					},
-					ClientKeySecretRef: &xpv1.SecretKeySelector{
-						SecretReference: xpv1.SecretReference{
+					ClientKeySecretRef: &xpv2.SecretKeySelector{
+						SecretReference: xpv2.SecretReference{
 							Name:      "resource-key-secret",
 							Namespace: "resource-ns",
 						},
@@ -624,22 +624,22 @@ func TestMergeTLSConfigs(t *testing.T) {
 					},
 				},
 				providerTLS: &common.TLSConfig{
-					CACertSecretRef: &xpv1.SecretKeySelector{
-						SecretReference: xpv1.SecretReference{
+					CACertSecretRef: &xpv2.SecretKeySelector{
+						SecretReference: xpv2.SecretReference{
 							Name:      "provider-ca-secret",
 							Namespace: "provider-ns",
 						},
 						Key: "ca.crt",
 					},
-					ClientCertSecretRef: &xpv1.SecretKeySelector{
-						SecretReference: xpv1.SecretReference{
+					ClientCertSecretRef: &xpv2.SecretKeySelector{
+						SecretReference: xpv2.SecretReference{
 							Name:      "provider-cert-secret",
 							Namespace: "provider-ns",
 						},
 						Key: "tls.crt",
 					},
-					ClientKeySecretRef: &xpv1.SecretKeySelector{
-						SecretReference: xpv1.SecretReference{
+					ClientKeySecretRef: &xpv2.SecretKeySelector{
+						SecretReference: xpv2.SecretReference{
 							Name:      "provider-key-secret",
 							Namespace: "provider-ns",
 						},
@@ -649,22 +649,22 @@ func TestMergeTLSConfigs(t *testing.T) {
 			},
 			want: want{
 				result: &common.TLSConfig{
-					CACertSecretRef: &xpv1.SecretKeySelector{
-						SecretReference: xpv1.SecretReference{
+					CACertSecretRef: &xpv2.SecretKeySelector{
+						SecretReference: xpv2.SecretReference{
 							Name:      "resource-ca-secret",
 							Namespace: "resource-ns",
 						},
 						Key: "ca.crt",
 					},
-					ClientCertSecretRef: &xpv1.SecretKeySelector{
-						SecretReference: xpv1.SecretReference{
+					ClientCertSecretRef: &xpv2.SecretKeySelector{
+						SecretReference: xpv2.SecretReference{
 							Name:      "resource-cert-secret",
 							Namespace: "resource-ns",
 						},
 						Key: "tls.crt",
 					},
-					ClientKeySecretRef: &xpv1.SecretKeySelector{
-						SecretReference: xpv1.SecretReference{
+					ClientKeySecretRef: &xpv2.SecretKeySelector{
+						SecretReference: xpv2.SecretReference{
 							Name:      "resource-key-secret",
 							Namespace: "resource-ns",
 						},
@@ -680,22 +680,22 @@ func TestMergeTLSConfigs(t *testing.T) {
 					InsecureSkipVerify: true,
 				},
 				providerTLS: &common.TLSConfig{
-					CACertSecretRef: &xpv1.SecretKeySelector{
-						SecretReference: xpv1.SecretReference{
+					CACertSecretRef: &xpv2.SecretKeySelector{
+						SecretReference: xpv2.SecretReference{
 							Name:      "provider-ca-secret",
 							Namespace: "provider-ns",
 						},
 						Key: "ca.crt",
 					},
-					ClientCertSecretRef: &xpv1.SecretKeySelector{
-						SecretReference: xpv1.SecretReference{
+					ClientCertSecretRef: &xpv2.SecretKeySelector{
+						SecretReference: xpv2.SecretReference{
 							Name:      "provider-cert-secret",
 							Namespace: "provider-ns",
 						},
 						Key: "tls.crt",
 					},
-					ClientKeySecretRef: &xpv1.SecretKeySelector{
-						SecretReference: xpv1.SecretReference{
+					ClientKeySecretRef: &xpv2.SecretKeySelector{
+						SecretReference: xpv2.SecretReference{
 							Name:      "provider-key-secret",
 							Namespace: "provider-ns",
 						},
@@ -705,22 +705,22 @@ func TestMergeTLSConfigs(t *testing.T) {
 			},
 			want: want{
 				result: &common.TLSConfig{
-					CACertSecretRef: &xpv1.SecretKeySelector{
-						SecretReference: xpv1.SecretReference{
+					CACertSecretRef: &xpv2.SecretKeySelector{
+						SecretReference: xpv2.SecretReference{
 							Name:      "provider-ca-secret",
 							Namespace: "provider-ns",
 						},
 						Key: "ca.crt",
 					},
-					ClientCertSecretRef: &xpv1.SecretKeySelector{
-						SecretReference: xpv1.SecretReference{
+					ClientCertSecretRef: &xpv2.SecretKeySelector{
+						SecretReference: xpv2.SecretReference{
 							Name:      "provider-cert-secret",
 							Namespace: "provider-ns",
 						},
 						Key: "tls.crt",
 					},
-					ClientKeySecretRef: &xpv1.SecretKeySelector{
-						SecretReference: xpv1.SecretReference{
+					ClientKeySecretRef: &xpv2.SecretKeySelector{
+						SecretReference: xpv2.SecretReference{
 							Name:      "provider-key-secret",
 							Namespace: "provider-ns",
 						},
@@ -734,8 +734,8 @@ func TestMergeTLSConfigs(t *testing.T) {
 			args: args{
 				resourceTLS: &common.TLSConfig{
 					CABundle: []byte("resource-ca"),
-					ClientCertSecretRef: &xpv1.SecretKeySelector{
-						SecretReference: xpv1.SecretReference{
+					ClientCertSecretRef: &xpv2.SecretKeySelector{
+						SecretReference: xpv2.SecretReference{
 							Name:      "resource-cert-secret",
 							Namespace: "resource-ns",
 						},
@@ -743,15 +743,15 @@ func TestMergeTLSConfigs(t *testing.T) {
 					},
 				},
 				providerTLS: &common.TLSConfig{
-					CACertSecretRef: &xpv1.SecretKeySelector{
-						SecretReference: xpv1.SecretReference{
+					CACertSecretRef: &xpv2.SecretKeySelector{
+						SecretReference: xpv2.SecretReference{
 							Name:      "provider-ca-secret",
 							Namespace: "provider-ns",
 						},
 						Key: "ca.crt",
 					},
-					ClientKeySecretRef: &xpv1.SecretKeySelector{
-						SecretReference: xpv1.SecretReference{
+					ClientKeySecretRef: &xpv2.SecretKeySelector{
+						SecretReference: xpv2.SecretReference{
 							Name:      "provider-key-secret",
 							Namespace: "provider-ns",
 						},
@@ -763,22 +763,22 @@ func TestMergeTLSConfigs(t *testing.T) {
 			want: want{
 				result: &common.TLSConfig{
 					CABundle: []byte("resource-ca"),
-					CACertSecretRef: &xpv1.SecretKeySelector{
-						SecretReference: xpv1.SecretReference{
+					CACertSecretRef: &xpv2.SecretKeySelector{
+						SecretReference: xpv2.SecretReference{
 							Name:      "provider-ca-secret",
 							Namespace: "provider-ns",
 						},
 						Key: "ca.crt",
 					},
-					ClientCertSecretRef: &xpv1.SecretKeySelector{
-						SecretReference: xpv1.SecretReference{
+					ClientCertSecretRef: &xpv2.SecretKeySelector{
+						SecretReference: xpv2.SecretReference{
 							Name:      "resource-cert-secret",
 							Namespace: "resource-ns",
 						},
 						Key: "tls.crt",
 					},
-					ClientKeySecretRef: &xpv1.SecretKeySelector{
-						SecretReference: xpv1.SecretReference{
+					ClientKeySecretRef: &xpv2.SecretKeySelector{
+						SecretReference: xpv2.SecretReference{
 							Name:      "provider-key-secret",
 							Namespace: "provider-ns",
 						},

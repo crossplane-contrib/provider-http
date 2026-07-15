@@ -11,9 +11,9 @@ import (
 	"github.com/crossplane-contrib/provider-http/internal/service/request/observe"
 	"github.com/crossplane-contrib/provider-http/internal/service/request/requestgen"
 	"github.com/crossplane-contrib/provider-http/internal/service/request/requestmapping"
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/logging"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/test"
+	xpv2 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -78,8 +78,8 @@ func httpRequest(rm ...httpRequestModifier) *v1alpha2.Request {
 			Namespace: testNamespace,
 		},
 		Spec: v1alpha2.RequestSpec{
-			ResourceSpec: xpv1.ResourceSpec{
-				ProviderConfigReference: &xpv1.Reference{
+			ClusterManagedResourceSpec: xpv2.ClusterManagedResourceSpec{
+				ProviderConfigReference: &xpv2.Reference{
 					Name: providerName,
 				},
 			},

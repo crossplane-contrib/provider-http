@@ -7,7 +7,7 @@ import (
 	httpClient "github.com/crossplane-contrib/provider-http/internal/clients/http"
 	datapatcher "github.com/crossplane-contrib/provider-http/internal/data-patcher"
 	"github.com/crossplane-contrib/provider-http/internal/service"
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	xpv2 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -78,8 +78,8 @@ func UpdateResourceStatus(ctx context.Context, obj client.Object, localKube clie
 	}
 
 	// Type assert to set conditions
-	if statusWriter, ok := obj.(interface{ SetConditions(...xpv1.Condition) }); ok {
-		statusWriter.SetConditions(xpv1.Available())
+	if statusWriter, ok := obj.(interface{ SetConditions(...xpv2.Condition) }); ok {
+		statusWriter.SetConditions(xpv2.Available())
 		if err := localKube.Status().Update(ctx, obj); err != nil {
 			return errors.New(errFailedUpdateStatusConditions)
 		}

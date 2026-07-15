@@ -31,12 +31,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/controller"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/event"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/ratelimiter"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
+	xpv2 "github.com/crossplane/crossplane/apis/v2/core/v2"
 
 	"github.com/crossplane-contrib/provider-http/apis/common"
 	"github.com/crossplane-contrib/provider-http/apis/namespaced/disposablerequest/v1alpha2"
@@ -113,7 +113,7 @@ func (r *errorConditionReconciler) ensureErrorObserved(ctx context.Context, cr *
 		}
 	}
 
-	errorCondition := xpv1.Condition{
+	errorCondition := xpv2.Condition{
 		Type:               "ErrorObserved",
 		Status:             corev1.ConditionTrue,
 		LastTransitionTime: metav1.Now(),
@@ -203,8 +203,8 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 
 	// Set default providerConfigRef if not specified
 	if cr.GetProviderConfigReference() == nil {
-		cr.SetProviderConfigReference(&xpv1.ProviderConfigReference{
-			Name: "default",
+		cr.SetProviderConfigReference(&xpv2.ProviderConfigReference{
+			Name: "default", //nolint:goconst // well-known K8s default name
 			Kind: "ClusterProviderConfig",
 		})
 		l.Debug("No providerConfigRef specified, defaulting to 'default'")
@@ -237,7 +237,7 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 	}
 
 	creds := ""
-	if cd.Source == xpv1.CredentialsSourceSecret {
+	if cd.Source == xpv2.CredentialsSourceSecret {
 		data, err := resource.CommonCredentialExtractor(ctx, cd.Source, c.kube, cd.CommonCredentialSelectors)
 		if err != nil {
 			return nil, errors.Wrap(err, errExtractCredentials)

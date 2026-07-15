@@ -22,8 +22,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
+	xpv2 "github.com/crossplane/crossplane/apis/v2/core/v2"
 )
 
 var _ resource.ProviderConfig = &ClusterProviderConfig{}
@@ -62,12 +62,12 @@ var (
 
 // GetCondition returns the condition for the given ConditionType if exists,
 // otherwise returns nil
-func (pc *ClusterProviderConfig) GetCondition(ct xpv1.ConditionType) xpv1.Condition {
+func (pc *ClusterProviderConfig) GetCondition(ct xpv2.ConditionType) xpv2.Condition {
 	return pc.Status.GetCondition(ct)
 }
 
 // SetConditions sets the conditions on the resource status
-func (pc *ClusterProviderConfig) SetConditions(c ...xpv1.Condition) {
+func (pc *ClusterProviderConfig) SetConditions(c ...xpv2.Condition) {
 	pc.Status.SetConditions(c...)
 }
 

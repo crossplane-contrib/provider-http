@@ -23,8 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	"github.com/crossplane-contrib/provider-http/apis/common"
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
-	xpv2 "github.com/crossplane/crossplane-runtime/v2/apis/common/v2"
+	xpv2 "github.com/crossplane/crossplane/apis/v2/core/v2"
 )
 
 const (
@@ -133,12 +132,12 @@ type Response struct {
 
 // A RequestStatus represents the observed state of a Request.
 type RequestStatus struct {
-	xpv1.ResourceStatus `json:",inline"`
-	Response            Response `json:"response,omitempty"`
-	Cache               Cache    `json:"cache,omitempty"`
-	Failed              int32    `json:"failed,omitempty"`
-	Error               string   `json:"error,omitempty"`
-	RequestDetails      Mapping  `json:"requestDetails,omitempty"`
+	xpv2.ManagedResourceStatus `json:",inline"`
+	Response                   Response `json:"response,omitempty"`
+	Cache                      Cache    `json:"cache,omitempty"`
+	Failed                     int32    `json:"failed,omitempty"`
+	Error                      string   `json:"error,omitempty"`
+	RequestDetails             Mapping  `json:"requestDetails,omitempty"`
 }
 
 type Cache struct {

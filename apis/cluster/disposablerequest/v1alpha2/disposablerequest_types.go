@@ -23,7 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	"github.com/crossplane-contrib/provider-http/apis/common"
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	xpv2 "github.com/crossplane/crossplane/apis/v2/core/v2"
 )
 
 // DisposableRequestParameters are the configurable fields of a DisposableRequest.
@@ -77,8 +77,8 @@ type DisposableRequestParameters struct {
 
 // A DisposableRequestSpec defines the desired state of a DisposableRequest.
 type DisposableRequestSpec struct {
-	xpv1.ResourceSpec `json:",inline"`
-	ForProvider       DisposableRequestParameters `json:"forProvider"`
+	xpv2.ClusterManagedResourceSpec `json:",inline"`
+	ForProvider                     DisposableRequestParameters `json:"forProvider"`
 }
 
 type Response struct {
@@ -96,12 +96,12 @@ type Mapping struct {
 
 // A DisposableRequestStatus represents the observed state of a DisposableRequest.
 type DisposableRequestStatus struct {
-	xpv1.ResourceStatus `json:",inline"`
-	Response            Response `json:"response,omitempty"`
-	Failed              int32    `json:"failed,omitempty"`
-	Error               string   `json:"error,omitempty"`
-	Synced              bool     `json:"synced,omitempty"`
-	RequestDetails      Mapping  `json:"requestDetails,omitempty"`
+	xpv2.ManagedResourceStatus `json:",inline"`
+	Response                   Response `json:"response,omitempty"`
+	Failed                     int32    `json:"failed,omitempty"`
+	Error                      string   `json:"error,omitempty"`
+	Synced                     bool     `json:"synced,omitempty"`
+	RequestDetails             Mapping  `json:"requestDetails,omitempty"`
 
 	// LastReconcileTime records the last time the resource was reconciled.
 	LastReconcileTime metav1.Time `json:"lastReconcileTime,omitempty"`

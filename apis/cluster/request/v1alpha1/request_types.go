@@ -22,7 +22,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	xpv2 "github.com/crossplane/crossplane/apis/v2/core/v2"
 )
 
 // RequestParameters are the configurable fields of a Request.
@@ -58,8 +58,8 @@ type Payload struct {
 
 // A RequestSpec defines the desired state of a Request.
 type RequestSpec struct {
-	xpv1.ResourceSpec `json:",inline"`
-	ForProvider       RequestParameters `json:"forProvider"`
+	xpv2.ClusterManagedResourceSpec `json:",inline"`
+	ForProvider                     RequestParameters `json:"forProvider"`
 }
 
 // RequestObservation are the observable fields of a Request.
@@ -71,12 +71,12 @@ type Response struct {
 
 // A RequestStatus represents the observed state of a Request.
 type RequestStatus struct {
-	xpv1.ResourceStatus `json:",inline"`
-	Response            Response `json:"response,omitempty"`
-	Cache               Cache    `json:"cache,omitempty"`
-	Failed              int32    `json:"failed,omitempty"`
-	Error               string   `json:"error,omitempty"`
-	RequestDetails      Mapping  `json:"requestDetails,omitempty"`
+	xpv2.ManagedResourceStatus `json:",inline"`
+	Response                   Response `json:"response,omitempty"`
+	Cache                      Cache    `json:"cache,omitempty"`
+	Failed                     int32    `json:"failed,omitempty"`
+	Error                      string   `json:"error,omitempty"`
+	RequestDetails             Mapping  `json:"requestDetails,omitempty"`
 }
 
 type Cache struct {

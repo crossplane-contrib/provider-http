@@ -74,6 +74,7 @@ linters:
           - dupl
           - errcheck
           - exportloopref
+          - goconst
           - gocyclo
           - gosec
           - unparam
@@ -97,6 +98,15 @@ linters:
       - linters:
           - staticcheck
         text: 'QF1001:'
+      - linters:
+          - staticcheck
+        text: 'SA1019: scheme.Builder is deprecated'
+      - linters:
+          - staticcheck
+        text: 'SA1019: managed.WithExternalConnecter is deprecated'
+      - linters:
+          - govet
+        text: 'inline: cannot inline'
     paths:
       - zz_generated\..+\.go$
       - third_party$

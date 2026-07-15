@@ -108,7 +108,7 @@ func applySecretConfig(ctx context.Context, localKube client.Client, logger logg
 			}
 		}
 	} else {
-		// Handle deprecated secretConfig fields
+		//nolint:staticcheck // backward compat with deprecated fields
 		mapping := common.KeyInjection{
 			SecretKey:            secretConfig.SecretKey,
 			ResponseJQ:           secretConfig.ResponsePath,

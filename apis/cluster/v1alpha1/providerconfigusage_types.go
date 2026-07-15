@@ -22,8 +22,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
+	xpv2 "github.com/crossplane/crossplane/apis/v2/core/v2"
 )
 
 // verify interface casting required by controller
@@ -42,7 +42,7 @@ type ProviderConfigUsage struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	xpv1.ProviderConfigUsage `json:",inline"`
+	xpv2.ProviderConfigUsage `json:",inline"`
 }
 
 // +kubebuilder:object:root=true
@@ -68,12 +68,12 @@ var (
 )
 
 // SetResourceReference sets the resource reference.
-func (pcu *ProviderConfigUsage) SetResourceReference(r xpv1.TypedReference) {
+func (pcu *ProviderConfigUsage) SetResourceReference(r xpv2.TypedReference) {
 	pcu.ResourceReference = r
 }
 
 // GetResourceReference gets the resource reference.
-func (pcu *ProviderConfigUsage) GetResourceReference() xpv1.TypedReference {
+func (pcu *ProviderConfigUsage) GetResourceReference() xpv2.TypedReference {
 	return pcu.ResourceReference
 }
 

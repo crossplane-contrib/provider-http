@@ -17,14 +17,14 @@ limitations under the License.
 
 package v1alpha1
 
-import xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+import xpv2 "github.com/crossplane/crossplane/apis/v2/core/v2"
 
 // GetProviderConfigReference of this ProviderConfigUsage.
-func (p *ProviderConfigUsage) GetProviderConfigReference() xpv1.Reference {
+func (p *ProviderConfigUsage) GetProviderConfigReference() xpv2.Reference {
 	return p.ProviderConfigReference
 }
 
 // SetProviderConfigReference of this ProviderConfigUsage.
-func (p *ProviderConfigUsage) SetProviderConfigReference(r xpv1.Reference) {
+func (p *ProviderConfigUsage) SetProviderConfigReference(r xpv2.Reference) {
 	p.ProviderConfigReference = r
 }

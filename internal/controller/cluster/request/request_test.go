@@ -10,12 +10,12 @@ import (
 	"github.com/crossplane-contrib/provider-http/apis/cluster/request/v1alpha2"
 	"github.com/crossplane-contrib/provider-http/apis/common"
 	httpClient "github.com/crossplane-contrib/provider-http/internal/clients/http"
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/feature"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/logging"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/test"
+	xpv2 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
 )
@@ -78,8 +78,8 @@ func httpRequest(rm ...httpRequestModifier) *v1alpha2.Request {
 			Namespace: testNamespace,
 		},
 		Spec: v1alpha2.RequestSpec{
-			ResourceSpec: xpv1.ResourceSpec{
-				ProviderConfigReference: &xpv1.Reference{
+			ClusterManagedResourceSpec: xpv2.ClusterManagedResourceSpec{
+				ProviderConfigReference: &xpv2.Reference{
 					Name: providerName,
 				},
 			},
@@ -514,7 +514,7 @@ func TestRequestManagementPolicies(t *testing.T) {
 	cases := map[string]struct {
 		reason string
 		mg     *v1alpha2.Request
-		want   xpv1.ManagementPolicies
+		want   xpv2.ManagementPolicies
 	}{
 		"DefaultManagementPolicies": {
 			reason: "Default management policies should be nil when not explicitly set",
@@ -529,70 +529,70 @@ func TestRequestManagementPolicies(t *testing.T) {
 			reason: "Observe-only management policies should only allow observation",
 			mg: func() *v1alpha2.Request {
 				r := httpRequest()
-				r.Spec.ManagementPolicies = xpv1.ManagementPolicies{xpv1.ManagementActionObserve}
+				r.Spec.ManagementPolicies = xpv2.ManagementPolicies{xpv2.ManagementActionObserve}
 				return r
 			}(),
-			want: xpv1.ManagementPolicies{xpv1.ManagementActionObserve},
+			want: xpv2.ManagementPolicies{xpv2.ManagementActionObserve},
 		},
 		"CreateAndUpdateManagementPolicies": {
 			reason: "Create and update management policies should allow creation and updates",
 			mg: func() *v1alpha2.Request {
 				r := httpRequest()
-				r.Spec.ManagementPolicies = xpv1.ManagementPolicies{
-					xpv1.ManagementActionCreate,
-					xpv1.ManagementActionUpdate,
+				r.Spec.ManagementPolicies = xpv2.ManagementPolicies{
+					xpv2.ManagementActionCreate,
+					xpv2.ManagementActionUpdate,
 				}
 				return r
 			}(),
-			want: xpv1.ManagementPolicies{
-				xpv1.ManagementActionCreate,
-				xpv1.ManagementActionUpdate,
+			want: xpv2.ManagementPolicies{
+				xpv2.ManagementActionCreate,
+				xpv2.ManagementActionUpdate,
 			},
 		},
 		"ObserveCreateUpdateManagementPolicies": {
 			reason: "Observe, create, and update management policies should allow all three actions",
 			mg: func() *v1alpha2.Request {
 				r := httpRequest()
-				r.Spec.ManagementPolicies = xpv1.ManagementPolicies{
-					xpv1.ManagementActionObserve,
-					xpv1.ManagementActionCreate,
-					xpv1.ManagementActionUpdate,
+				r.Spec.ManagementPolicies = xpv2.ManagementPolicies{
+					xpv2.ManagementActionObserve,
+					xpv2.ManagementActionCreate,
+					xpv2.ManagementActionUpdate,
 				}
 				return r
 			}(),
-			want: xpv1.ManagementPolicies{
-				xpv1.ManagementActionObserve,
-				xpv1.ManagementActionCreate,
-				xpv1.ManagementActionUpdate,
+			want: xpv2.ManagementPolicies{
+				xpv2.ManagementActionObserve,
+				xpv2.ManagementActionCreate,
+				xpv2.ManagementActionUpdate,
 			},
 		},
 		"AllActionsExceptDeleteManagementPolicies": {
 			reason: "All actions except delete should allow observe, create, update, and late initialize",
 			mg: func() *v1alpha2.Request {
 				r := httpRequest()
-				r.Spec.ManagementPolicies = xpv1.ManagementPolicies{
-					xpv1.ManagementActionObserve,
-					xpv1.ManagementActionCreate,
-					xpv1.ManagementActionUpdate,
-					xpv1.ManagementActionLateInitialize,
+				r.Spec.ManagementPolicies = xpv2.ManagementPolicies{
+					xpv2.ManagementActionObserve,
+					xpv2.ManagementActionCreate,
+					xpv2.ManagementActionUpdate,
+					xpv2.ManagementActionLateInitialize,
 				}
 				return r
 			}(),
-			want: xpv1.ManagementPolicies{
-				xpv1.ManagementActionObserve,
-				xpv1.ManagementActionCreate,
-				xpv1.ManagementActionUpdate,
-				xpv1.ManagementActionLateInitialize,
+			want: xpv2.ManagementPolicies{
+				xpv2.ManagementActionObserve,
+				xpv2.ManagementActionCreate,
+				xpv2.ManagementActionUpdate,
+				xpv2.ManagementActionLateInitialize,
 			},
 		},
 		"ExplicitAllManagementPolicies": {
 			reason: "Explicit all management policies should allow all actions",
 			mg: func() *v1alpha2.Request {
 				r := httpRequest()
-				r.Spec.ManagementPolicies = xpv1.ManagementPolicies{xpv1.ManagementActionAll}
+				r.Spec.ManagementPolicies = xpv2.ManagementPolicies{xpv2.ManagementActionAll}
 				return r
 			}(),
-			want: xpv1.ManagementPolicies{xpv1.ManagementActionAll},
+			want: xpv2.ManagementPolicies{xpv2.ManagementActionAll},
 		},
 	}
 
@@ -609,7 +609,7 @@ func TestRequestManagementPolicies(t *testing.T) {
 func TestRequestManagementPoliciesResolver(t *testing.T) {
 	type args struct {
 		enabled bool
-		policy  xpv1.ManagementPolicies
+		policy  xpv2.ManagementPolicies
 	}
 	type want struct {
 		shouldCreate         bool
@@ -628,7 +628,7 @@ func TestRequestManagementPoliciesResolver(t *testing.T) {
 			reason: "When management policies are disabled, all actions should be allowed",
 			args: args{
 				enabled: false,
-				policy:  xpv1.ManagementPolicies{xpv1.ManagementActionObserve},
+				policy:  xpv2.ManagementPolicies{xpv2.ManagementActionObserve},
 			},
 			want: want{
 				shouldCreate:         true,
@@ -642,7 +642,7 @@ func TestRequestManagementPoliciesResolver(t *testing.T) {
 			reason: "Observe-only policy should only allow observation",
 			args: args{
 				enabled: true,
-				policy:  xpv1.ManagementPolicies{xpv1.ManagementActionObserve},
+				policy:  xpv2.ManagementPolicies{xpv2.ManagementActionObserve},
 			},
 			want: want{
 				shouldCreate:         false,
@@ -656,7 +656,7 @@ func TestRequestManagementPoliciesResolver(t *testing.T) {
 			reason: "Create-only policy should only allow creation",
 			args: args{
 				enabled: true,
-				policy:  xpv1.ManagementPolicies{xpv1.ManagementActionCreate},
+				policy:  xpv2.ManagementPolicies{xpv2.ManagementActionCreate},
 			},
 			want: want{
 				shouldCreate:         true,
@@ -670,7 +670,7 @@ func TestRequestManagementPoliciesResolver(t *testing.T) {
 			reason: "Update-only policy should only allow updates",
 			args: args{
 				enabled: true,
-				policy:  xpv1.ManagementPolicies{xpv1.ManagementActionUpdate},
+				policy:  xpv2.ManagementPolicies{xpv2.ManagementActionUpdate},
 			},
 			want: want{
 				shouldCreate:         false,
@@ -684,7 +684,7 @@ func TestRequestManagementPoliciesResolver(t *testing.T) {
 			reason: "Delete-only policy should only allow deletion",
 			args: args{
 				enabled: true,
-				policy:  xpv1.ManagementPolicies{xpv1.ManagementActionDelete},
+				policy:  xpv2.ManagementPolicies{xpv2.ManagementActionDelete},
 			},
 			want: want{
 				shouldCreate:         false,
@@ -698,7 +698,7 @@ func TestRequestManagementPoliciesResolver(t *testing.T) {
 			reason: "Create and update policy should allow both creation and updates",
 			args: args{
 				enabled: true,
-				policy:  xpv1.ManagementPolicies{xpv1.ManagementActionCreate, xpv1.ManagementActionUpdate},
+				policy:  xpv2.ManagementPolicies{xpv2.ManagementActionCreate, xpv2.ManagementActionUpdate},
 			},
 			want: want{
 				shouldCreate:         true,
@@ -712,7 +712,7 @@ func TestRequestManagementPoliciesResolver(t *testing.T) {
 			reason: "Observe, create, and update policy should allow all three actions",
 			args: args{
 				enabled: true,
-				policy:  xpv1.ManagementPolicies{xpv1.ManagementActionObserve, xpv1.ManagementActionCreate, xpv1.ManagementActionUpdate},
+				policy:  xpv2.ManagementPolicies{xpv2.ManagementActionObserve, xpv2.ManagementActionCreate, xpv2.ManagementActionUpdate},
 			},
 			want: want{
 				shouldCreate:         true,
@@ -726,7 +726,7 @@ func TestRequestManagementPoliciesResolver(t *testing.T) {
 			reason: "All actions except delete should allow observe, create, update, and late initialize",
 			args: args{
 				enabled: true,
-				policy:  xpv1.ManagementPolicies{xpv1.ManagementActionObserve, xpv1.ManagementActionCreate, xpv1.ManagementActionUpdate, xpv1.ManagementActionLateInitialize},
+				policy:  xpv2.ManagementPolicies{xpv2.ManagementActionObserve, xpv2.ManagementActionCreate, xpv2.ManagementActionUpdate, xpv2.ManagementActionLateInitialize},
 			},
 			want: want{
 				shouldCreate:         true,
@@ -740,7 +740,7 @@ func TestRequestManagementPoliciesResolver(t *testing.T) {
 			reason: "Explicit all policy should allow all actions",
 			args: args{
 				enabled: true,
-				policy:  xpv1.ManagementPolicies{xpv1.ManagementActionAll},
+				policy:  xpv2.ManagementPolicies{xpv2.ManagementActionAll},
 			},
 			want: want{
 				shouldCreate:         true,
@@ -763,7 +763,7 @@ func TestRequestManagementPoliciesResolver(t *testing.T) {
 			// The actual enforcement happens in the Crossplane managed reconciler
 
 			// Helper function to check if a ManagementPolicies slice contains a specific action
-			contains := func(policies xpv1.ManagementPolicies, action xpv1.ManagementAction) bool {
+			contains := func(policies xpv2.ManagementPolicies, action xpv2.ManagementAction) bool {
 				for _, p := range policies {
 					if p == action {
 						return true
@@ -775,7 +775,7 @@ func TestRequestManagementPoliciesResolver(t *testing.T) {
 			// Test ShouldCreate
 			shouldCreate := tc.want.shouldCreate
 			if tc.args.enabled {
-				shouldCreate = contains(tc.args.policy, xpv1.ManagementActionCreate) || contains(tc.args.policy, xpv1.ManagementActionAll)
+				shouldCreate = contains(tc.args.policy, xpv2.ManagementActionCreate) || contains(tc.args.policy, xpv2.ManagementActionAll)
 			}
 			if shouldCreate != tc.want.shouldCreate {
 				t.Errorf("ShouldCreate() = %v, want %v", shouldCreate, tc.want.shouldCreate)
@@ -784,7 +784,7 @@ func TestRequestManagementPoliciesResolver(t *testing.T) {
 			// Test ShouldUpdate
 			shouldUpdate := tc.want.shouldUpdate
 			if tc.args.enabled {
-				shouldUpdate = contains(tc.args.policy, xpv1.ManagementActionUpdate) || contains(tc.args.policy, xpv1.ManagementActionAll)
+				shouldUpdate = contains(tc.args.policy, xpv2.ManagementActionUpdate) || contains(tc.args.policy, xpv2.ManagementActionAll)
 			}
 			if shouldUpdate != tc.want.shouldUpdate {
 				t.Errorf("ShouldUpdate() = %v, want %v", shouldUpdate, tc.want.shouldUpdate)
@@ -793,7 +793,7 @@ func TestRequestManagementPoliciesResolver(t *testing.T) {
 			// Test ShouldDelete
 			shouldDelete := tc.want.shouldDelete
 			if tc.args.enabled {
-				shouldDelete = contains(tc.args.policy, xpv1.ManagementActionDelete) || contains(tc.args.policy, xpv1.ManagementActionAll)
+				shouldDelete = contains(tc.args.policy, xpv2.ManagementActionDelete) || contains(tc.args.policy, xpv2.ManagementActionAll)
 			}
 			if shouldDelete != tc.want.shouldDelete {
 				t.Errorf("ShouldDelete() = %v, want %v", shouldDelete, tc.want.shouldDelete)
@@ -802,7 +802,7 @@ func TestRequestManagementPoliciesResolver(t *testing.T) {
 			// Test ShouldOnlyObserve
 			shouldOnlyObserve := tc.want.shouldOnlyObserve
 			if tc.args.enabled {
-				shouldOnlyObserve = len(tc.args.policy) == 1 && contains(tc.args.policy, xpv1.ManagementActionObserve)
+				shouldOnlyObserve = len(tc.args.policy) == 1 && contains(tc.args.policy, xpv2.ManagementActionObserve)
 			}
 			if shouldOnlyObserve != tc.want.shouldOnlyObserve {
 				t.Errorf("ShouldOnlyObserve() = %v, want %v", shouldOnlyObserve, tc.want.shouldOnlyObserve)
@@ -811,7 +811,7 @@ func TestRequestManagementPoliciesResolver(t *testing.T) {
 			// Test ShouldLateInitialize
 			shouldLateInitialize := tc.want.shouldLateInitialize
 			if tc.args.enabled {
-				shouldLateInitialize = contains(tc.args.policy, xpv1.ManagementActionLateInitialize) || contains(tc.args.policy, xpv1.ManagementActionAll)
+				shouldLateInitialize = contains(tc.args.policy, xpv2.ManagementActionLateInitialize) || contains(tc.args.policy, xpv2.ManagementActionAll)
 			}
 			if shouldLateInitialize != tc.want.shouldLateInitialize {
 				t.Errorf("ShouldLateInitialize() = %v, want %v", shouldLateInitialize, tc.want.shouldLateInitialize)
@@ -936,8 +936,8 @@ func TestTLSConfiguration(t *testing.T) {
 func clusterRequestWithTLS() *v1alpha2.Request {
 	return httpRequest(func(cr *v1alpha2.Request) {
 		cr.Spec.ForProvider.TLSConfig = &common.TLSConfig{
-			CACertSecretRef: &xpv1.SecretKeySelector{
-				SecretReference: xpv1.SecretReference{
+			CACertSecretRef: &xpv2.SecretKeySelector{
+				SecretReference: xpv2.SecretReference{
 					Name:      "ca-cert-secret",
 					Namespace: "default",
 				},
@@ -958,22 +958,22 @@ func clusterRequestWithInsecureSkipTLS() *v1alpha2.Request {
 func clusterRequestWithMutualTLS() *v1alpha2.Request {
 	return httpRequest(func(cr *v1alpha2.Request) {
 		cr.Spec.ForProvider.TLSConfig = &common.TLSConfig{
-			CACertSecretRef: &xpv1.SecretKeySelector{
-				SecretReference: xpv1.SecretReference{
+			CACertSecretRef: &xpv2.SecretKeySelector{
+				SecretReference: xpv2.SecretReference{
 					Name:      "ca-cert-secret",
 					Namespace: "default",
 				},
 				Key: "ca.crt",
 			},
-			ClientCertSecretRef: &xpv1.SecretKeySelector{
-				SecretReference: xpv1.SecretReference{
+			ClientCertSecretRef: &xpv2.SecretKeySelector{
+				SecretReference: xpv2.SecretReference{
 					Name:      "client-cert-secret",
 					Namespace: "default",
 				},
 				Key: "tls.crt",
 			},
-			ClientKeySecretRef: &xpv1.SecretKeySelector{
-				SecretReference: xpv1.SecretReference{
+			ClientKeySecretRef: &xpv2.SecretKeySelector{
+				SecretReference: xpv2.SecretReference{
 					Name:      "client-cert-secret",
 					Namespace: "default",
 				},

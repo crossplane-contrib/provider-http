@@ -27,12 +27,12 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/controller"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/event"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/ratelimiter"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
+	xpv2 "github.com/crossplane/crossplane/apis/v2/core/v2"
 
 	"github.com/crossplane-contrib/provider-http/apis/cluster/request/v1alpha2"
 	apisv1alpha1 "github.com/crossplane-contrib/provider-http/apis/cluster/v1alpha1"
@@ -116,8 +116,8 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 
 	// Set default providerConfigRef if not specified
 	if cr.GetProviderConfigReference() == nil {
-		cr.SetProviderConfigReference(&xpv1.Reference{
-			Name: "default",
+		cr.SetProviderConfigReference(&xpv2.Reference{
+			Name: "default", //nolint:goconst // well-known K8s default name
 		})
 		l.Debug("No providerConfigRef specified, defaulting to 'default'")
 	}
@@ -129,7 +129,7 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 	}
 
 	creds := ""
-	if pc.Spec.Credentials.Source == xpv1.CredentialsSourceSecret {
+	if pc.Spec.Credentials.Source == xpv2.CredentialsSourceSecret {
 		data, err := resource.CommonCredentialExtractor(ctx, pc.Spec.Credentials.Source, c.kube, pc.Spec.Credentials.CommonCredentialSelectors)
 		if err != nil {
 			return nil, errors.Wrap(err, errExtractCredentials)
@@ -206,7 +206,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		statusHandler.ResetFailures()
 	}
 
-	cr.Status.SetConditions(xpv1.Available())
+	cr.Status.SetConditions(xpv2.Available())
 	err = statusHandler.SetRequestStatus()
 	if err != nil {
 		return managed.ExternalObservation{}, errors.Wrap(err, " failed updating status")

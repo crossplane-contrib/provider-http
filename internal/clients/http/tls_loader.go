@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/crossplane-contrib/provider-http/apis/common"
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	xpv2 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	kube "sigs.k8s.io/controller-runtime/pkg/client"
@@ -54,7 +54,7 @@ func LoadTLSConfig(ctx context.Context, kubeClient kube.Client, tlsConfig *commo
 }
 
 // loadSecretData loads data from a Kubernetes secret
-func loadSecretData(ctx context.Context, kubeClient kube.Client, secretRef *xpv1.SecretKeySelector) ([]byte, error) {
+func loadSecretData(ctx context.Context, kubeClient kube.Client, secretRef *xpv2.SecretKeySelector) ([]byte, error) {
 	if secretRef == nil {
 		return nil, nil
 	}
