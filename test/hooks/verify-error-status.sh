@@ -30,18 +30,18 @@ echo "========================================="
 
 # Record test start time to ignore stale logs from previous runs
 RUN_START=$(date -u +"%Y/%m/%d %H:%M:%S")
-RUN_START_EPOCH=$(date -u -d "$RUN_START" +%s 2>/dev/null || date -u -j -f "%Y/%m/%d %H:%M:%S" "$RUN_START" +%s 2>/dev/null || echo "")
+RUN_START_EPOCH=$(TZ=UTC date -d "$RUN_START" +%s 2>/dev/null || date -u -j -f "%Y/%m/%d %H:%M:%S" "$RUN_START" +%s 2>/dev/null || echo "")
 # Prefer to filter logs starting from the resource's LastReconcileTime or creationTimestamp if available
 LAST_RECONCILE=$(kubectl get "$RESOURCE_KIND" "$NAME" $NS_ARG -o jsonpath='{.status.lastReconcileTime}' 2>/dev/null || echo "")
 LAST_RECONCILE_EPOCH=""
 if [[ -n "$LAST_RECONCILE" ]]; then
-  LAST_RECONCILE_EPOCH=$(date -u -d "$LAST_RECONCILE" +%s 2>/dev/null || date -u -j -f "%Y-%m-%dT%H:%M:%SZ" "$LAST_RECONCILE" +%s 2>/dev/null || echo "")
+  LAST_RECONCILE_EPOCH=$(TZ=UTC date -d "$LAST_RECONCILE" +%s 2>/dev/null || date -u -j -f "%Y-%m-%dT%H:%M:%SZ" "$LAST_RECONCILE" +%s 2>/dev/null || echo "")
 fi
 # Also get creation timestamp so we can capture calls that occurred at resource creation
 CREATION_TS=$(kubectl get "$RESOURCE_KIND" "$NAME" $NS_ARG -o jsonpath='{.metadata.creationTimestamp}' 2>/dev/null || echo "")
 CREATION_TS_EPOCH=""
 if [[ -n "$CREATION_TS" ]]; then
-  CREATION_TS_EPOCH=$(date -u -d "$CREATION_TS" +%s 2>/dev/null || date -u -j -f "%Y-%m-%dT%H:%M:%SZ" "$CREATION_TS" +%s 2>/dev/null || echo "")
+  CREATION_TS_EPOCH=$(TZ=UTC date -d "$CREATION_TS" +%s 2>/dev/null || date -u -j -f "%Y-%m-%dT%H:%M:%SZ" "$CREATION_TS" +%s 2>/dev/null || echo "")
 fi
 # Determine the effective filter start epoch.
 # Use the earlier of LastReconcileTime and RUN_START so we don't miss calls
@@ -253,7 +253,7 @@ if [[ -n "$TEST_SERVER_POD" ]]; then
   while IFS= read -r line; do
     # Each log line starts with timestamp like: 2025/12/21 00:44:48 ...
     ts=$(echo "$line" | awk '{print $1" "$2}')
-    EPOCH=$(date -u -d "$ts" +%s 2>/dev/null || date -u -j -f "%Y/%m/%d %H:%M:%S" "$ts" +%s 2>/dev/null || echo "")
+    EPOCH=$(TZ=UTC date -d "$ts" +%s 2>/dev/null || date -u -j -f "%Y/%m/%d %H:%M:%S" "$ts" +%s 2>/dev/null || echo "")
     if [[ -n "$EPOCH" && -n "$FILTER_START_EPOCH" && "$EPOCH" -ge "$FILTER_START_EPOCH" ]]; then
       if echo "$line" | grep -q "\[POST\] $ENDPOINT_PATH" && echo "$line" | grep -q "Go-http-client"; then
         TOTAL_API_CALLS=$((TOTAL_API_CALLS+1))
@@ -331,7 +331,7 @@ if [[ -n "$NEXT_RECONCILE" && -n "$TEST_SERVER_POD" && "$ACTUAL_CALLS" -gt 1 ]];
       while IFS= read -r ts; do
         if [[ -n "$ts" ]]; then
           # Convert timestamp to epoch (format: 2025/12/21 00:44:48)
-          EPOCH=$(date -u -d "$ts" +%s 2>/dev/null || date -u -j -f "%Y/%m/%d %H:%M:%S" "$ts" +%s 2>/dev/null || echo "")
+          EPOCH=$(TZ=UTC date -d "$ts" +%s 2>/dev/null || date -u -j -f "%Y/%m/%d %H:%M:%S" "$ts" +%s 2>/dev/null || echo "")
           if [[ -n "$EPOCH" ]]; then
             EPOCHS+=("$EPOCH")
           fi
@@ -378,7 +378,7 @@ if [[ -n "$NEXT_RECONCILE" && -n "$TEST_SERVER_POD" && "$ACTUAL_CALLS" -gt 1 ]];
         NEW_TOTAL_API_CALLS=0
         while IFS= read -r line; do
           ts=$(echo "$line" | awk '{print $1" "$2}')
-          EPOCH=$(date -u -d "$ts" +%s 2>/dev/null || date -u -j -f "%Y/%m/%d %H:%M:%S" "$ts" +%s 2>/dev/null || echo "")
+          EPOCH=$(TZ=UTC date -d "$ts" +%s 2>/dev/null || date -u -j -f "%Y/%m/%d %H:%M:%S" "$ts" +%s 2>/dev/null || echo "")
           if [[ -n "$EPOCH" && -n "$FILTER_START_EPOCH" && "$EPOCH" -ge "$FILTER_START_EPOCH" ]]; then
             if echo "$line" | grep -q "\[POST\] $ENDPOINT_PATH" && echo "$line" | grep -q "Go-http-client"; then
               NEW_TOTAL_API_CALLS=$((NEW_TOTAL_API_CALLS+1))

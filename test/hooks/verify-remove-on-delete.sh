@@ -27,14 +27,14 @@ resource_exists() {
 
 to_epoch() {
   local ts="$1"
-  date -u -d "$ts" +%s 2>/dev/null || date -u -j -f "%Y-%m-%dT%H:%M:%SZ" "$ts" +%s 2>/dev/null || echo ""
+  TZ=UTC date -d "$ts" +%s 2>/dev/null || date -u -j -f "%Y-%m-%dT%H:%M:%SZ" "$ts" +%s 2>/dev/null || echo ""
 }
 
 log_line_epoch() {
   local line="$1"
   local ts
   ts=$(echo "$line" | awk '{print $1" "$2}')
-  date -u -d "$ts" +%s 2>/dev/null || date -u -j -f "%Y/%m/%d %H:%M:%S" "$ts" +%s 2>/dev/null || echo ""
+  TZ=UTC date -d "$ts" +%s 2>/dev/null || date -u -j -f "%Y/%m/%d %H:%M:%S" "$ts" +%s 2>/dev/null || echo ""
 }
 
 print_diagnostics() {

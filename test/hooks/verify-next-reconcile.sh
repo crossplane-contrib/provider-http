@@ -44,7 +44,7 @@ if [[ -z "$LR" ]]; then
 fi
 
 to_epoch() {
-  date -u -d "$1" +%s 2>/dev/null || date -u -j -f "%Y-%m-%dT%H:%M:%SZ" "$1" +%s
+  TZ=UTC date -d "$1" +%s 2>/dev/null || date -u -j -f "%Y-%m-%dT%H:%M:%SZ" "$1" +%s
 }
 
 T1=$(to_epoch "$LR")
