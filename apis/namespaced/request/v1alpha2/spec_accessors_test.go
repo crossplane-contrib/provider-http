@@ -173,36 +173,49 @@ func TestResponse_Accessors(t *testing.T) {
 }
 
 func TestRequest_CachedResponse(t *testing.T) {
-	// Test with cached response
+	// GetCachedResponse must return the cache, not the live response. When the
+	// live response is a failed request (e.g. a 400 with no id), the cache must
+	// still surface the last good response so mappings can resolve the id.
 	req := &Request{
 		Status: RequestStatus{
 			Response: Response{
-				StatusCode: 200,
-				Body:       "cached",
+				StatusCode: 400,
+				Body:       `{"error":"Invalid ID format: \"null\""}`,
+			},
+			Cache: Cache{
+				Response: Response{
+					StatusCode: 200,
+					Body:       `{"id":"123"}`,
+				},
 			},
 		},
 	}
 
 	cached := req.GetCachedResponse()
 	if cached == nil {
-		t.Error("GetCachedResponse() returned nil for valid response")
+		t.Fatal("GetCachedResponse() returned nil for valid cached response")
 	}
 	if cached.GetStatusCode() != 200 {
 		t.Errorf("Cached response StatusCode = %v, want 200", cached.GetStatusCode())
+	}
+	if cached.GetBody() != `{"id":"123"}` {
+		t.Errorf("GetCachedResponse() returned live response %q, want cached %q", cached.GetBody(), `{"id":"123"}`)
 	}
 
 	// Test with no cached response
 	req2 := &Request{
 		Status: RequestStatus{
-			Response: Response{
-				StatusCode: 0,
+			Cache: Cache{
+				Response: Response{
+					StatusCode: 0,
+				},
 			},
 		},
 	}
 
 	cached2 := req2.GetCachedResponse()
 	if cached2 != nil {
-		t.Error("GetCachedResponse() should return nil when StatusCode is 0")
+		t.Error("GetCachedResponse() should return nil when cached StatusCode is 0")
 	}
 }
 
