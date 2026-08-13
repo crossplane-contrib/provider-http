@@ -41,6 +41,9 @@ const (
 
 // RequestParameters are the configurable fields of a Request.
 // +kubebuilder:validation:XValidation:rule="!(self.insecureSkipTLSVerify == true && has(self.tlsConfig))",message="insecureSkipTLSVerify and tlsConfig are mutually exclusive"
+// +kubebuilder:validation:XValidation:rule="!has(self.pollInterval) || duration(self.pollInterval) > duration('0s')",message="pollInterval must be greater than zero"
+// +kubebuilder:validation:XValidation:rule="!has(self.pollJitter) || has(self.pollInterval)",message="pollJitter requires pollInterval"
+// +kubebuilder:validation:XValidation:rule="!has(self.pollJitter) || duration(self.pollJitter) >= duration('0s')",message="pollJitter must not be negative"
 type RequestParameters struct {
 	// Mappings defines the HTTP mappings for different methods.
 	// Either Method or Action must be specified. If both are omitted, the mapping will not be used.
@@ -55,6 +58,16 @@ type RequestParameters struct {
 
 	// WaitTimeout specifies the maximum time duration for waiting.
 	WaitTimeout *metav1.Duration `json:"waitTimeout,omitempty"`
+
+	// PollInterval specifies how often this Request is checked for external drift.
+	// When omitted, the provider's global poll interval is used.
+	// +optional
+	PollInterval *metav1.Duration `json:"pollInterval,omitempty"`
+
+	// PollJitter specifies a deterministic non-negative delay added to PollInterval.
+	// PollJitter requires PollInterval.
+	// +optional
+	PollJitter *metav1.Duration `json:"pollJitter,omitempty"`
 
 	// InsecureSkipTLSVerify, when set to true, skips TLS certificate checks for the HTTP request.
 	// This field is mutually exclusive with TLSConfig.
@@ -139,6 +152,18 @@ type RequestStatus struct {
 	Failed                     int32    `json:"failed,omitempty"`
 	Error                      string   `json:"error,omitempty"`
 	RequestDetails             Mapping  `json:"requestDetails,omitempty"`
+
+	// LastRequestTime records when the most recent external HTTP request was sent.
+	LastRequestTime *metav1.Time `json:"lastRequestTime,omitempty"`
+
+	// NextPollTime records when the next periodic external observation becomes due.
+	NextPollTime *metav1.Time `json:"nextPollTime,omitempty"`
+
+	// RateLimitUntil records the earliest time another external HTTP request is permitted after a 429 response.
+	RateLimitUntil *metav1.Time `json:"rateLimitUntil,omitempty"`
+
+	// ObservedDesiredStateHash identifies the desired state evaluated by the most recent external HTTP request.
+	ObservedDesiredStateHash string `json:"observedDesiredStateHash,omitempty"`
 }
 
 type Cache struct {

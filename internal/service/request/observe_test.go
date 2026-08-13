@@ -218,6 +218,32 @@ func Test_isUpToDate(t *testing.T) {
 				err: errNotFound,
 			},
 		},
+		"RateLimitedInitialObservation": {
+			args: args{
+				http: &MockHttpClient{
+					MockSendRequest: func(ctx context.Context, method string, url string, body, headers httpClient.Data, tlsConfigData *httpClient.TLSConfigData) (resp httpClient.HttpDetails, err error) {
+						return httpClient.HttpDetails{HttpResponse: httpClient.HttpResponse{
+							Body:       `{"error":"rate limited"}`,
+							StatusCode: http.StatusTooManyRequests,
+							Headers:    map[string][]string{"Retry-After": {"60"}},
+						}}, nil
+					},
+				},
+				localKube: &test.MockClient{MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil)},
+				mg: httpRequest(func(r *v1alpha2.Request) {
+					r.Status.Response.Body = ""
+					r.Status.Response.StatusCode = 0
+				}),
+			},
+			want: want{result: ObserveRequestDetails{
+				Details: httpClient.HttpDetails{HttpResponse: httpClient.HttpResponse{
+					Body:       `{"error":"rate limited"}`,
+					StatusCode: http.StatusTooManyRequests,
+					Headers:    map[string][]string{"Retry-After": {"60"}},
+				}},
+				Synced: true,
+			}},
+		},
 		"FailBodyNotJSON": {
 			args: args{
 				http: &MockHttpClient{

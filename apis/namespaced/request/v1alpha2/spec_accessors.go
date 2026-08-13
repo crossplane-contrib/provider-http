@@ -29,9 +29,22 @@ var _ interfaces.MappedHTTPRequestSpec = (*RequestParameters)(nil)
 // Ensure RequestParameters implements ResponseCheckAware
 var _ interfaces.ResponseCheckAware = (*RequestParameters)(nil)
 
+// Ensure RequestParameters implements RequestSchedulingAware
+var _ interfaces.RequestSchedulingAware = (*RequestParameters)(nil)
+
 // GetWaitTimeout returns the maximum time duration for waiting.
 func (r *RequestParameters) GetWaitTimeout() *metav1.Duration {
 	return r.WaitTimeout
+}
+
+// GetPollInterval returns the resource-specific polling interval.
+func (r *RequestParameters) GetPollInterval() *metav1.Duration {
+	return r.PollInterval
+}
+
+// GetPollJitter returns the deterministic polling jitter window.
+func (r *RequestParameters) GetPollJitter() *metav1.Duration {
+	return r.PollJitter
 }
 
 // GetInsecureSkipTLSVerify returns whether to skip TLS certificate verification.
@@ -182,6 +195,26 @@ func (r *Request) GetFailed() int32 {
 // GetRequestDetails returns the request details mapping.
 func (r *Request) GetRequestDetails() interfaces.HTTPMapping {
 	return &r.Status.RequestDetails
+}
+
+// GetLastRequestTime returns when the most recent external request was sent.
+func (r *Request) GetLastRequestTime() *metav1.Time {
+	return r.Status.LastRequestTime
+}
+
+// GetNextPollTime returns when the next periodic observation becomes due.
+func (r *Request) GetNextPollTime() *metav1.Time {
+	return r.Status.NextPollTime
+}
+
+// GetRateLimitUntil returns when external requests are permitted after a 429.
+func (r *Request) GetRateLimitUntil() *metav1.Time {
+	return r.Status.RateLimitUntil
+}
+
+// GetObservedDesiredStateHash returns the desired state evaluated by the last external request.
+func (r *Request) GetObservedDesiredStateHash() string {
+	return r.Status.ObservedDesiredStateHash
 }
 
 // Ensure Request implements RequestResource

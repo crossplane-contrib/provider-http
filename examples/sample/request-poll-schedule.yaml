@@ -1,0 +1,24 @@
+apiVersion: http.crossplane.io/v1alpha2
+kind: Request
+metadata:
+  name: scheduled-observation
+  annotations:
+    # Change this value to prompt an observation before the periodic deadline.
+    example.org/reconcile-at: "2026-08-12T18:00:00Z"
+spec:
+  forProvider:
+    pollInterval: 24h
+    pollJitter: 1h
+    payload:
+      baseUrl: https://httpbin.org/get
+    mappings:
+      - action: OBSERVE
+        url: .payload.baseUrl
+    expectedResponseCheck:
+      type: CUSTOM
+      logic: '(.response.statusCode == 200)'
+    isRemovedCheck:
+      type: CUSTOM
+      logic: "false"
+  providerConfigRef:
+    name: default

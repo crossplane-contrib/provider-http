@@ -3,6 +3,8 @@ package utils
 import (
 	"context"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	"github.com/crossplane-contrib/provider-http/apis/interfaces"
 	httpClient "github.com/crossplane-contrib/provider-http/internal/clients/http"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -91,6 +93,38 @@ func (rr *RequestResource) ResetFailures() SetRequestStatusFunc {
 	return func() {
 		if resetter, ok := rr.StatusWriter.(interfaces.RequestStatusWriter); ok {
 			resetter.ResetFailures()
+		}
+	}
+}
+
+func (rr *RequestResource) SetLastRequestTime(t *metav1.Time) SetRequestStatusFunc {
+	return func() {
+		if writer, ok := rr.StatusWriter.(interfaces.RequestStatusWriter); ok {
+			writer.SetLastRequestTime(t)
+		}
+	}
+}
+
+func (rr *RequestResource) SetNextPollTime(t *metav1.Time) SetRequestStatusFunc {
+	return func() {
+		if writer, ok := rr.StatusWriter.(interfaces.RequestStatusWriter); ok {
+			writer.SetNextPollTime(t)
+		}
+	}
+}
+
+func (rr *RequestResource) SetRateLimitUntil(t *metav1.Time) SetRequestStatusFunc {
+	return func() {
+		if writer, ok := rr.StatusWriter.(interfaces.RequestStatusWriter); ok {
+			writer.SetRateLimitUntil(t)
+		}
+	}
+}
+
+func (rr *RequestResource) SetObservedDesiredStateHash(hash string) SetRequestStatusFunc {
+	return func() {
+		if writer, ok := rr.StatusWriter.(interfaces.RequestStatusWriter); ok {
+			writer.SetObservedDesiredStateHash(hash)
 		}
 	}
 }

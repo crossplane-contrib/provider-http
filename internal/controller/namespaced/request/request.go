@@ -23,6 +23,7 @@ import (
 	"github.com/crossplane/crossplane-runtime/v2/pkg/feature"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/logging"
 	"github.com/pkg/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -38,6 +39,7 @@ import (
 	"github.com/crossplane-contrib/provider-http/apis/namespaced/request/v1alpha2"
 	apisv1alpha2 "github.com/crossplane-contrib/provider-http/apis/namespaced/v1alpha2"
 	httpClient "github.com/crossplane-contrib/provider-http/internal/clients/http"
+	"github.com/crossplane-contrib/provider-http/internal/requestschedule"
 	"github.com/crossplane-contrib/provider-http/internal/service"
 	"github.com/crossplane-contrib/provider-http/internal/service/request"
 	"github.com/crossplane-contrib/provider-http/internal/service/request/observe"
@@ -68,9 +70,11 @@ func Setup(mgr ctrl.Manager, o controller.Options, timeout time.Duration) error 
 			kube:            mgr.GetClient(),
 			usage:           resource.NewProviderConfigUsageTracker(mgr.GetClient(), &apisv1alpha2.ProviderConfigUsage{}),
 			newHttpClientFn: httpClient.NewClient,
+			pollInterval:    o.PollInterval,
 		}),
 		managed.WithLogger(o.Logger.WithValues("controller", name)),
 		managed.WithPollInterval(o.PollInterval),
+		managed.WithPollIntervalHook(customPollIntervalHook),
 		managed.WithTimeout(timeout),
 		managed.WithRecorder(event.NewAPIRecorder(mgr.GetEventRecorderFor(name))),
 	}
@@ -99,6 +103,7 @@ type connector struct {
 	kube            client.Client
 	usage           *resource.ProviderConfigUsageTracker
 	newHttpClientFn func(log logging.Logger, timeout time.Duration, creds string) (httpClient.Client, error)
+	pollInterval    time.Duration
 }
 
 // Connect creates a new external client using the provider config.
@@ -183,6 +188,7 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 		logger:        l,
 		http:          h,
 		tlsConfigData: tlsConfigData,
+		pollInterval:  c.pollInterval,
 	}, nil
 }
 
@@ -193,12 +199,24 @@ type external struct {
 	logger        logging.Logger
 	http          httpClient.Client
 	tlsConfigData *httpClient.TLSConfigData
+	pollInterval  time.Duration
 }
 
+// Observe checks and schedules external Request state.
+//
+//gocyclo:ignore
 func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
 	cr, ok := mg.(*v1alpha2.Request)
 	if !ok {
 		return managed.ExternalObservation{}, errors.New(errNotRequest)
+	}
+
+	desiredHash, err := requestschedule.DesiredStateHash(cr)
+	if err != nil {
+		return managed.ExternalObservation{}, errors.Wrap(err, "cannot hash request desired state")
+	}
+	if decision := requestschedule.Evaluate(time.Now(), desiredHash, cr); !decision.AllowHTTP {
+		return managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: true}, nil
 	}
 
 	svcCtx := service.NewServiceContext(ctx, c.localKube, c.logger, c.http, c.tlsConfigData)
@@ -220,9 +238,26 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	}
 
 	synced := observeRequestDetails.Synced
-	if synced {
-		statusHandler.ResetFailures()
+	now := time.Now().UTC()
+	lastRequest := metav1.NewTime(now)
+	var nextPoll, rateLimitUntil *metav1.Time
+	if observeRequestDetails.Details.HttpResponse.StatusCode == 429 {
+		// A rate-limited observation must not be followed by Update in the same
+		// managed reconcile. Treat it as temporarily up to date and retry after
+		// the persisted server-directed deadline.
+		synced = true
+		deadline, _ := requestschedule.RateLimitDeadline(now, observeRequestDetails.Details.HttpResponse.Headers, cr.Status.Failed+1, cr)
+		value := metav1.NewTime(deadline)
+		rateLimitUntil = &value
+	} else {
+		deadline := requestschedule.NextPollTime(now, cr, &cr.Spec.ForProvider, c.pollInterval)
+		value := metav1.NewTime(deadline)
+		nextPoll = &value
+		if synced {
+			statusHandler.ResetFailures()
+		}
 	}
+	statusHandler.SetScheduling(&lastRequest, nextPoll, rateLimitUntil, desiredHash)
 
 	cr.Status.SetConditions(xpv2.Available())
 	err = statusHandler.SetRequestStatus()
@@ -288,4 +323,19 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 // Disconnect does nothing. It never returns an error.
 func (c *external) Disconnect(_ context.Context) error {
 	return nil
+}
+
+func customPollIntervalHook(mg resource.Managed, defaultInterval time.Duration) time.Duration {
+	cr, ok := mg.(*v1alpha2.Request)
+	if !ok {
+		return defaultInterval
+	}
+	now := time.Now()
+	if cr.Status.RateLimitUntil != nil && now.Before(cr.Status.RateLimitUntil.Time) {
+		return cr.Status.RateLimitUntil.Sub(now)
+	}
+	if cr.Status.NextPollTime != nil && now.Before(cr.Status.NextPollTime.Time) {
+		return cr.Status.NextPollTime.Sub(now)
+	}
+	return requestschedule.EffectiveInterval(&cr.Spec.ForProvider, defaultInterval)
 }

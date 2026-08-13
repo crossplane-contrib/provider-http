@@ -1,7 +1,12 @@
 package request
 
 import (
+	"time"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	datapatcher "github.com/crossplane-contrib/provider-http/internal/data-patcher"
+	"github.com/crossplane-contrib/provider-http/internal/requestschedule"
 	"github.com/crossplane-contrib/provider-http/internal/service"
 	"github.com/crossplane-contrib/provider-http/internal/service/request/requestgen"
 	"github.com/crossplane-contrib/provider-http/internal/service/request/requestmapping"
@@ -37,6 +42,20 @@ func DeployAction(svcCtx *service.ServiceContext, crCtx *service.RequestCRContex
 	statusHandler, err := statushandler.NewStatusHandler(svcCtx, crCtx, details, sendErr)
 	if err != nil {
 		return err
+	}
+
+	// Persist rate-limit deferral for create and update actions too, so the next
+	// managed reconcile cannot immediately repeat a server-throttled request.
+	if details.HttpResponse.StatusCode == 429 {
+		now := time.Now().UTC()
+		lastRequest := metav1.NewTime(now)
+		deadline, _ := requestschedule.RateLimitDeadline(now, details.HttpResponse.Headers, crCtx.Status().GetFailed()+1, crCtx.GetCR())
+		rateLimitUntil := metav1.NewTime(deadline)
+		desiredHash, hashErr := requestschedule.DesiredStateHash(crCtx.GetCR())
+		if hashErr != nil {
+			return hashErr
+		}
+		statusHandler.SetScheduling(&lastRequest, nil, &rateLimitUntil, desiredHash)
 	}
 
 	return statusHandler.SetRequestStatus()

@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"strconv"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	"github.com/crossplane-contrib/provider-http/apis/interfaces"
 	httpClient "github.com/crossplane-contrib/provider-http/internal/clients/http"
 	"github.com/crossplane-contrib/provider-http/internal/service"
@@ -18,6 +20,7 @@ import (
 type RequestStatusHandler interface {
 	SetRequestStatus() error
 	ResetFailures()
+	SetScheduling(lastRequest, nextPoll, rateLimitUntil *metav1.Time, desiredStateHash string)
 }
 
 // requestStatusHandler sets the request status.
@@ -117,6 +120,19 @@ func (r *requestStatusHandler) ResetFailures() {
 	}
 
 	*r.extraSetters = append(*r.extraSetters, r.resource.ResetFailures())
+}
+
+// SetScheduling records durable scheduling state with the HTTP response status update.
+func (r *requestStatusHandler) SetScheduling(lastRequest, nextPoll, rateLimitUntil *metav1.Time, desiredStateHash string) {
+	if r.extraSetters == nil {
+		r.extraSetters = &[]utils.SetRequestStatusFunc{}
+	}
+	*r.extraSetters = append(*r.extraSetters,
+		r.resource.SetLastRequestTime(lastRequest),
+		r.resource.SetNextPollTime(nextPoll),
+		r.resource.SetRateLimitUntil(rateLimitUntil),
+		r.resource.SetObservedDesiredStateHash(desiredStateHash),
+	)
 }
 
 // NewStatusHandler returns a new Request statusHandler

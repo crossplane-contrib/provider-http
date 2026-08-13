@@ -70,10 +70,15 @@ func IsUpToDate(svcCtx *service.ServiceContext, crCtx *service.RequestCRContext)
 	details, responseErr := svcCtx.HTTP.SendRequest(svcCtx.Ctx, requestmapping.GetEffectiveMethod(mapping), requestDetails.Url, requestDetails.Body, requestDetails.Headers, svcCtx.TLSConfigData)
 	// The initial observation of an object requires a successful HTTP response
 	// to be considered existing.
-	if !utils.IsHTTPSuccess(details.HttpResponse.StatusCode) && objectNotCreated {
+	if details.HttpResponse.StatusCode != http.StatusTooManyRequests && !utils.IsHTTPSuccess(details.HttpResponse.StatusCode) && objectNotCreated {
 		// Cannot confirm existence of the resource, jumping to the default
 		// behavior of creating before observing.
 		return FailedObserve(), errors.New(observe.ErrObjectNotFound)
+	}
+	if details.HttpResponse.StatusCode == http.StatusTooManyRequests {
+		// Return the complete response to the controller so it can persist the
+		// server-directed deferral without evaluating JSON/JQ drift checks.
+		return NewObserve(details, responseErr, true), nil
 	}
 	if err := determineIfRemoved(svcCtx, crCtx, details, responseErr); err != nil {
 		return FailedObserve(), err

@@ -125,6 +125,15 @@ type ResponseCheck interface {
 	GetLogic() string
 }
 
+// RequestSchedulingAware indicates that a Request supports resource-specific polling.
+type RequestSchedulingAware interface {
+	// GetPollInterval returns the resource-specific polling interval.
+	GetPollInterval() *metav1.Duration
+
+	// GetPollJitter returns the deterministic polling jitter window.
+	GetPollJitter() *metav1.Duration
+}
+
 // ReconciliationPolicyAware indicates that a spec supports custom reconciliation policies.
 // This is a v1alpha2 DisposableRequest-specific feature.
 type ReconciliationPolicyAware interface {
@@ -221,6 +230,18 @@ type RequestStatusReader interface {
 
 	// GetRequestDetails returns the request details mapping.
 	GetRequestDetails() HTTPMapping
+
+	// GetLastRequestTime returns when the most recent external request was sent.
+	GetLastRequestTime() *metav1.Time
+
+	// GetNextPollTime returns when the next periodic observation becomes due.
+	GetNextPollTime() *metav1.Time
+
+	// GetRateLimitUntil returns when external requests are permitted after a 429.
+	GetRateLimitUntil() *metav1.Time
+
+	// GetObservedDesiredStateHash returns the desired state evaluated by the last external request.
+	GetObservedDesiredStateHash() string
 }
 
 // RequestStatusWriter provides write access to Request status fields.
@@ -232,6 +253,18 @@ type RequestStatusWriter interface {
 
 	// ResetFailures resets the failure count.
 	ResetFailures()
+
+	// SetLastRequestTime records when the most recent external request was sent.
+	SetLastRequestTime(t *metav1.Time)
+
+	// SetNextPollTime records when the next periodic observation becomes due.
+	SetNextPollTime(t *metav1.Time)
+
+	// SetRateLimitUntil records or clears the active HTTP rate-limit deadline.
+	SetRateLimitUntil(t *metav1.Time)
+
+	// SetObservedDesiredStateHash records the desired state evaluated by the external request.
+	SetObservedDesiredStateHash(hash string)
 }
 
 // RequestStatus combines read and write access to Request status.

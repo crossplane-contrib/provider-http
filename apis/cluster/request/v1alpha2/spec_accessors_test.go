@@ -11,6 +11,8 @@ import (
 
 func TestRequestParameters_Accessors(t *testing.T) {
 	timeout := &metav1.Duration{Duration: 5 * time.Minute}
+	pollInterval := &metav1.Duration{Duration: 24 * time.Hour}
+	pollJitter := &metav1.Duration{Duration: time.Hour}
 	headers := map[string][]string{
 		"Content-Type": {"application/json"},
 	}
@@ -25,6 +27,8 @@ func TestRequestParameters_Accessors(t *testing.T) {
 
 	params := &RequestParameters{
 		WaitTimeout:            timeout,
+		PollInterval:           pollInterval,
+		PollJitter:             pollJitter,
 		InsecureSkipTLSVerify:  true,
 		Headers:                headers,
 		SecretInjectionConfigs: secretConfigs,
@@ -51,6 +55,12 @@ func TestRequestParameters_Accessors(t *testing.T) {
 
 	if got := params.GetWaitTimeout(); got != timeout {
 		t.Errorf("GetWaitTimeout() = %v, want %v", got, timeout)
+	}
+	if got := params.GetPollInterval(); got != pollInterval {
+		t.Errorf("GetPollInterval() = %v, want %v", got, pollInterval)
+	}
+	if got := params.GetPollJitter(); got != pollJitter {
+		t.Errorf("GetPollJitter() = %v, want %v", got, pollJitter)
 	}
 
 	if got := params.GetInsecureSkipTLSVerify(); got != true {
@@ -209,6 +219,9 @@ func TestRequest_CachedResponse(t *testing.T) {
 }
 
 func TestRequest_StatusReader(t *testing.T) {
+	lastRequestTime := metav1.NewTime(time.Now().Add(-time.Hour))
+	nextPollTime := metav1.NewTime(time.Now().Add(time.Hour))
+	rateLimitUntil := metav1.NewTime(time.Now().Add(time.Minute))
 	req := &Request{
 		Status: RequestStatus{
 			Response: Response{
@@ -220,6 +233,10 @@ func TestRequest_StatusReader(t *testing.T) {
 				Method: "POST",
 				URL:    "https://example.com",
 			},
+			LastRequestTime:          &lastRequestTime,
+			NextPollTime:             &nextPollTime,
+			RateLimitUntil:           &rateLimitUntil,
+			ObservedDesiredStateHash: "sha256:test",
 		},
 	}
 
@@ -241,6 +258,48 @@ func TestRequest_StatusReader(t *testing.T) {
 	}
 	if details.GetMethod() != "POST" {
 		t.Errorf("RequestDetails Method = %v, want POST", details.GetMethod())
+	}
+	if req.GetLastRequestTime() != &lastRequestTime {
+		t.Error("GetLastRequestTime() did not return status value")
+	}
+	if req.GetNextPollTime() != &nextPollTime {
+		t.Error("GetNextPollTime() did not return status value")
+	}
+	if req.GetRateLimitUntil() != &rateLimitUntil {
+		t.Error("GetRateLimitUntil() did not return status value")
+	}
+	if got := req.GetObservedDesiredStateHash(); got != "sha256:test" {
+		t.Errorf("GetObservedDesiredStateHash() = %q, want sha256:test", got)
+	}
+}
+
+func TestRequest_SchedulingDefaultsAndSetters(t *testing.T) {
+	params := &RequestParameters{}
+	if params.GetPollInterval() != nil {
+		t.Error("GetPollInterval() = non-nil, want nil global fallback")
+	}
+	if params.GetPollJitter() != nil {
+		t.Error("GetPollJitter() = non-nil, want nil")
+	}
+
+	req := &Request{}
+	lastRequestTime := metav1.NewTime(time.Now())
+	nextPollTime := metav1.NewTime(time.Now().Add(time.Hour))
+	rateLimitUntil := metav1.NewTime(time.Now().Add(time.Minute))
+	req.SetLastRequestTime(&lastRequestTime)
+	req.SetNextPollTime(&nextPollTime)
+	req.SetRateLimitUntil(&rateLimitUntil)
+	req.SetObservedDesiredStateHash("sha256:test")
+
+	if req.Status.LastRequestTime != &lastRequestTime || req.Status.NextPollTime != &nextPollTime || req.Status.RateLimitUntil != &rateLimitUntil {
+		t.Error("schedule timestamp setters did not update status")
+	}
+	if req.Status.ObservedDesiredStateHash != "sha256:test" {
+		t.Errorf("ObservedDesiredStateHash = %q, want sha256:test", req.Status.ObservedDesiredStateHash)
+	}
+	req.SetRateLimitUntil(nil)
+	if req.Status.RateLimitUntil != nil {
+		t.Error("SetRateLimitUntil(nil) did not clear status")
 	}
 }
 

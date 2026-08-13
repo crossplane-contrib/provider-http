@@ -166,6 +166,16 @@ spec:
                           body.
                         type: string
                     type: object
+                  pollInterval:
+                    description: |-
+                      PollInterval specifies how often this Request is checked for external drift.
+                      When omitted, the provider's global poll interval is used.
+                    type: string
+                  pollJitter:
+                    description: |-
+                      PollJitter specifies a deterministic non-negative delay added to PollInterval.
+                      PollJitter requires PollInterval.
+                    type: string
                   secretInjectionConfigs:
                     description: SecretInjectionConfig specifies the secrets receiving
                       patches for response data.
@@ -345,6 +355,13 @@ spec:
                 x-kubernetes-validations:
                 - message: insecureSkipTLSVerify and tlsConfig are mutually exclusive
                   rule: '!(self.insecureSkipTLSVerify == true && has(self.tlsConfig))'
+                - message: pollInterval must be greater than zero
+                  rule: '!has(self.pollInterval) || duration(self.pollInterval) >
+                    duration(''0s'')'
+                - message: pollJitter requires pollInterval
+                  rule: '!has(self.pollJitter) || has(self.pollInterval)'
+                - message: pollJitter must not be negative
+                  rule: '!has(self.pollJitter) || duration(self.pollJitter) >= duration(''0s'')'
               managementPolicies:
                 default:
                 - '*'
@@ -484,6 +501,20 @@ spec:
                   processed. Users can compare this to the annotation to determine
                   whether a reconcile request has been handled.
                 type: string
+              lastRequestTime:
+                description: LastRequestTime records when the most recent external
+                  HTTP request was sent.
+                format: date-time
+                type: string
+              nextPollTime:
+                description: NextPollTime records when the next periodic external
+                  observation becomes due.
+                format: date-time
+                type: string
+              observedDesiredStateHash:
+                description: ObservedDesiredStateHash identifies the desired state
+                  evaluated by the most recent external HTTP request.
+                type: string
               observedGeneration:
                 description: |-
                   ObservedGeneration is the latest metadata.generation
@@ -491,6 +522,11 @@ spec:
                   it can not recover from without human intervention.
                 format: int64
                 type: integer
+              rateLimitUntil:
+                description: RateLimitUntil records the earliest time another external
+                  HTTP request is permitted after a 429 response.
+                format: date-time
+                type: string
               requestDetails:
                 properties:
                   action:

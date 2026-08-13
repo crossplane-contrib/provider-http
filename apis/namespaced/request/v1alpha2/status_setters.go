@@ -1,6 +1,10 @@
 package v1alpha2
 
-import "time"
+import (
+	"time"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
 
 func (d *Request) SetStatusCode(statusCode int) {
 	d.Status.Response.StatusCode = statusCode
@@ -38,4 +42,20 @@ func (d *Request) SetCache(statusCode int, headers map[string][]string, body str
 	d.Status.Cache.Response.Headers = headers
 	d.Status.Cache.Response.Body = body
 	d.Status.Cache.LastUpdated = time.Now().UTC().Format(time.RFC3339)
+}
+
+func (d *Request) SetLastRequestTime(t *metav1.Time) {
+	d.Status.LastRequestTime = t
+}
+
+func (d *Request) SetNextPollTime(t *metav1.Time) {
+	d.Status.NextPollTime = t
+}
+
+func (d *Request) SetRateLimitUntil(t *metav1.Time) {
+	d.Status.RateLimitUntil = t
+}
+
+func (d *Request) SetObservedDesiredStateHash(hash string) {
+	d.Status.ObservedDesiredStateHash = hash
 }
