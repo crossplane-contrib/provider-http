@@ -2,6 +2,7 @@ package datapatcher
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/crossplane-contrib/provider-http/apis/common"
@@ -89,6 +90,7 @@ func TestPatchSecretsIntoBody(t *testing.T) {
 		})
 	}
 }
+
 func TestPatchSecretsIntoHeaders(t *testing.T) {
 	type args struct {
 		ctx       context.Context
@@ -194,6 +196,116 @@ func TestPatchSecretsIntoHeaders(t *testing.T) {
 			}
 			if diff := cmp.Diff(tc.want.result, got); diff != "" {
 				t.Errorf("isUpToDate(...): -want result, +got result: %s", diff)
+			}
+		})
+	}
+}
+
+func TestApplyResponseDataToSecretsIgnoresPlaceholder(t *testing.T) {
+	type want struct {
+		secretData  []byte
+		updateCount int
+	}
+
+	const (
+		secretName      = "test-secret"
+		secretNamespace = "default"
+		secretKey       = "secret"
+		placeholder     = "{{test-secret:default:secret}}"
+	)
+
+	mockCR := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-cr",
+			Namespace: secretNamespace,
+		},
+	}
+
+	cases := map[string]struct {
+		responseValue string
+		want          want
+	}{
+		"UpdatesSecretWhenValueIsNotPlaceholder": {
+			responseValue: "secret-value",
+			want: want{
+				secretData:  []byte("secret-value"),
+				updateCount: 1,
+			},
+		},
+		"DoesNotUpdateSecretWhenValueIsPlaceholder": {
+			responseValue: placeholder,
+			want: want{
+				secretData:  nil,
+				updateCount: 0,
+			},
+		},
+	}
+
+	for name, tc := range cases {
+		tc := tc
+
+		t.Run(name, func(t *testing.T) {
+			var updatedSecretData []byte
+			updateCount := 0
+
+			localKube := &test.MockClient{
+				MockGet: func(ctx context.Context, key client.ObjectKey, obj client.Object) error {
+					secret, ok := obj.(*corev1.Secret)
+					if !ok {
+						return errors.New("object is not a Secret")
+					}
+
+					*secret = *createSpecificSecret(secretName, secretNamespace, "key", "value")
+					return nil
+				},
+				MockUpdate: func(ctx context.Context, obj client.Object, opts ...client.UpdateOption) error {
+					secret, ok := obj.(*corev1.Secret)
+					if !ok {
+						return errors.New("object is not a Secret")
+					}
+
+					updateCount++
+					updatedSecretData = secret.Data[secretKey]
+					return nil
+				},
+			}
+
+			response := &httpClient.HttpResponse{
+				StatusCode: 200,
+				Body:       fmt.Sprintf(`{"secret": %q}`, tc.responseValue),
+				Headers:    map[string][]string{"Content-Type": {"application/json"}},
+			}
+
+			secretConfigs := []common.SecretInjectionConfig{
+				{
+					SecretRef: common.SecretRef{
+						Name:      secretName,
+						Namespace: secretNamespace,
+					},
+					KeyMappings: []common.KeyInjection{
+						{
+							SecretKey:  secretKey,
+							ResponseJQ: ".body.secret",
+						},
+					},
+				},
+			}
+
+			ApplyResponseDataToSecrets(
+				context.Background(),
+				localKube,
+				logging.NewNopLogger(),
+				response,
+				secretConfigs,
+				mockCR,
+			)
+
+			if diff := cmp.Diff(tc.want.updateCount, updateCount); diff != "" {
+				t.Errorf("update count mismatch (-want, +got):\n%s", diff)
+			}
+
+			if diff := cmp.Diff(tc.want.secretData, updatedSecretData); diff != "" {
+				t.Errorf("secret data mismatch (-want, +got):\n%s", diff)
 			}
 		})
 	}
