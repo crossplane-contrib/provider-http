@@ -67,6 +67,12 @@ func updateSecretWithPatchedValue(ctx context.Context, kubeClient client.Client,
 
 	// Step 2: Extract the value to patch
 	valueToPatch := extractValueToPatch(logger, dataMap, mapping.ResponseJQ)
+	placeholder := placeholder(secret, mapping.SecretKey)
+
+	// Check for already replaced value
+	if valueToPatch != nil && *valueToPatch == placeholder {
+		return nil
+	}
 
 	// Step 3: Update the secret data based on the missing strategy.
 	updateSecretData(secret, mapping.SecretKey, valueToPatch, mapping.MissingFieldStrategy)
@@ -166,6 +172,11 @@ func updateSecretData(secret *corev1.Secret, secretKey string, valueToPatch *str
 	}
 }
 
+// placeholder returns the string used as a placeholder in the stored response.
+func placeholder(secret *corev1.Secret, secretKey string) string {
+	return fmt.Sprintf("{{%s:%s:%s}}", secret.Name, secret.Namespace, secretKey)
+}
+
 // replaceSensitiveValues replaces occurrences of sensitive values in the HTTP response body
 // and headers with a placeholder. Handles both simple values (quoted strings) and JSON objects.
 func replaceSensitiveValues(data *httpClient.HttpResponse, secret *corev1.Secret, secretKey string, valueToPatch *string) {
@@ -173,7 +184,7 @@ func replaceSensitiveValues(data *httpClient.HttpResponse, secret *corev1.Secret
 		return
 	}
 
-	placeholder := fmt.Sprintf("{{%s:%s:%s}}", secret.Name, secret.Namespace, secretKey)
+	placeholder := placeholder(secret, secretKey)
 
 	// For JSON objects, replace the entire JSON object in the response.
 	// valueToPatch is produced by json.Marshal which sorts keys alphabetically,
