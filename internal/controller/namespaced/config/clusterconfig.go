@@ -34,10 +34,12 @@ import (
 func SetupCluster(mgr ctrl.Manager, o controller.Options, timeout time.Duration) error {
 	name := providerconfig.ControllerName(v1alpha2.ClusterProviderConfigGroupKind)
 
+	// Every MR in this provider is namespaced, so its usage record is always a namespaced
+	// ProviderConfigUsage, even when it refers to a ClusterProviderConfig.
 	of := resource.ProviderConfigKinds{
 		Config:    v1alpha2.ClusterProviderConfigGroupVersionKind,
-		Usage:     v1alpha2.ClusterProviderConfigUsageGroupVersionKind,
-		UsageList: v1alpha2.ClusterProviderConfigUsageListGroupVersionKind,
+		Usage:     v1alpha2.ProviderConfigUsageGroupVersionKind,
+		UsageList: v1alpha2.ProviderConfigUsageListGroupVersionKind,
 	}
 
 	r := providerconfig.NewReconciler(mgr, of,
@@ -48,6 +50,6 @@ func SetupCluster(mgr ctrl.Manager, o controller.Options, timeout time.Duration)
 		Named(name).
 		WithOptions(o.ForControllerRuntime()).
 		For(&v1alpha2.ClusterProviderConfig{}).
-		Watches(&v1alpha2.ClusterProviderConfigUsage{}, &resource.EnqueueRequestForProviderConfig{}).
+		Watches(&v1alpha2.ProviderConfigUsage{}, &resource.EnqueueRequestForProviderConfig{}).
 		Complete(ratelimiter.NewReconciler(name, r, o.GlobalRateLimiter))
 }
